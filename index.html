@@ -32,8 +32,8 @@
 
   <div class="card">
     <b>1. 데이터 넣기</b>
-    <div class="hint">탭으로 구분된 표 텍스트를 붙여넣거나, Excel/CSV/TXT 파일을 불러와. '한글 / 영어' 행은 자동으로 제외돼.</div>
-    <textarea id="inputText" placeholder="한글<Tab>영어 형태로 붙여넣기"></textarea>
+    <div class="hint">탭 또는 엔터로 구분된 한글/영어 문장을 붙여넣거나, Excel/CSV/TXT 파일을 불러와. '한글 / 영어' 행은 자동으로 제외돼.</div>
+    <textarea id="inputText" placeholder="한글<Tab>영어 또는 한글<Enter>영어 형태로 붙여넣기"></textarea>
     <div class="row">
       <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.txt" />
       <button onclick="parseText()">표 생성</button>
@@ -71,8 +71,8 @@
       <label>한글/영어 사이 쉬기 <input id="pairGapSec" type="number" min="0" step="0.1" value="5" style="width:70px"> 초</label>
       <label>문장 사이 쉬기 <input id="gapSec" type="number" min="0" step="0.1" value="1.0" style="width:70px"> 초</label>
       <label><input id="pythonRandom" type="checkbox"> Python 랜덤 순서</label>
-      <label>한글 속도 <input id="koRate" type="number" min="0.5" max="2" step="0.1" value="1.5" style="width:70px"></label>
-      <label>영어 속도 <input id="enRate" type="number" min="0.5" max="2" step="0.1" value="0.9" style="width:70px"></label>
+      <label>한글 속도 <input id="koRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label>
+      <label>영어 속도 <input id="enRate" type="number" min="0.5" max="2" step="0.1" value="1.0" style="width:70px"></label>
       <label>파일명 <input id="baseName" value="opic_practice" style="width:150px"></label>
     </div>
     <div class="hint">Python 코드는 edge-tts만 사용해. 문장별 생성은 001_ko.mp3 / 001_en.mp3, 한글/영어 한 파일 코드는 ko.mp3 또는 en.mp3 하나로 만들어.</div>
@@ -95,8 +95,27 @@
 </div>
 
 <script>
-let rows=[]; let speaking=false; let loopOne=false; let paused=false; let currentIndex=0; let currentPythonMode='both';
+let rows=[]; let speaking=false; let loopOne=false; let paused=false; let currentIndex=0; let currentPythonMode='both'; let playToken=0;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+function sleepWithToken(ms,token){
+ return new Promise(resolve=>{
+   const start=Date.now();
+   const tick=()=>{
+     if(token!==playToken || !speaking){
+       resolve(false);
+       return;
+     }
+     const remain=ms-(Date.now()-start);
+     if(remain<=0){
+       resolve(true);
+       return;
+     }
+     setTimeout(tick, Math.min(100, remain));
+   };
+   tick();
+ });
+}
 
 function isHeader(ko,en){return ko.trim()==='한글' && en.trim()==='영어';}
 function loadSample(){
@@ -114,12 +133,20 @@ function clearAll(){rows=[];document.getElementById('inputText').value='';render
 function parseText(){
  const text=document.getElementById('inputText').value.trim();
  if(!text){alert('데이터를 먼저 넣어줘.');return;}
- const lines=text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+
+ // 탭과 엔터를 모두 "한 번 끊기"로 보고,
+ // 순서대로 2개씩 묶어서 한글/영어 쌍을 만든다.
+ const parts=text
+   .replace(/\r\n/g,'\n')
+   .replace(/\t/g,'\n')
+   .split(/\n+/)
+   .map(x=>x.trim())
+   .filter(Boolean);
+
  rows=[];
- for(const line of lines){
-   let parts=line.split('\t');
-   if(parts.length<2) parts=line.split(/ {2,}|,/);
-   const ko=(parts[0]||'').trim(); const en=(parts[1]||'').trim();
+ for(let i=0;i<parts.length;i+=2){
+   const ko=(parts[i]||'').trim();
+   const en=(parts[i+1]||'').trim();
    if(!ko||!en) continue;
    if(isHeader(ko,en)) continue;
    rows.push({ko,en,done:false});
@@ -141,34 +168,173 @@ function renderTable(){
 }
 function escapeHtml(s){return String(s).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 function getVoice(lang){const voices=speechSynthesis.getVoices(); return voices.find(v=>v.lang.toLowerCase().startsWith(lang))||null;}
-function speakText(text,lang,rate){
+function speakText(text,lang,rate,token){
  return new Promise(resolve=>{
-  if(!text){resolve();return;}
-  const u=new SpeechSynthesisUtterance(text); u.lang=lang==='ko'?'ko-KR':'en-US'; u.rate=Number(rate)||1;
-  const v=getVoice(lang); if(v) u.voice=v;
-  u.onend=resolve; u.onerror=resolve; speechSynthesis.speak(u);
+  if(!text || token!==playToken || !speaking){
+    resolve(false);
+    return;
+  }
+
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang=lang==='ko'?'ko-KR':'en-US';
+  u.rate=Number(rate)||1;
+
+  const v=getVoice(lang);
+  if(v) u.voice=v;
+
+  let finished=false;
+
+  const finish=(ok=true)=>{
+    if(finished) return;
+    finished=true;
+    resolve(ok);
+  };
+
+  u.onend=()=>finish(true);
+  u.onerror=()=>finish(false);
+
+  speechSynthesis.speak(u);
+
+  // 일부 브라우저에서 cancel 후 onend가 늦거나 안 오는 경우 대비
+  const watcher=setInterval(()=>{
+    if(finished){
+      clearInterval(watcher);
+      return;
+    }
+    if(token!==playToken || !speaking){
+      clearInterval(watcher);
+      finish(false);
+    }
+  },100);
  });
 }
 function markActive(i){currentIndex=i; document.querySelectorAll('tr').forEach(x=>x.classList.remove('active')); const tr=document.getElementById('row'+i); if(tr){tr.classList.add('active');}}
 function clearActive(){document.querySelectorAll('tr').forEach(x=>x.classList.remove('active'));}
 function markDone(i){const tr=document.getElementById('row'+i); if(tr) tr.classList.add('done');}
-async function speakRow(i,mode){
- if(!rows[i])return; markActive(i);
- const r=rows[i]; const gap=Number(document.getElementById('pairGapSec').value||0)*1000;
- const koRate=document.getElementById('koRate').value; const enRate=document.getElementById('enRate').value;
- if(mode==='ko') await speakText(r.ko,'ko',koRate);
- else if(mode==='en') await speakText(r.en,'en',enRate);
- else if(document.getElementById('orderMode').value==='ko_en') { await speakText(r.ko,'ko',koRate); await sleep(gap); await speakText(r.en,'en',enRate); }
- else { await speakText(r.en,'en',enRate); await sleep(gap); await speakText(r.ko,'ko',koRate); }
+async function speakRow(i,mode,token){
+ if(token!==playToken || !rows[i]) return;
+ markActive(i);
+
+ const r=rows[i];
+ const gap=Number(document.getElementById('pairGapSec').value||0)*1000;
+ const koRate=document.getElementById('koRate').value;
+ const enRate=document.getElementById('enRate').value;
+
+ if(mode==='ko'){
+   await speakText(r.ko,'ko',koRate,token);
+ }
+ else if(mode==='en'){
+   await speakText(r.en,'en',enRate,token);
+ }
+ else if(document.getElementById('orderMode').value==='ko_en'){
+   await speakText(r.ko,'ko',koRate,token);
+   if(token!==playToken || !speaking) return;
+   const ok=await sleepWithToken(gap,token);
+   if(!ok || token!==playToken || !speaking) return;
+   await speakText(r.en,'en',enRate,token);
+ }
+ else{
+   await speakText(r.en,'en',enRate,token);
+   if(token!==playToken || !speaking) return;
+   const ok=await sleepWithToken(gap,token);
+   if(!ok || token!==playToken || !speaking) return;
+   await speakText(r.ko,'ko',koRate,token);
+ }
+
+ if(token!==playToken || !speaking) return;
  markDone(i);
 }
-async function readOne(i,mode){stopSpeak(); await sleep(100); speaking=true; paused=false; loopOne=false; await speakRow(i,mode); speaking=false;}
-async function repeatOne(i){stopSpeak(); await sleep(100); speaking=true; paused=false; loopOne=true; while(speaking&&loopOne){await speakRow(i,'both'); await sleep(500);} }
-async function readAll(mode){stopSpeak(); await sleep(100); speaking=true; paused=false; loopOne=false; const rep=Number(document.getElementById('repeatCount').value||1); const gap=Number(document.getElementById('gapSec').value||0)*1000; for(let k=0;k<rep;k++){for(let i=0;i<rows.length;i++){if(!speaking)return; await speakRow(i,mode); await sleep(gap);}} speaking=false;}
-async function readRandom(){stopSpeak(); await sleep(100); speaking=true; paused=false; loopOne=false; const rep=Number(document.getElementById('repeatCount').value||1); const gap=Number(document.getElementById('gapSec').value||0)*1000; for(let k=0;k<rep;k++){let arr=[...rows.keys()].sort(()=>Math.random()-0.5); for(const i of arr){if(!speaking)return; await speakRow(i,'both'); await sleep(gap);}} speaking=false;}
-function pauseSpeak(){if(speechSynthesis.speaking){paused=true; speechSynthesis.pause();}}
-function resumeSpeak(){if(paused){paused=false; speechSynthesis.resume();}}
-function stopSpeak(){speaking=false;loopOne=false;paused=false;currentIndex=0;speechSynthesis.cancel();clearActive(); const first=document.getElementById('row0'); if(first){first.classList.add('active');}}
+
+async function readOne(i,mode){
+ stopSpeak();
+ await sleep(150);
+ const token=++playToken;
+ speaking=true; paused=false; loopOne=false;
+ await speakRow(i,mode,token);
+ if(token===playToken) speaking=false;
+}
+
+async function repeatOne(i){
+ stopSpeak();
+ await sleep(150);
+ const token=++playToken;
+ speaking=true; paused=false; loopOne=true;
+
+ while(speaking && loopOne && token===playToken){
+   await speakRow(i,'both',token);
+   if(token!==playToken || !speaking) break;
+   await sleepWithToken(500,token);
+ }
+}
+
+async function readAll(mode){
+ stopSpeak();
+ await sleep(150);
+ const token=++playToken;
+ speaking=true; paused=false; loopOne=false;
+
+ const rep=Number(document.getElementById('repeatCount').value||1);
+ const gap=Number(document.getElementById('gapSec').value||0)*1000;
+
+ for(let k=0;k<rep;k++){
+   for(let i=0;i<rows.length;i++){
+     if(!speaking || token!==playToken) return;
+     await speakRow(i,mode,token);
+     if(!speaking || token!==playToken) return;
+     await sleepWithToken(gap,token);
+   }
+ }
+
+ if(token===playToken) speaking=false;
+}
+
+async function readRandom(){
+ stopSpeak();
+ await sleep(150);
+ const token=++playToken;
+ speaking=true; paused=false; loopOne=false;
+
+ const rep=Number(document.getElementById('repeatCount').value||1);
+ const gap=Number(document.getElementById('gapSec').value||0)*1000;
+
+ for(let k=0;k<rep;k++){
+   let arr=[...rows.keys()].sort(()=>Math.random()-0.5);
+   for(const i of arr){
+     if(!speaking || token!==playToken) return;
+     await speakRow(i,'both',token);
+     if(!speaking || token!==playToken) return;
+     await sleepWithToken(gap,token);
+   }
+ }
+
+ if(token===playToken) speaking=false;
+}
+
+function pauseSpeak(){
+ if(speechSynthesis.speaking && !speechSynthesis.paused){
+   paused=true;
+   speechSynthesis.pause();
+ }
+}
+
+function resumeSpeak(){
+ if(paused || speechSynthesis.paused){
+   paused=false;
+   speechSynthesis.resume();
+ }
+}
+
+function stopSpeak(){
+ playToken++;
+ speaking=false;
+ loopOne=false;
+ paused=false;
+ currentIndex=0;
+ speechSynthesis.cancel();
+ clearActive();
+ const first=document.getElementById('row0');
+ if(first){first.classList.add('active');}
+}
 
 document.getElementById('fileInput').addEventListener('change', async e=>{
  const file=e.target.files[0]; if(!file)return;
