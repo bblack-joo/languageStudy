@@ -55,8 +55,10 @@ tr.done{background:var(--success-tint)}
 .check-col{width:34px;text-align:center}
 .forget-check{width:18px;height:18px;accent-color:var(--filter)}
 .num{width:42px;text-align:center;color:var(--text-muted)}
-.actions{width:150px;white-space:nowrap}
-.actions button{white-space:nowrap;margin:2px}
+.actions{width:150px}
+.actions-col{display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start}
+.actions-col button{margin:0;white-space:nowrap}
+.actions-hidden{display:none!important}
 .kr{width:22%}
 .en{width:32%}
 pre{white-space:pre-wrap;background:#111;color:#e6e6e6;padding:12px;border-radius:10px;max-height:390px;overflow:auto;font-size:13px}
@@ -80,7 +82,12 @@ pre{white-space:pre-wrap;background:#111;color:#e6e6e6;padding:12px;border-radiu
 .practice-cell{width:32%;min-width:320px}
 .practice-input,.question-practice-input{width:100%;min-height:70px;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:14px;line-height:1.5;resize:vertical;background:#fff}
 .question-practice-input{min-height:58px}
-.important-text{color:var(--highlight)!important;font-weight:900}
+
+.important-text{
+    color:#B7410E  !important;
+    font-weight:normal;
+}
+
 .practice-tools{margin:8px 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .practice-cell.practice-hidden{display:none!important}
 .question-practice{margin-top:8px}
@@ -140,10 +147,10 @@ tr.only-forget-hidden{display:none!important}
 <div class="toolbar"><button id="practiceToggleBtn" class="green small" onclick="togglePracticeColumn(this)">✍ 연습칸 보이기</button><button id="forgetOnlyBtn" class="orange small" onclick="toggleForgetOnly(this)">☑ 안 외워진 것만 보기</button></div>
 <div class="toolbar-label">연습 관리</div>
 <div class="toolbar"><span class="hint" style="margin:0 4px 0 0">연습칸에 적어보며 외우기</span><button class="green small" onclick="copyPracticeColumn()">✍ 연습 복사</button><button class="gray small" onclick="clearCurrentPractice()">현재 표 연습 삭제</button><button class="red small" onclick="clearAllPractice()">전체 연습 삭제</button></div>
-<div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">✓</th><th class="num">번호</th><th class="kr">한글 <button class="green small" onclick="displayRow('ko', this)">숨기기</button><button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="green small" onclick="displayRow('en', this)">숨기기</button><button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="actions">기능</th><th class="practice-cell practice-hidden">✍ 연습</th></tr></thead><tbody></tbody></table></div>
+<div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">✓</th><th class="num">번호</th><th class="kr">한글 <button class="green small" onclick="displayRow('ko', this)">숨기기</button><button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="green small" onclick="displayRow('en', this)">숨기기</button><button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="actions actions-header">기능 <button id="actionsToggleBtn" class="green small" onclick="toggleActionsColumn(this)">숨기기</button></th><th class="practice-cell practice-hidden">✍ 연습</th></tr></thead><tbody></tbody></table></div>
 </div>
 <script>
-let rows=[],practiceVisible=false,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[];
+let rows=[],practiceVisible=false,actionsVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
 function norm(s){return String(s??'').trim().replace(/\s+/g,'').toLowerCase();}
@@ -158,6 +165,8 @@ function isBlankRow(row,cols){return cols.every(c=>!val(row,c));}
 function keyOf(u,g,q){return `${String(u).trim()}|${String(g).trim()}|${String(q).trim()}`;}
 function compactNo(u,g,q){return `${String(u).trim()}${String(g).trim()}${String(q).trim()}`;}
 function escapeHtml(s){return String(s??'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
+function stripStress(text){return String(text??'').replace(/\[\[([\s\S]*?)\]\]/g,'$1');}
+function formatStress(text){return escapeHtml(String(text??'')).replace(/\[\[([\s\S]*?)\]\]/g,'<b>$1</b>');}
 function escapeAttr(s){return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function pyStr(s){return JSON.stringify(String(s??''));}
 function uniqueRefs(refs){const seen=new Set(),out=[]; refs.forEach(r=>{if(!r.unitNo||!r.groupNo||!r.questionNo)return; const k=keyOf(r.unitNo,r.groupNo,r.questionNo); if(!seen.has(k)){seen.add(k);out.push(r);}}); return out;}
@@ -416,7 +425,7 @@ function showQuestions(items){
       const no=compactNo(q.unitNo,q.groupNo,q.questionNo);
       const koId=`qko_${itemNo}_${qAudioNo}`;
       const qAudioId=`question_audio_${itemNo}_${qAudioNo}`;
-      QUESTION_AUDIO[qAudioId]=qText;
+      QUESTION_AUDIO[qAudioId]=stripStress(qText);
       const koHtml=q.trans
         ? `<button class="ko-toggle" onclick="toggleQuestionKo('${koId}', this)">한글 보기</button><div id="${koId}" class="q-ko">${escapeHtml(q.trans)}</div>`
         : '';
@@ -424,7 +433,7 @@ function showQuestions(items){
         ? `<button class="ko-toggle" onclick="readQuestionAudio('${qAudioId}')">🔊 질문</button>`
         : '';
       const qPracticeKey=getQuestionPracticeKey(q);
-      html.push(`<div class="question-item"><div><span class="question-no">${escapeHtml(no)}.</span><span class="q-en">${escapeHtml(qText||'질문을 찾지 못했어.')}</span></div><div>${readBtn}${koHtml}</div><div class="q-meta">U${escapeHtml(q.unitNo)} G${escapeHtml(q.groupNo)} Q${escapeHtml(q.questionNo)}</div><div class="question-practice"><div class="question-practice-label">질문 연습</div><textarea class="question-practice-input" data-key="${escapeAttr(qPracticeKey)}" placeholder="질문 답변 연습" oninput="savePracticeInput(this)" onkeydown="practiceKeydown(event,this)">${escapeHtml(getSavedPractice(qPracticeKey))}</textarea></div></div>`);
+      html.push(`<div class="question-item"><div><span class="question-no">${escapeHtml(no)}.</span><span class="q-en">${qText?formatStress(qText):'질문을 찾지 못했어.'}</span></div><div>${readBtn}${koHtml}</div><div class="q-meta">U${escapeHtml(q.unitNo)} G${escapeHtml(q.groupNo)} Q${escapeHtml(q.questionNo)}</div><div class="question-practice"><div class="question-practice-label">질문 연습</div><textarea class="question-practice-input" data-key="${escapeAttr(qPracticeKey)}" placeholder="질문 답변 연습" oninput="savePracticeInput(this)" onkeydown="practiceKeydown(event,this)">${escapeHtml(getSavedPractice(qPracticeKey))}</textarea></div></div>`);
       qAudioNo++;
     });
   }
@@ -583,11 +592,12 @@ function renderTable(){
   tr.id='row'+i;
   if(showOnlyNotMemorized && !r.notMemorized) tr.classList.add('only-forget-hidden');
   const pKey=getPracticeKey(r);
-  tr.innerHTML=`<td class="check-col"><input type="checkbox" class="forget-check" ${r.notMemorized?'checked':''} disabled></td><td class="num">${i+1}</td><td class="${r.important?'important-text':''}">${escapeHtml(r.ko)}</td><td class="${r.important?'important-text':''}">${escapeHtml(r.en)}</td><td class="actions"><button class="small" onclick="readOne(${i},'both')">▶전체</button><button class="small" onclick="readOne(${i},'ko')">한글</button><button class="small" onclick="readOne(${i},'en')">영어</button><button class="small orange" onclick="repeatOne(${i})">🔁</button></td><td class="practice-cell practice-hidden"><textarea class="practice-input" data-key="${escapeAttr(pKey)}" placeholder="" oninput="savePracticeInput(this)" onkeydown="practiceKeydown(event,this)">${escapeHtml(getSavedPractice(pKey))}</textarea></td>`;
+  tr.innerHTML=`<td class="check-col"><input type="checkbox" class="forget-check" ${r.notMemorized?'checked':''} disabled></td><td class="num">${i+1}</td><td class="${r.important?'important-text':''}">${escapeHtml(r.ko)}</td><td class="${r.important?'important-text':''}">${formatStress(r.en)}</td><td class="actions actions-col"><button class="small" onclick="readOne(${i},'both')">▶전체</button><button class="small" onclick="readOne(${i},'ko')">한글</button><button class="small" onclick="readOne(${i},'en')">영어</button><button class="small orange" onclick="repeatOne(${i})">🔁</button></td><td class="practice-cell practice-hidden"><textarea class="practice-input" data-key="${escapeAttr(pKey)}" placeholder="" oninput="savePracticeInput(this)" onkeydown="practiceKeydown(event,this)">${escapeHtml(getSavedPractice(pKey))}</textarea></td>`;
   tb.appendChild(tr);
  });
  updateCountInfo();
  applyPracticeVisibility();
+ applyActionsVisibility();
  applyForgetOnlyButton();
  setTimeout(refreshPracticeHeights,0);
 }
@@ -618,7 +628,7 @@ function getQuestionPracticeKey(q){return 'ls_qpractice_'+storageSafe(keyOf(q.un
 function getSavedPractice(key){return localStorage.getItem(key)||'';}
 function savePracticeInput(el){if(!el||!el.dataset.key)return;localStorage.setItem(el.dataset.key,el.value);autoGrow(el);}
 function autoGrow(el){if(!el)return;el.style.height='auto';el.style.height=Math.max(42,el.scrollHeight)+'px';}
-function practiceKeydown(e,el){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const inputs=[...document.querySelectorAll('.practice-input,.question-practice-input')];const idx=inputs.indexOf(el);if(idx>=0&&idx<inputs.length-1)inputs[idx+1].focus();}}
+function practiceKeydown(e,el){if(el&&el.classList.contains('question-practice-input'))return;if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const inputs=[...document.querySelectorAll('.practice-input')];const idx=inputs.indexOf(el);if(idx>=0&&idx<inputs.length-1)inputs[idx+1].focus();}}
 function refreshPracticeHeights(){document.querySelectorAll('.practice-input,.question-practice-input').forEach(autoGrow);}
 function copyPracticeColumn(){const text=getVisibleRowIndices().map(i=>getSavedPractice(getPracticeKey(rows[i]))).join('\n');navigator.clipboard.writeText(text);alert('연습 열을 복사했어.');}
 function currentQuestionPracticeKeys(){const keys=[];(currentQuestionItems||[]).forEach(item=>(item.questions||[]).forEach(q=>keys.push(getQuestionPracticeKey(q))));return keys;}
@@ -631,7 +641,35 @@ function speakText(text,lang,rate,token){return new Promise(resolve=>{if(!text||
 function markActive(i){currentIndex=i;document.querySelectorAll('tr').forEach(x=>x.classList.remove('active'));const tr=document.getElementById('row'+i);if(tr)tr.classList.add('active');}
 function clearActive(){document.querySelectorAll('tr').forEach(x=>x.classList.remove('active'));}
 function markDone(i){const tr=document.getElementById('row'+i);if(tr)tr.classList.add('done');}
-async function speakRow(i,mode,token){if(token!==playToken||!rows[i])return;markActive(i);const r=rows[i],gap=Number(document.getElementById('pairGapSec').value||0)*1000,koRate=document.getElementById('koRate').value,enRate=document.getElementById('enRate').value;await speakText(`${i+1}`,'ko',koRate,token);let ok=await sleepWithToken(500,token);if(!ok)return;if(mode==='ko')await speakText(r.ko,'ko',koRate,token);else if(mode==='en')await speakText(r.en,'en',enRate,token);else if(document.getElementById('orderMode').value==='ko_en'){await speakText(r.ko,'ko',koRate,token);ok=await sleepWithToken(gap,token);if(!ok)return;await speakText(r.en,'en',enRate,token);}else{await speakText(r.en,'en',enRate,token);ok=await sleepWithToken(gap,token);if(!ok)return;await speakText(r.ko,'ko',koRate,token);}if(token===playToken&&speaking)markDone(i);}
+async function speakRow(i,mode,token){
+ if(token!==playToken||!rows[i])return;
+ markActive(i);
+ const r=rows[i];
+ const koText=String(r.ko||'');
+ const enText=stripStress(r.en||'');
+ const gap=Number(document.getElementById('pairGapSec').value||0)*1000;
+ const koRate=document.getElementById('koRate').value;
+ const enRate=document.getElementById('enRate').value;
+ await speakText(`${i+1}`,'ko',koRate,token);
+ let ok=await sleepWithToken(500,token);
+ if(!ok)return;
+ if(mode==='ko'){
+   await speakText(koText,'ko',koRate,token);
+ }else if(mode==='en'){
+   await speakText(enText,'en',enRate,token);
+ }else if(document.getElementById('orderMode').value==='ko_en'){
+   await speakText(koText,'ko',koRate,token);
+   ok=await sleepWithToken(gap,token);
+   if(!ok)return;
+   await speakText(enText,'en',enRate,token);
+ }else{
+   await speakText(enText,'en',enRate,token);
+   ok=await sleepWithToken(gap,token);
+   if(!ok)return;
+   await speakText(koText,'ko',koRate,token);
+ }
+ if(token===playToken&&speaking)markDone(i);
+}
 async function readOne(i,mode){stopSpeak();await sleep(150);const token=++playToken;speaking=true;paused=false;loopOne=false;await speakRow(i,mode,token);if(token===playToken)speaking=false;}
 async function repeatOne(i){stopSpeak();await sleep(150);const token=++playToken;speaking=true;loopOne=true;while(speaking&&loopOne&&token===playToken){await speakRow(i,'both',token);await sleepWithToken(500,token);}}
 async function readAll(mode){stopSpeak();await sleep(150);const token=++playToken;speaking=true;loopOne=false;const rep=Number(document.getElementById('repeatCount').value||1),gap=Number(document.getElementById('gapSec').value||0)*1000;const indices=getVisibleRowIndices();for(let k=0;k<rep;k++)for(const i of indices){if(!speaking||token!==playToken)return;await speakRow(i,mode,token);if(!speaking||token!==playToken)return;await sleepWithToken(gap,token);}if(token===playToken)speaking=false;}
@@ -655,9 +693,11 @@ function copyColumn(lang){
 }
 function applyPracticeVisibility(){document.querySelectorAll('.practice-cell').forEach(cell=>{cell.classList.toggle('practice-hidden',!practiceVisible);});const btn=document.getElementById('practiceToggleBtn');if(btn)btn.textContent=practiceVisible?'✍ 연습칸 숨기기':'✍ 연습칸 보이기';}
 function togglePracticeColumn(btn){practiceVisible=!practiceVisible;applyPracticeVisibility();if(practiceVisible)setTimeout(refreshPracticeHeights,0);}
+function applyActionsVisibility(){document.querySelectorAll('.actions-col,.actions-header').forEach(el=>{el.classList.toggle('actions-hidden',!actionsVisible);});const btn=document.getElementById('actionsToggleBtn');if(btn)btn.textContent=actionsVisible?'숨기기':'보이기';}
+function toggleActionsColumn(btn){actionsVisible=!actionsVisible;applyActionsVisibility();}
 document.getElementById('fileInput').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;const name=file.name.toLowerCase();if(name.endsWith('.txt')||name.endsWith('.csv')){document.getElementById('inputText').value=await file.text();parseText();return;}const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];const arr=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false});rows=[];arr.forEach(line=>{const ko=val(line,0),en=val(line,1);if(ko&&en&&!isHeader(ko,en))rows.push({ko,en,important:false,notMemorized:false,done:false});});document.getElementById('inputText').value=rows.map(r=>`${r.ko}\t${r.en}`).join('\n');renderTable();});
 function rateToEdge(v){const n=Number(v||1),pct=Math.round((n-1)*100);return pct===0?'+0%':pct>0?`+${pct}%`:`${pct}%`;}
-function getPythonDataBlock(){return rows.map(r=>`    (${pyStr(r.ko)}, ${pyStr(r.en)})`).join(',\n');}
+function getPythonDataBlock(){return rows.map(r=>`    (${pyStr(r.ko)}, ${pyStr(stripStress(r.en))})`).join(',\n');}
 function setPythonCode(code,mode){currentPythonMode=mode;document.getElementById('pythonCode').textContent=code;document.getElementById('pythonCard').style.display='block';return code;}
 function baseSettings(){return{base:document.getElementById('baseName').value||'opic_practice',repeat:Number(document.getElementById('repeatCount').value||1),random:document.getElementById('pythonRandom').checked,koRate:rateToEdge(document.getElementById('koRate').value),enRate:rateToEdge(document.getElementById('enRate').value),data:getPythonDataBlock()};}
 function generatePython(mode='both'){if(!rows.length){alert('먼저 표를 생성해줘.');return '';}const s=baseSettings();let code='';if(mode==='both')code=["# pip install edge-tts","import asyncio","import random","from pathlib import Path","import edge_tts","",`BASE_NAME = ${pyStr(s.base)}`,`REPEAT_COUNT = ${s.repeat}`,`RANDOM_ORDER = ${s.random?'True':'False'}`,`KO_VOICE = "ko-KR-SunHiNeural"`,`EN_VOICE = "en-US-JennyNeural"`,`KO_RATE = ${pyStr(s.koRate)}`,`EN_RATE = ${pyStr(s.enRate)}`,"DATA = [",s.data,"]","out_dir = Path(BASE_NAME)","out_dir.mkdir(exist_ok=True)","async def make_mp3(text, voice, rate, path):","    communicate = edge_tts.Communicate(text, voice=voice, rate=rate)","    await communicate.save(str(path))","async def main():","    sequence = list(DATA)","    clip_no = 1","    for _ in range(REPEAT_COUNT):","        if RANDOM_ORDER:","            random.shuffle(sequence)","        for ko, en in sequence:","            no = f'{clip_no:03d}'","            await make_mp3(ko, KO_VOICE, KO_RATE, out_dir / f'{no}_ko.mp3')","            await make_mp3(en, EN_VOICE, EN_RATE, out_dir / f'{no}_en.mp3')","            print(f'saved {no}')","            clip_no += 1","    print('완료!')","if __name__ == '__main__':","    asyncio.run(main())"].join('\n');else{const isKo=mode==='ko';code=["# pip install edge-tts","import asyncio","from pathlib import Path","import edge_tts","",`BASE_NAME = ${pyStr(s.base)}`,`SELECT_TXT = ${pyStr(mode)}`,`VOICE = ${pyStr(isKo?'ko-KR-SunHiNeural':'en-US-JennyNeural')}`,`RATE = ${pyStr(isKo?s.koRate:s.enRate)}`,"DATA = [",s.data,"]","out_dir = Path(BASE_NAME)","out_dir.mkdir(exist_ok=True)","async def make_mp3(text, voice, rate, path):","    communicate = edge_tts.Communicate(text, voice=voice, rate=rate)","    await communicate.save(str(path))","    print(f'생성 완료: {path}')","async def main():",isKo?"    final_text = ' '.join([ko for ko, en in DATA])":"    final_text = ' '.join([en for ko, en in DATA])",`    await make_mp3(final_text, VOICE, RATE, out_dir / ${pyStr(isKo?'ko.mp3':'en.mp3')})`,"if __name__ == '__main__':","    asyncio.run(main())"].join('\n');}return setPythonCode(code,mode);}
