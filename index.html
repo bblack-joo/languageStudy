@@ -6,8 +6,86 @@
 <title>한글 영어 읽기 프로그램</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;background:#f6f7fb;color:#222}.wrap{width:98vw;max-width:1900px;margin:0 auto;padding:18px}h1{font-size:24px;margin:8px 0 14px}.card{background:#fff;border:1px solid #ddd;border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.04)}textarea{width:100%;height:150px;box-sizing:border-box;border:1px solid #ccc;border-radius:10px;padding:10px;font-size:15px;line-height:1.45}button{border:0;border-radius:9px;padding:9px 12px;margin:4px;background:#2f6fed;color:white;font-weight:700;cursor:pointer}button.secondary{background:#555}button.green{background:#138a4d}button.orange{background:#e57920}button.red{background:#d93f3f}button.gray{background:#777}button.small{padding:6px 9px;font-size:13px;margin:2px}input,select{padding:7px;border:1px solid #ccc;border-radius:8px;margin:4px}label{display:inline-flex;align-items:center;gap:4px;margin:5px 10px 5px 0;font-size:14px}.row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.book-row{display:flex;align-items:center;gap:8px;margin:8px 0;flex-wrap:wrap}.book-name{width:90px;font-weight:800;font-size:15px}.book-row select{min-width:260px}.hint{font-size:13px;color:#666;margin-top:6px}table{width:100%;border-collapse:collapse;background:#fff;table-layout:fixed}th,td{border:1px solid #ddd;padding:6px 7px;vertical-align:top;font-size:14px}th{background:#eef3ff}tr.active{background:#fff6c9}tr.done{background:#edf9ef}.check-col{width:34px;text-align:center}.forget-check{width:18px;height:18px;accent-color:#15803d}.num{width:42px;text-align:center;color:#666}.actions{width:150px;white-space:nowrap}.actions button{white-space:nowrap;margin:2px}.kr{width:22%}.en{width:32%}pre{white-space:pre-wrap;background:#111;color:#e6e6e6;padding:12px;border-radius:10px;max-height:390px;overflow:auto;font-size:13px}.random-count{min-width:110px;background:#fffaf3;border:1px solid #f0b36a}.question-box{background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:12px;margin:10px 0;line-height:1.5}.question-group-title{margin-top:10px;color:#166534;font-weight:800}.question-item{margin:8px 0;color:#14532d}.question-no{display:inline-block;background:#dcfce7;border-radius:6px;padding:2px 6px;font-weight:900;margin-right:4px}.q-en{font-weight:800}.q-ko{display:none;margin-top:6px;padding:8px 10px;background:#f8fafc;border:1px solid #dbeafe;border-radius:8px;color:#1e3a8a}.ko-toggle{background:#2563eb;padding:6px 9px;font-size:12px;margin:6px 4px 3px 0}.q-meta{font-size:12px;color:#666;margin-top:2px}.keyword-toggle{background:#0f766e;padding:6px 9px;font-size:12px;margin:6px 0 3px}.keyword-box{display:none;background:#ecfeff;border:1px solid #67e8f9;border-radius:10px;padding:9px;margin-top:5px;color:#164e63;white-space:pre-wrap}.keyword-copy{background:#0891b2;padding:5px 8px;font-size:12px;margin-left:5px}.keyword-gap-label{display:inline-flex;align-items:center;gap:4px;margin:4px 6px;font-size:12px;color:#164e63}.keyword-gap-input{width:58px;padding:5px;border:1px solid #67e8f9;border-radius:7px;background:#fff}
-.practice-cell{width:32%;min-width:320px}.practice-input,.question-practice-input{width:100%;min-height:70px;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:14px;line-height:1.5;resize:vertical;background:#fff}.question-practice-input{min-height:58px}.important-text{color:#15803d!important;font-weight:900}.practice-tools{margin:8px 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}.practice-cell.practice-hidden{display:none!important}.question-practice{margin-top:8px}.question-practice-label{font-size:12px;color:#475569;font-weight:700;margin-bottom:3px}tr.only-forget-hidden{display:none!important}
+:root{
+  --primary:#40301F;--primary-dark:#2f2315;--primary-tint:#F1E9DC;
+  --neutral:#6E6A63;--neutral-dark:#57534c;--neutral-tint:#F1EFEB;
+  --filter:#8A6A46;--filter-dark:#725636;--filter-tint:#F5EFE4;
+  --success:#5C4A32;--success-dark:#4a3a28;--success-tint:#F1EAE0;
+  --danger:#8C3B2E;--danger-dark:#742f24;--danger-tint:#F5E7E3;
+  --highlight:#6B4A28;--highlight-tint:#F1E4CE;
+  --bg:#EDEAE4;--card-bg:#FFFFFF;--border:#DAD3C8;
+  --text:#2A2420;--text-muted:#726657;
+}
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;background:var(--bg);color:var(--text)}
+.wrap{width:98vw;max-width:1900px;margin:0 auto;padding:18px}
+h1{font-size:23px;font-weight:800;margin:6px 0 16px;letter-spacing:-.2px}
+.card{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(15,23,42,.05)}
+.card>b{display:block;font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px}
+textarea{width:100%;height:150px;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:15px;line-height:1.45;background:#fff}
+button{border:0;border-radius:8px;padding:9px 13px;margin:3px;background:var(--primary);color:#fff;font-weight:700;font-size:14px;cursor:pointer;transition:background .12s ease,opacity .12s ease}
+button:hover{background:var(--primary-dark)}
+button.secondary{background:var(--neutral)}
+button.secondary:hover{background:var(--neutral-dark)}
+button.green{background:var(--success)}
+button.green:hover{background:var(--success-dark)}
+button.orange{background:var(--filter)}
+button.orange:hover{background:var(--filter-dark)}
+button.red{background:var(--danger)}
+button.red:hover{background:var(--danger-dark)}
+button.gray{background:#fff;color:var(--neutral-dark);border:1px solid var(--border);font-weight:600}
+button.gray:hover{background:var(--neutral-tint)}
+button.small{padding:6px 10px;font-size:12.5px;margin:2px}
+input,select{padding:7px 9px;border:1px solid var(--border);border-radius:8px;margin:3px;background:#fff;font-size:14px;color:var(--text)}
+label{display:inline-flex;align-items:center;gap:5px;margin:4px 10px 4px 0;font-size:13.5px;color:var(--text-muted)}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 0}
+.toolbar+.toolbar{border-top:1px dashed var(--border);margin-top:4px}
+.toolbar-label{font-size:12px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;width:100%;margin-bottom:-2px}
+.book-row{display:flex;align-items:center;gap:8px;margin:6px 0;flex-wrap:wrap}
+.book-name{width:90px;font-weight:800;font-size:14px;color:var(--text-muted)}
+.book-row select{min-width:260px}
+#unitFilter,#unitSelect{min-width:220px}
+.hint{font-size:12.5px;color:var(--text-muted);margin-top:6px;line-height:1.5}
+table{width:100%;border-collapse:collapse;background:#fff;table-layout:fixed}
+th,td{border:1px solid var(--border);padding:6px 7px;vertical-align:top;font-size:14px}
+th{background:var(--primary-tint);color:var(--primary-dark);font-weight:800}
+tr.active{background:var(--primary-tint)}
+tr.done{background:var(--success-tint)}
+.check-col{width:34px;text-align:center}
+.forget-check{width:18px;height:18px;accent-color:var(--filter)}
+.num{width:42px;text-align:center;color:var(--text-muted)}
+.actions{width:150px;white-space:nowrap}
+.actions button{white-space:nowrap;margin:2px}
+.kr{width:22%}
+.en{width:32%}
+pre{white-space:pre-wrap;background:#111;color:#e6e6e6;padding:12px;border-radius:10px;max-height:390px;overflow:auto;font-size:13px}
+.random-count{width:90px;background:var(--filter-tint);border:1px solid var(--filter);color:var(--filter-dark);font-weight:600;text-align:center}
+.question-box{background:#fbfcfe;border:1px solid var(--border);border-left:4px solid var(--filter);border-radius:10px;padding:12px;margin:10px 0;line-height:1.5}
+.question-group-title{margin-top:10px;color:var(--filter-dark);font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:.03em}
+.question-item{margin:8px 0;color:var(--text)}
+.question-no{display:inline-block;background:var(--filter-tint);color:var(--filter-dark);border-radius:6px;padding:2px 6px;font-weight:900;margin-right:4px}
+.q-en{font-weight:800}
+.q-ko{display:none;margin-top:6px;padding:8px 10px;background:var(--primary-tint);border:1px solid var(--border);border-radius:8px;color:var(--primary-dark)}
+.ko-toggle{background:var(--primary);padding:6px 9px;font-size:12px;margin:6px 4px 3px 0}
+.ko-toggle:hover{background:var(--primary-dark)}
+.q-meta{font-size:12px;color:var(--text-muted);margin-top:2px}
+.keyword-toggle{background:var(--filter);padding:6px 9px;font-size:12px;margin:6px 0 3px}
+.keyword-toggle:hover{background:var(--filter-dark)}
+.keyword-box{display:none;background:var(--filter-tint);border:1px solid var(--filter);border-radius:10px;padding:9px;margin-top:5px;color:var(--filter-dark);white-space:pre-wrap}
+.keyword-copy{background:var(--neutral);padding:5px 8px;font-size:12px;margin-left:5px}
+.keyword-copy:hover{background:var(--neutral-dark)}
+.keyword-gap-label{display:inline-flex;align-items:center;gap:4px;margin:4px 6px;font-size:12px;color:var(--filter-dark)}
+.keyword-gap-input{width:58px;padding:5px;border:1px solid var(--filter);border-radius:7px;background:#fff}
+.practice-cell{width:32%;min-width:320px}
+.practice-input,.question-practice-input{width:100%;min-height:70px;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:14px;line-height:1.5;resize:vertical;background:#fff}
+.question-practice-input{min-height:58px}
+.important-text{color:var(--highlight)!important;font-weight:900}
+.practice-tools{margin:8px 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.practice-cell.practice-hidden{display:none!important}
+.question-practice{margin-top:8px}
+.question-practice-label{font-size:12px;color:var(--text-muted);font-weight:700;margin-bottom:3px}
+tr.only-forget-hidden{display:none!important}
 </style>
 </head>
 <body>
@@ -16,39 +94,53 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 
 <div class="card">
   <b>0. 엑셀 문장집 불러오기</b>
-  <div class="book-row">
+  <div class="toolbar">
     <span class="book-name">문장집</span>
-    <input type="file" id="bookExcelInput" accept=".xlsx,.xls" onchange="loadWorkbookFile(this.files[0])">
+    <input type="file" id="bookExcelInput" accept=".xlsx,.xls" multiple onchange="loadWorkbookFiles(this.files)">
     <span class="book-name">Unit</span>
     <select id="unitFilter" onchange="renderItemSelect()"><option value="">전체</option></select>
     <span class="book-name">묶음</span>
     <select id="unitSelect"><option value="">엑셀 파일을 먼저 선택</option></select>
+  </div>
+  <div class="toolbar">
     <button onclick="loadSelectedItem()">선택 불러오기</button>
     <button class="secondary" onclick="loadAllItems()">전체 불러오기</button>
     <button class="orange" onclick="loadImportantItems()">⭐ 중요만 불러오기</button>
-    <select id="randomCount" class="random-count"><option value="5">랜덤 5개</option><option value="10" selected>랜덤 10개</option><option value="20">랜덤 20개</option></select>
+    <input type="number" id="randomCount" class="random-count" min="1" step="1" value="10">
     <button class="orange" onclick="loadRandomItems()">랜덤 불러오기</button>
   </div>
-  <div class="hint">답변 탭은 헤더 아래에서 빈 줄 전까지 한 묶음으로 읽어. 같은 묶음 안의 unit/그룹/질문 번호는 전부 질문 박스에 표시해. "⭐ 중요만 불러오기"는 Unit에서 고른 범위(전체 또는 특정 Unit) 안에서 중요도=1로 표시된 묶음들을 처음부터 빈 줄 직전까지 통째로 전부 불러와.</div>
+  <div class="toolbar">
+    <button class="orange" onclick="loadAllImportantItems()">⭐ 전체 중요문장 불러오기</button>
+    <button class="orange" onclick="loadRandomImportantItem()">🎲 중요문장 랜덤 1개</button>
+  </div>
+  <div class="hint">파일 선택 창에서 여러 개(Ctrl/Shift로 다중 선택)를 고르면 한 번에 합쳐서 불러와. 파일이 2개 이상이면 Unit 목록에 "파일명::시트명"으로 구분해서 표시돼. 답변 탭은 헤더 아래에서 빈 줄 전까지 한 묶음으로 읽어. 같은 묶음 안의 unit/그룹/질문 번호는 전부 질문 박스에 표시해. "⭐ 중요만 불러오기"는 Unit/묶음에서 고른 범위 안에서만, "⭐ 전체 중요문장 불러오기"는 필터와 상관없이 문장집 전체에서 중요도=1로 표시된 묶음들을 처음부터 빈 줄 직전까지 통째로 전부 불러와. "🎲 중요문장 랜덤 1개"는 문장집 전체의 중요 묶음들 중 딱 하나만 랜덤으로 불러와.</div>
 </div>
 
 <div class="card">
 <b>1. 데이터 넣기</b>
 <div class="hint">탭 또는 엔터로 구분된 한글/영어 문장을 붙여넣거나, Excel/CSV/TXT 파일을 불러와.</div>
 <textarea id="inputText" placeholder="한글<Tab>영어 또는 한글<Enter>영어 형태로 붙여넣기"></textarea>
-<div class="row"><input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.txt" /><button onclick="parseText()">표 생성</button><button class="secondary" onclick="loadSample()">샘플 넣기</button><button class="gray" onclick="clearAll()">초기화</button></div>
+<div class="toolbar"><input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.txt" /><button onclick="parseText()">표 생성</button><button class="secondary" onclick="loadSample()">샘플 넣기</button><button class="gray" onclick="clearAll()">초기화</button></div>
 </div>
 
 <div class="card">
 <b>2. 읽기 설정 / Python 코드</b>
-<div class="row"><button onclick="readAll('both')">▶ 표 읽기</button><button onclick="readAll('ko')">한글</button><button onclick="readAll('en')">영어</button><button class="orange" onclick="readRandom()">🎲 랜덤 읽기</button><button class="secondary" onclick="pauseSpeak()">⏸ 일시정지</button><button class="green" onclick="resumeSpeak()">▶ 이어읽기</button><button class="red" onclick="stopSpeak()">■ 정지</button></div>
-<div class="row"><button class="green" onclick="generatePython('both')">🐍 문장별 생성 코드</button><button class="green" onclick="generatePython('ko')">🇰🇷 한글 한 파일 코드</button><button class="green" onclick="generatePython('en')">🇺🇸 영어 한 파일 코드</button><button class="green" onclick="downloadPython()">💾 .py 저장</button><button class="secondary" onclick="copyPython()">📋 코드 복사</button></div>
-<div class="row"><label>읽기 순서<select id="orderMode"><option value="ko_en">한글 → 영어</option><option value="en_ko">영어 → 한글</option></select></label><label>반복 <input id="repeatCount" type="number" min="1" value="1" style="width:60px"> 회</label><label>한글/영어 사이 쉬기 <input id="pairGapSec" type="number" min="0" step="0.1" value="5" style="width:70px"> 초</label><label>문장 사이 쉬기 <input id="gapSec" type="number" min="0" step="0.1" value="1.0" style="width:70px"> 초</label><label>키워드 사이 쉬기 <input id="keywordGapSec" type="number" min="0" step="0.5" value="5" style="width:70px"> 초</label><label><input id="pythonRandom" type="checkbox"> Python 랜덤 순서</label><label>한글 속도 <input id="koRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label><label>영어 속도 <input id="enRate" type="number" min="0.5" max="2" step="0.1" value="1.0" style="width:70px"></label><label>파일명 <input id="baseName" value="opic_practice" style="width:150px"></label></div>
+<div class="toolbar-label">재생</div>
+<div class="toolbar"><button onclick="readAll('both')">▶ 표 읽기</button><button onclick="readAll('ko')">한글</button><button onclick="readAll('en')">영어</button><button class="orange" onclick="readRandom()">🎲 랜덤 읽기</button><button class="secondary" onclick="pauseSpeak()">⏸ 일시정지</button><button class="green" onclick="resumeSpeak()">▶ 이어읽기</button><button class="red" onclick="stopSpeak()">■ 정지</button></div>
+<div class="toolbar-label">Python 코드</div>
+<div class="toolbar"><button class="green" onclick="generatePython('both')">🐍 문장별 생성 코드</button><button class="green" onclick="generatePython('ko')">🇰🇷 한글 한 파일 코드</button><button class="green" onclick="generatePython('en')">🇺🇸 영어 한 파일 코드</button><button class="green" onclick="downloadPython()">💾 .py 저장</button><button class="secondary" onclick="copyPython()">📋 코드 복사</button></div>
+<div class="toolbar-label">옵션</div>
+<div class="toolbar"><label>읽기 순서<select id="orderMode"><option value="ko_en">한글 → 영어</option><option value="en_ko">영어 → 한글</option></select></label><label>반복 <input id="repeatCount" type="number" min="1" value="1" style="width:60px"> 회</label><label>한글/영어 사이 쉬기 <input id="pairGapSec" type="number" min="0" step="0.1" value="5" style="width:70px"> 초</label><label>문장 사이 쉬기 <input id="gapSec" type="number" min="0" step="0.1" value="1.0" style="width:70px"> 초</label><label>키워드 사이 쉬기 <input id="keywordGapSec" type="number" min="0" step="0.5" value="5" style="width:70px"> 초</label><label><input id="pythonRandom" type="checkbox"> Python 랜덤 순서</label><label>한글 속도 <input id="koRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label><label>영어 속도 <input id="enRate" type="number" min="0.5" max="2" step="0.1" value="1.0" style="width:70px"></label><label>파일명 <input id="baseName" value="opic_practice" style="width:150px"></label></div>
 </div>
 
 <div class="card" id="pythonCard" style="display:none"><b>생성된 Python 코드</b><pre id="pythonCode"></pre></div>
 
-<div class="card"><b>3. 생성된 표</b><div class="hint">각 행의 ▶전체 / 한글 / 영어 / 🔁 버튼으로 그 문장만 읽을 수 있어.</div><div id="questionBox" class="question-box" style="display:none"><b>질문</b><div id="questionList"></div></div><div class="practice-tools"><span class="hint">연습칸에 적어보며 외우기</span><button id="practiceToggleBtn" class="green small" onclick="togglePracticeColumn(this)">✍ 연습칸 보이기</button><button id="forgetOnlyBtn" class="orange small" onclick="toggleForgetOnly(this)">☑ 안 외워진 것만 보기</button><button class="green small" onclick="copyPracticeColumn()">✍ 연습 복사</button><button class="gray small" onclick="clearCurrentPractice()">현재 표 연습 삭제</button><button class="red small" onclick="clearAllPractice()">전체 연습 삭제</button></div><div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">✓</th><th class="num">번호</th><th class="kr">한글 <button class="green small" onclick="displayRow('ko', this)">숨기기</button><button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="green small" onclick="displayRow('en', this)">숨기기</button><button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="actions">기능</th><th class="practice-cell practice-hidden">✍ 연습</th></tr></thead><tbody></tbody></table></div>
+<div class="card"><b>3. 생성된 표</b><div class="hint">각 행의 ▶전체 / 한글 / 영어 / 🔁 버튼으로 그 문장만 읽을 수 있어.</div><div id="questionBox" class="question-box" style="display:none"><b>질문</b><div id="questionList"></div></div>
+<div class="toolbar-label">보기 옵션</div>
+<div class="toolbar"><button id="practiceToggleBtn" class="green small" onclick="togglePracticeColumn(this)">✍ 연습칸 보이기</button><button id="forgetOnlyBtn" class="orange small" onclick="toggleForgetOnly(this)">☑ 안 외워진 것만 보기</button></div>
+<div class="toolbar-label">연습 관리</div>
+<div class="toolbar"><span class="hint" style="margin:0 4px 0 0">연습칸에 적어보며 외우기</span><button class="green small" onclick="copyPracticeColumn()">✍ 연습 복사</button><button class="gray small" onclick="clearCurrentPractice()">현재 표 연습 삭제</button><button class="red small" onclick="clearAllPractice()">전체 연습 삭제</button></div>
+<div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">✓</th><th class="num">번호</th><th class="kr">한글 <button class="green small" onclick="displayRow('ko', this)">숨기기</button><button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="green small" onclick="displayRow('en', this)">숨기기</button><button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="actions">기능</th><th class="practice-cell practice-hidden">✍ 연습</th></tr></thead><tbody></tbody></table></div>
 </div>
 <script>
 let rows=[],practiceVisible=false,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[];
@@ -224,39 +316,46 @@ function parseAnswerSheet(ws,sheetName){
  saveBlock();
  return blocks;
 }
-async function loadWorkbookFile(file){
- if(!file)return;
+async function loadWorkbookFiles(fileList){
+ if(!fileList||!fileList.length)return;
  stopSpeak();
  try{
-  const data=await file.arrayBuffer();
-  const wb=XLSX.read(data,{type:'array'});
-  BOOK.workbook=wb;
+  const files=[...fileList];
+  const multi=files.length>1;
+  BOOK.workbook=null;
   BOOK.questions={};
   BOOK.items=[];
 
-  const qName=wb.SheetNames.find(n=>norm(n)==='0.질문')||wb.SheetNames.find(n=>String(n).includes('질문'));
-  if(qName) BOOK.questions=parseQuestionSheet(wb.Sheets[qName]);
+  for(const file of files){
+   const data=await file.arrayBuffer();
+   const wb=XLSX.read(data,{type:'array'});
+   const fileLabel=String(file.name||'').replace(/\.(xlsx|xls)$/i,'');
 
-  wb.SheetNames.forEach(sheetName=>{
-    if(sheetName===qName) return;
+   const qName=wb.SheetNames.find(n=>norm(n)==='0.질문')||wb.SheetNames.find(n=>String(n).includes('질문'));
+   const fileQuestions=qName?parseQuestionSheet(wb.Sheets[qName]):{};
+
+   wb.SheetNames.forEach(sheetName=>{
+    if(sheetName===qName)return;
     const blocks=parseAnswerSheet(wb.Sheets[sheetName],sheetName);
+    const displaySheet=multi?`${fileLabel}::${sheetName}`:sheetName;
     blocks.forEach(b=>{
-      const questions=b.refs.map(ref=>{
-        const found=BOOK.questions[keyOf(ref.unitNo,ref.groupNo,ref.questionNo)];
-        return found || {...ref,content:'질문을 찾지 못했어.',trans:''};
-      });
-      BOOK.items.push({
-        key:`${sheetName}__${b.blockNo}`,
-        label:`${sheetName}_${b.blockNo}`,
-        sheetName,
-        blockNo:b.blockNo,
-        refs:b.refs,
-        questions,
-        answers:b.answers,
-        flows:b.flows || []
-      });
+     const questions=b.refs.map(ref=>{
+      const found=fileQuestions[keyOf(ref.unitNo,ref.groupNo,ref.questionNo)];
+      return found||{...ref,content:'질문을 찾지 못했어.',trans:''};
+     });
+     BOOK.items.push({
+      key:`${fileLabel}__${sheetName}__${b.blockNo}`,
+      label:`${displaySheet}_${b.blockNo}`,
+      sheetName:displaySheet,
+      blockNo:b.blockNo,
+      refs:b.refs,
+      questions,
+      answers:b.answers,
+      flows:b.flows||[]
+     });
     });
-  });
+   });
+  }
 
   const select=document.getElementById('unitSelect');
   if(!BOOK.items.length){
@@ -437,9 +536,39 @@ function loadImportantItems(){
  showQuestions(list);
  setRows(list.flatMap(itemToPairs));
 }
+function loadAllImportantItems(){
+ stopSpeak();
+ if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}
+ const list=BOOK.items.filter(isItemImportant);
+ if(!list.length){alert('문장집 전체에 중요도 1인 묶음이 없어.');return;}
+ showQuestions(list);
+ setRows(list.flatMap(itemToPairs));
+}
+function loadRandomImportantItem(){
+ stopSpeak();
+ if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}
+ const list=BOOK.items.filter(isItemImportant);
+ if(!list.length){alert('문장집 전체에 중요도 1인 묶음이 없어.');return;}
+ const picked=list[Math.floor(Math.random()*list.length)];
+ showQuestions([picked]);
+ setRows(itemToPairs(picked));
+}
 function loadAllItems(){stopSpeak();if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}const list=getFilteredItems();if(!list.length){alert('선택한 Unit에 불러올 문장이 없어.');return;}showQuestions(list);setRows(list.flatMap(itemToPairs));}
 function shuffleArray(a){return a.map(v=>({v,s:Math.random()})).sort((x,y)=>x.s-y.s).map(x=>x.v)}
-function loadRandomItems(){stopSpeak();if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}const list=getFilteredItems();if(!list.length){alert('선택한 Unit에 불러올 문장이 없어.');return;}const count=Number(document.getElementById('randomCount').value||10);const picked=shuffleArray(list).slice(0,Math.min(count,list.length));showQuestions(picked);setRows(picked.flatMap(itemToPairs));}
+function loadRandomItems(){
+ stopSpeak();
+ if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}
+ const list=getFilteredItems();
+ if(!list.length){alert('선택한 범위에 불러올 문장이 없어.');return;}
+ const allPairs=list.flatMap(item=>itemToPairs(item).map(p=>({...p,__itemKey:item.key})));
+ if(!allPairs.length){alert('선택한 범위에 불러올 문장이 없어.');return;}
+ const count=Math.max(1,Number(document.getElementById('randomCount').value||10));
+ const picked=shuffleArray(allPairs).slice(0,Math.min(count,allPairs.length));
+ const usedKeys=new Set(picked.map(p=>p.__itemKey));
+ const usedItems=list.filter(item=>usedKeys.has(item.key));
+ showQuestions(usedItems);
+ setRows(picked.map(({__itemKey,...rest})=>rest));
+}
 function isHeader(ko,en){return norm(ko)==='한글'&&norm(en)==='영어';}
 function loadSample(){document.getElementById('inputText').value=`한글\t영어\n집에 있는 가구에 대해 말해 주세요.\tTell me about the furniture you have in your home.\n가장 좋아하는 가구가 있나요?\tIs there a piece that is your favorite?`;parseText();}
 function clearAll(){rows=[];document.getElementById('inputText').value='';renderTable();document.getElementById('pythonCard').style.display='none';hideQuestions();}
