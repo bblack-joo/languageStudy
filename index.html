@@ -517,7 +517,27 @@ function getQuestionPracticeKey(q){return 'ls_qpractice_'+storageSafe(keyOf(q.un
 function getSavedPractice(key){return localStorage.getItem(key)||'';}
 function savePracticeInput(el){if(!el||!el.dataset.key)return;localStorage.setItem(el.dataset.key,el.value);autoGrow(el);}
 function autoGrow(el){if(!el)return;el.style.height='auto';el.style.height=Math.max(42,el.scrollHeight)+'px';}
-function practiceKeydown(e,el){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const inputs=[...document.querySelectorAll('.practice-input,.question-practice-input')];const idx=inputs.indexOf(el);if(idx>=0&&idx<inputs.length-1)inputs[idx+1].focus();}}
+
+function practiceKeydown(e, el){
+
+    // 질문 답변 연습은 Enter = 줄바꿈
+    if(el.classList.contains('question-practice-input')){
+        return;
+    }
+
+    // 표 연습은 Enter = 다음 칸
+    if(e.key === 'Enter' && !e.shiftKey){
+        e.preventDefault();
+
+        const inputs = [...document.querySelectorAll('.practice-input')];
+        const idx = inputs.indexOf(el);
+
+        if(idx >= 0 && idx < inputs.length - 1){
+            inputs[idx + 1].focus();
+        }
+    }
+}
+
 function refreshPracticeHeights(){document.querySelectorAll('.practice-input,.question-practice-input').forEach(autoGrow);}
 function copyPracticeColumn(){const text=getVisibleRowIndices().map(i=>getSavedPractice(getPracticeKey(rows[i]))).join('\n');navigator.clipboard.writeText(text);alert('연습 열을 복사했어.');}
 function currentQuestionPracticeKeys(){const keys=[];(currentQuestionItems||[]).forEach(item=>(item.questions||[]).forEach(q=>keys.push(getQuestionPracticeKey(q))));return keys;}
