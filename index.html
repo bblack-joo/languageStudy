@@ -87,16 +87,23 @@ pre{white-space:pre-wrap;background:#111;color:#e6e6e6;padding:12px;border-radiu
 .important-text{
     color:#9C3D1E;
 }
-b{
+
+
+
+.main_title{
     color:inherit;
     font-weight:700;
+
     background:linear-gradient(
         to top,
-        #FFE082 45%,
+        #FFD54F 45%,
         transparent 45%
     );
+
     padding:0 1px;
+    border-radius:2px;
 }
+
 
 .practice-tools{margin:8px 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .practice-cell.practice-hidden{display:none!important}
@@ -176,7 +183,12 @@ function keyOf(u,g,q){return `${String(u).trim()}|${String(g).trim()}|${String(q
 function compactNo(u,g,q){return `${String(u).trim()}${String(g).trim()}${String(q).trim()}`;}
 function escapeHtml(s){return String(s??'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 function stripStress(text){return String(text??'').replace(/\[\[([\s\S]*?)\]\]/g,'$1');}
-function formatStress(text){return escapeHtml(String(text??'')).replace(/\[\[([\s\S]*?)\]\]/g,'<b>$1</b>');}
+
+function formatStress(text){
+    return escapeHtml(String(text || ''))
+        .replace(/\[\[(.*?)\]\]/g,'<span class="main_title">$1</span>');
+}
+
 function escapeAttr(s){return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function pyStr(s){return JSON.stringify(String(s??''));}
 function uniqueRefs(refs){const seen=new Set(),out=[]; refs.forEach(r=>{if(!r.unitNo||!r.groupNo||!r.questionNo)return; const k=keyOf(r.unitNo,r.groupNo,r.questionNo); if(!seen.has(k)){seen.add(k);out.push(r);}}); return out;}
