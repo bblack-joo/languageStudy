@@ -110,6 +110,20 @@ pre{white-space:pre-wrap;background:#111;color:#e6e6e6;padding:12px;border-radiu
 .question-practice{margin-top:8px}
 .question-practice-label{font-size:12px;color:var(--text-muted);font-weight:700;margin-bottom:3px}
 tr.only-forget-hidden{display:none!important}
+
+.flash-card-box{background:#fffaf3;border:1px solid var(--filter);border-left:4px solid var(--filter);border-radius:12px;padding:14px;margin:10px 0 14px}
+.flash-card-box b{margin-bottom:0}
+.flash-options{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0}
+.flash-progress{font-size:13px;font-weight:800;color:var(--filter-dark);margin-left:4px}
+.flash-bar{height:8px;background:var(--neutral-tint);border-radius:99px;overflow:hidden;margin:8px 0}
+.flash-bar-inner{height:100%;width:0%;background:var(--filter);transition:width .2s ease}
+.flash-card{min-height:150px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:26px 18px;margin-top:10px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;cursor:pointer;box-shadow:0 1px 3px rgba(15,23,42,.05);user-select:none}
+.flash-card:hover{background:#fffdf8}
+.flash-front{font-size:24px;font-weight:800;line-height:1.5;white-space:pre-wrap}
+.flash-back{font-size:22px;line-height:1.55;margin-top:18px;padding-top:16px;border-top:1px dashed var(--border);width:100%;white-space:pre-wrap}
+.flash-help{font-size:12.5px;color:var(--text-muted);margin-top:8px}
+.flash-hidden{display:none!important}
+
 </style>
 </head>
 <body>
@@ -159,7 +173,43 @@ tr.only-forget-hidden{display:none!important}
 
 <div class="card" id="pythonCard" style="display:none"><b>생성된 Python 코드</b><pre id="pythonCode"></pre></div>
 
-<div class="card"><b>3. 생성된 표</b><div class="hint">각 행의 ▶전체 / 한글 / 영어 / 🔁 버튼으로 그 문장만 읽을 수 있어.</div><div id="questionBox" class="question-box" style="display:none"><b>질문</b><div id="questionList"></div></div>
+<div class="card"><b>3. 생성된 표</b><div class="hint">각 행의 ▶전체 / 한글 / 영어 / 🔁 버튼으로 그 문장만 읽을 수 있어.</div>
+
+<div class="flash-card-box">
+  <b>🧠 암기하기</b>
+  <div class="flash-options">
+    <label>모드
+      <select id="flashMode" onchange="resetFlashcard()">
+        <option value="ko_en">한글 → 영어</option>
+        <option value="en_ko">영어 → 한글</option>
+      </select>
+    </label>
+    <label>순서
+      <select id="flashOrder" onchange="resetFlashcard()">
+        <option value="seq">순서대로</option>
+        <option value="random">랜덤</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="flashAutoSpeak"> 자동 음성</label>
+    <button class="green small" onclick="startFlashcards()">시작</button>
+    <button class="secondary small" onclick="prevFlashcard()">◀ 이전</button>
+    <button class="secondary small" onclick="flipFlashcard()">뒤집기</button>
+    <button class="secondary small" onclick="nextFlashcard()">다음 ▶</button>
+    <span id="flashProgress" class="flash-progress">0 / 0</span>
+  </div>
+  <div class="flash-bar"><div id="flashBarInner" class="flash-bar-inner"></div></div>
+  <div id="flashCard" class="flash-card" onclick="handleFlashCardClick()">
+    <div id="flashFront" class="flash-front">표를 불러온 뒤 시작을 눌러줘.</div>
+    <div id="flashBack" class="flash-back flash-hidden"></div>
+  </div>
+  <div class="flash-options">
+    <button class="secondary small" onclick="copyFlashText('ko')">한글 복사</button>
+    <button class="secondary small" onclick="copyFlashText('en')">영어 복사</button>
+  </div>
+  <div class="flash-help">카드 클릭: 정답 보기 → 다음 카드 / Space: 뒤집기 / ← →: 이전·다음</div>
+</div>
+
+<div id="questionBox" class="question-box" style="display:none"><b>질문</b><div id="questionList"></div></div>
 <div class="toolbar-label">보기 옵션</div>
 <div class="toolbar"><button id="practiceToggleBtn" class="green small" onclick="togglePracticeColumn(this)">✍ 연습칸 보이기</button><button id="forgetOnlyBtn" class="orange small" onclick="toggleForgetOnly(this)">☑ 안 외워진 것만 보기</button></div>
 <div class="toolbar-label">연습 관리</div>
@@ -168,6 +218,7 @@ tr.only-forget-hidden{display:none!important}
 </div>
 <script>
 let rows=[],practiceVisible=false,actionsVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[];
+let flashOrderList=[],flashIndex=0,flashRevealed=false;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
 function norm(s){return String(s??'').trim().replace(/\s+/g,'').toLowerCase();}
@@ -621,6 +672,7 @@ function renderTable(){
  applyPracticeVisibility();
  applyActionsVisibility();
  applyForgetOnlyButton();
+ resetFlashcard();
  setTimeout(refreshPracticeHeights,0);
 }
 function getVisibleRowIndices(){
@@ -642,7 +694,118 @@ function toggleForgetOnly(btn){
  });
  updateCountInfo();
  applyForgetOnlyButton();
+ resetFlashcard();
 }
+
+
+function buildFlashOrder(){
+ const indices=getVisibleRowIndices().filter(i=>rows[i]&&((rows[i].ko||'').trim()||(rows[i].en||'').trim()));
+ flashOrderList=document.getElementById('flashOrder')?.value==='random'?shuffleArray(indices):indices;
+ flashIndex=0;
+ flashRevealed=false;
+}
+function resetFlashcard(){
+ buildFlashOrder();
+ renderFlashcard(false);
+}
+function startFlashcards(){
+ if(!rows.length){alert('먼저 표를 생성해줘.');return;}
+ buildFlashOrder();
+ renderFlashcard(true);
+}
+function getFlashCurrent(){
+ if(!flashOrderList.length) buildFlashOrder();
+ const rowIndex=flashOrderList[flashIndex];
+ return rows[rowIndex]||null;
+}
+function flashSide(row,side){
+ const mode=document.getElementById('flashMode')?.value||'ko_en';
+ const frontLang=mode==='ko_en'?'ko':'en';
+ const backLang=mode==='ko_en'?'en':'ko';
+ const lang=side==='front'?frontLang:backLang;
+ const raw=lang==='ko'?(row.ko||''):(row.en||'');
+ const html=lang==='ko'?escapeHtml(raw):formatStress(raw);
+ const plain=lang==='ko'?raw:stripStress(raw);
+ return {lang,html,plain};
+}
+function renderFlashcard(autoSpeak=false){
+ const frontEl=document.getElementById('flashFront');
+ const backEl=document.getElementById('flashBack');
+ const prog=document.getElementById('flashProgress');
+ const bar=document.getElementById('flashBarInner');
+ if(!frontEl||!backEl)return;
+ if(!flashOrderList.length){
+   frontEl.textContent=rows.length?'현재 조건에 표시할 카드가 없어.':'표를 불러온 뒤 시작을 눌러줘.';
+   backEl.innerHTML='';
+   backEl.classList.add('flash-hidden');
+   if(prog)prog.textContent='0 / 0';
+   if(bar)bar.style.width='0%';
+   return;
+ }
+ const row=getFlashCurrent();
+ if(!row)return;
+ const front=flashSide(row,'front');
+ const back=flashSide(row,'back');
+ frontEl.innerHTML=front.html;
+ backEl.innerHTML=back.html;
+ backEl.classList.toggle('flash-hidden',!flashRevealed);
+ if(prog)prog.textContent=`${flashIndex+1} / ${flashOrderList.length}`;
+ if(bar)bar.style.width=`${Math.round(((flashIndex+1)/flashOrderList.length)*100)}%`;
+ if(autoSpeak || document.getElementById('flashAutoSpeak')?.checked){
+   speakFlashText(flashRevealed?back:front);
+ }
+}
+async function speakFlashText(side){
+ if(!side||!side.plain)return;
+ stopSpeak();
+ await sleep(100);
+ const token=++playToken;
+ speaking=true;
+ paused=false;
+ const rate=side.lang==='ko'?document.getElementById('koRate').value:document.getElementById('enRate').value;
+ await speakText(side.plain,side.lang,rate,token);
+ if(token===playToken)speaking=false;
+}
+function flipFlashcard(){
+ if(!flashOrderList.length) startFlashcards();
+ if(!flashOrderList.length)return;
+ flashRevealed=!flashRevealed;
+ renderFlashcard(true);
+}
+function nextFlashcard(){
+ if(!flashOrderList.length) startFlashcards();
+ if(!flashOrderList.length)return;
+ flashIndex=(flashIndex+1)%flashOrderList.length;
+ flashRevealed=false;
+ renderFlashcard(true);
+}
+function prevFlashcard(){
+ if(!flashOrderList.length) startFlashcards();
+ if(!flashOrderList.length)return;
+ flashIndex=(flashIndex-1+flashOrderList.length)%flashOrderList.length;
+ flashRevealed=false;
+ renderFlashcard(true);
+}
+function handleFlashCardClick(){
+ if(!flashOrderList.length){startFlashcards();return;}
+ if(!flashRevealed){flipFlashcard();}
+ else{nextFlashcard();}
+}
+function copyFlashText(lang){
+ const row=getFlashCurrent();
+ if(!row){alert('복사할 플래시카드가 없어.');return;}
+ const text=lang==='ko'?(row.ko||''):stripStress(row.en||'');
+ if(!text.trim()){alert('복사할 내용이 없어.');return;}
+ navigator.clipboard.writeText(text);
+ alert((lang==='ko'?'한글':'영어')+'을 복사했어.');
+}
+document.addEventListener('keydown',function(e){
+ const tag=(e.target&&e.target.tagName||'').toLowerCase();
+ if(tag==='input'||tag==='textarea'||tag==='select')return;
+ if(e.code==='Space'){e.preventDefault();flipFlashcard();}
+ else if(e.key==='ArrowRight'){nextFlashcard();}
+ else if(e.key==='ArrowLeft'){prevFlashcard();}
+});
 
 function storageSafe(s){return encodeURIComponent(String(s||'')).slice(0,1800);}
 function getPracticeKey(row){return 'ls_practice_'+storageSafe((row.en||'')+'|'+(row.ko||''));}
