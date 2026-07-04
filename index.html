@@ -20,6 +20,11 @@
 body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;background:var(--bg);color:var(--text)}
 .wrap{width:98vw;max-width:1900px;margin:0 auto;padding:18px}
 h1{font-size:23px;font-weight:800;margin:6px 0 16px;letter-spacing:-.2px}
+.brand{margin:4px 0 20px}
+.brand-title{font-size:36px;font-weight:900;letter-spacing:-.8px;margin:0;line-height:1;display:inline-flex}
+.brand-repeat-1{color:var(--primary)}
+.brand-repeat-2{color:var(--filter)}
+.brand-tagline{font-size:13px;color:var(--text-muted);font-weight:700;margin-top:7px;letter-spacing:.03em}
 .card{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(15,23,42,.05)}
 .card>b{display:block;font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px}
 textarea{width:100%;height:150px;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:15px;line-height:1.45;background:#fff}
@@ -124,59 +129,105 @@ tr.only-forget-hidden{display:none!important}
 .flash-help{font-size:12.5px;color:var(--text-muted);margin-top:8px}
 .flash-hidden{display:none!important}
 
+.scramble-box{background:#fbf9f6;border:1px solid var(--neutral);border-left:4px solid var(--primary);border-radius:12px;padding:14px;margin:10px 0 14px}
+.scramble-box b{margin-bottom:0}
+.scramble-prompt{font-size:19px;font-weight:800;margin:10px 0 4px;line-height:1.5;white-space:pre-wrap;color:var(--text)}
+.scramble-pool{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;min-height:44px}
+.scramble-chip{background:#fff;border:1px solid var(--primary);color:var(--primary-dark);border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer;font-size:14.5px}
+.scramble-chip:hover{background:var(--primary-tint)}
+.scramble-chip.used{opacity:.28;pointer-events:none}
+.scramble-answer-row{display:flex;gap:6px;align-items:center;margin:8px 0;flex-wrap:wrap}
+.scramble-input{flex:1;min-width:220px;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:15px}
+.scramble-feedback{margin-top:8px;padding:9px 11px;border-radius:8px;font-weight:700;font-size:14px}
+.scramble-feedback.correct{background:var(--success-tint);color:var(--success-dark)}
+.scramble-feedback.wrong{background:var(--danger-tint);color:var(--danger-dark)}
+.scramble-result{margin-top:12px;padding:12px;background:var(--neutral-tint);border-radius:10px}
+.scramble-result table{width:100%;border-collapse:collapse;margin-top:8px;background:#fff}
+.scramble-result td,.scramble-result th{border:1px solid var(--border);padding:6px 8px;font-size:13.5px;text-align:left}
+.scramble-result .num-col{width:52px;text-align:center}
+
+.mode-switch{gap:10px}
+.mode-btn{background:#fff;border:1px solid var(--border);color:var(--text-muted);font-weight:800;padding:10px 18px;font-size:14.5px}
+.mode-btn:hover{background:var(--neutral-tint)}
+.mode-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.mode-panel{display:none}
+.mode-panel.active{display:block}
+
 </style>
 </head>
 <body>
 <div class="wrap">
-<h1>한글 영어 읽기 프로그램</h1>
+<div class="brand">
+  <h1 class="brand-title"><span class="brand-repeat-1">Repeat</span><span class="brand-repeat-2">Repeat</span></h1>
+  <div class="brand-tagline">한글 · 영어 문장 암기 트레이너</div>
+</div>
 
+<div id="loadArea">
 <div class="card">
-  <b>0. 엑셀 문장집 불러오기</b>
+  <b>엑셀 파일 불러오기</b>
   <div class="toolbar">
-    <span class="book-name">문장집</span>
     <input type="file" id="bookExcelInput" accept=".xlsx,.xls" multiple onchange="loadWorkbookFiles(this.files)">
-    <span class="book-name">Unit</span>
-    <select id="unitFilter" onchange="renderItemSelect()"><option value="">전체</option></select>
-    <span class="book-name">묶음</span>
-    <select id="unitSelect"><option value="">엑셀 파일을 먼저 선택</option></select>
+    <button class="secondary" onclick="loadAllItems()">전체 문장</button>
+    <button class="orange" onclick="loadAllImportantItems()">⭐ 전체 중요문장</button>
+    <button class="orange" onclick="loadRandomImportantItem()">🎲 중요문장 랜덤 1개</button>
   </div>
   <div class="toolbar">
-    <button onclick="loadSelectedItem()">선택 불러오기</button>
-    <button class="secondary" onclick="loadAllItems()">전체 불러오기</button>
-    <button class="orange" onclick="loadImportantItems()">⭐ 중요만 불러오기</button>
+    <select id="unitFilter" onchange="renderItemSelect()"><option value="">전체</option></select>
+    <select id="unitSelect"><option value="">엑셀 파일을 먼저 선택</option></select>
+    <button onclick="loadSelectedItem()">선택 문장</button>
+    <button class="orange" onclick="loadImportantItems()">선택 중요문장</button>
+  </div>
+  <div class="toolbar">
     <input type="number" id="randomCount" class="random-count" min="1" step="1" value="10">
     <button class="orange" onclick="loadRandomItems()">랜덤 불러오기</button>
   </div>
-  <div class="toolbar">
-    <button class="orange" onclick="loadAllImportantItems()">⭐ 전체 중요문장 불러오기</button>
-    <button class="orange" onclick="loadRandomImportantItem()">🎲 중요문장 랜덤 1개</button>
-  </div>
-  <div class="hint">파일 선택 창에서 여러 개(Ctrl/Shift로 다중 선택)를 고르면 한 번에 합쳐서 불러와. 파일이 2개 이상이면 Unit 목록에 "파일명::시트명"으로 구분해서 표시돼. 답변 탭은 헤더 아래에서 빈 줄 전까지 한 묶음으로 읽어. 같은 묶음 안의 unit/그룹/질문 번호는 전부 질문 박스에 표시해. "⭐ 중요만 불러오기"는 Unit/묶음에서 고른 범위 안에서만, "⭐ 전체 중요문장 불러오기"는 필터와 상관없이 문장집 전체에서 중요도=1로 표시된 묶음들을 처음부터 빈 줄 직전까지 통째로 전부 불러와. "🎲 중요문장 랜덤 1개"는 문장집 전체의 중요 묶음들 중 딱 하나만 랜덤으로 불러와.</div>
+  <div class="hint">파일 선택 창에서 여러 개(Ctrl/Shift로 다중 선택)를 고르면 한 번에 합쳐서 불러와. 파일이 2개 이상이면 Unit 목록에 "파일명::시트명"으로 구분해서 표시돼. 답변 탭은 헤더 아래에서 빈 줄 전까지 한 묶음으로 읽어. 같은 묶음 안의 unit/그룹/질문 번호는 전부 질문 박스에 표시해. "선택 중요문장"는 Unit/묶음에서 고른 범위 안에서만, "⭐ 전체 중요문장"는 필터와 상관없이 문장집 전체에서 중요도=1로 표시된 묶음들을 처음부터 빈 줄 직전까지 통째로 전부 불러와. "🎲 중요문장 랜덤 1개"는 문장집 전체의 중요 묶음들 중 딱 하나만 랜덤으로 불러와.</div>
 </div>
 
 <div class="card">
-<b>1. 데이터 넣기</b>
+<div class="toolbar"><button class="secondary small" id="manualEntryToggleBtn" onclick="toggleManualEntry()">✏ 데이터 직접 넣기</button></div>
+<div id="manualEntryBox" style="display:none">
 <div class="hint">탭 또는 엔터로 구분된 한글/영어 문장을 붙여넣거나, Excel/CSV/TXT 파일을 불러와.</div>
 <textarea id="inputText" placeholder="한글<Tab>영어 또는 한글<Enter>영어 형태로 붙여넣기"></textarea>
 <div class="toolbar"><input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.txt" /><button onclick="parseText()">표 생성</button><button class="secondary" onclick="loadSample()">샘플 넣기</button><button class="gray" onclick="clearAll()">초기화</button></div>
 </div>
+</div>
+</div>
 
+<div id="studyArea" style="display:none">
 <div class="card">
-<b>2. 읽기 설정 / Python 코드</b>
+  <b>학습 모드 선택</b>
+  <div class="toolbar mode-switch">
+    <button id="modeBtn-table" class="mode-btn active" onclick="switchMode('table')">📋 표</button>
+    <button id="modeBtn-flash" class="mode-btn" onclick="switchMode('flash')">🧠 플래시카드</button>
+    <button id="modeBtn-scramble" class="mode-btn" onclick="switchMode('scramble')">🔤 단어 배열</button>
+    <button class="gray" onclick="clearAll()">초기화</button>
+  </div>
+</div>
+
+<div id="mode-table" class="card mode-panel active">
+<b>표 · 읽기 설정</b>
 <div class="toolbar-label">재생</div>
 <div class="toolbar"><button onclick="readAll('both')">▶ 표 읽기</button><button onclick="readAll('ko')">한글</button><button onclick="readAll('en')">영어</button><button class="orange" onclick="readRandom()">🎲 랜덤 읽기</button><button class="secondary" onclick="pauseSpeak()">⏸ 일시정지</button><button class="green" onclick="resumeSpeak()">▶ 이어읽기</button><button class="red" onclick="stopSpeak()">■ 정지</button></div>
 <div class="toolbar-label">Python 코드</div>
 <div class="toolbar"><button class="green" onclick="generatePython('both')">🐍 문장별 생성 코드</button><button class="green" onclick="generatePython('ko')">🇰🇷 한글 한 파일 코드</button><button class="green" onclick="generatePython('en')">🇺🇸 영어 한 파일 코드</button><button class="green" onclick="downloadPython()">💾 .py 저장</button><button class="secondary" onclick="copyPython()">📋 코드 복사</button></div>
 <div class="toolbar-label">옵션</div>
 <div class="toolbar"><label>읽기 순서<select id="orderMode"><option value="ko_en">한글 → 영어</option><option value="en_ko">영어 → 한글</option></select></label><label>반복 <input id="repeatCount" type="number" min="1" value="1" style="width:60px"> 회</label><label>한글/영어 사이 쉬기 <input id="pairGapSec" type="number" min="0" step="0.1" value="5" style="width:70px"> 초</label><label>문장 사이 쉬기 <input id="gapSec" type="number" min="0" step="0.1" value="1.0" style="width:70px"> 초</label><label>키워드 사이 쉬기 <input id="keywordGapSec" type="number" min="0" step="0.5" value="5" style="width:70px"> 초</label><label><input id="pythonRandom" type="checkbox"> Python 랜덤 순서</label><label>한글 속도 <input id="koRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label><label>영어 속도 <input id="enRate" type="number" min="0.5" max="2" step="0.1" value="1.0" style="width:70px"></label><label>파일명 <input id="baseName" value="opic_practice" style="width:150px"></label></div>
+
+<div id="pythonCard" style="display:none;margin-top:10px"><b>생성된 Python 코드</b><pre id="pythonCode"></pre></div>
+
+<div class="hint" style="margin-top:10px">각 행의 ▶전체 / 한글 / 영어 / 🔁 버튼으로 그 문장만 읽을 수 있어.</div>
+<div id="questionBox" class="question-box" style="display:none"><b>질문</b><div id="questionList"></div></div>
+<div class="toolbar-label">보기 옵션</div>
+<div class="toolbar"><button id="practiceToggleBtn" class="green small" onclick="togglePracticeColumn(this)">✍ 연습칸 보이기</button><button id="forgetOnlyBtn" class="orange small" onclick="toggleForgetOnly(this)">☑ 안 외워진 것만 보기</button></div>
+<div class="toolbar-label">연습 관리</div>
+<div class="toolbar"><span class="hint" style="margin:0 4px 0 0">연습칸에 적어보며 외우기</span><button class="green small" onclick="copyPracticeColumn()">✍ 연습 복사</button><button class="gray small" onclick="clearCurrentPractice()">현재 표 연습 삭제</button><button class="red small" onclick="clearAllPractice()">전체 연습 삭제</button></div>
+<div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">✓</th><th class="num">번호</th><th class="kr">한글 <button class="green small" onclick="displayRow('ko', this)">숨기기</button><button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="green small" onclick="displayRow('en', this)">숨기기</button><button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="actions actions-header">기능 <button id="actionsToggleBtn" class="green small" onclick="toggleActionsColumn(this)">숨기기</button></th><th class="practice-cell practice-hidden">✍ 연습</th></tr></thead><tbody></tbody></table></div>
 </div>
 
-<div class="card" id="pythonCard" style="display:none"><b>생성된 Python 코드</b><pre id="pythonCode"></pre></div>
-
-<div class="card"><b>3. 생성된 표</b><div class="hint">각 행의 ▶전체 / 한글 / 영어 / 🔁 버튼으로 그 문장만 읽을 수 있어.</div>
-
+<div id="mode-flash" class="card mode-panel">
+<b>🧠 플래시카드로 암기하기</b>
 <div class="flash-card-box">
-  <b>🧠 암기하기</b>
   <div class="flash-options">
     <label>모드
       <select id="flashMode" onchange="resetFlashcard()">
@@ -191,13 +242,6 @@ tr.only-forget-hidden{display:none!important}
       </select>
     </label>
     <label><input type="checkbox" id="flashAutoSpeak"> 자동 음성</label>
-    <label>음성 범위
-      <select id="flashAutoSpeakMode">
-        <option value="all">모두 읽기</option>
-        <option value="ko">한글만 읽기</option>
-        <option value="en">영어만 읽기</option>
-      </select>
-    </label>
     <button class="green small" onclick="startFlashcards()">시작</button>
     <button class="secondary small" onclick="prevFlashcard()">◀ 이전</button>
     <button class="secondary small" onclick="flipFlashcard()">뒤집기</button>
@@ -215,13 +259,48 @@ tr.only-forget-hidden{display:none!important}
   </div>
   <div class="flash-help">카드 클릭: 정답 보기 → 다음 카드 / Space: 뒤집기 / ← →: 이전·다음</div>
 </div>
+</div>
 
-<div id="questionBox" class="question-box" style="display:none"><b>질문</b><div id="questionList"></div></div>
-<div class="toolbar-label">보기 옵션</div>
-<div class="toolbar"><button id="practiceToggleBtn" class="green small" onclick="togglePracticeColumn(this)">✍ 연습칸 보이기</button><button id="forgetOnlyBtn" class="orange small" onclick="toggleForgetOnly(this)">☑ 안 외워진 것만 보기</button></div>
-<div class="toolbar-label">연습 관리</div>
-<div class="toolbar"><span class="hint" style="margin:0 4px 0 0">연습칸에 적어보며 외우기</span><button class="green small" onclick="copyPracticeColumn()">✍ 연습 복사</button><button class="gray small" onclick="clearCurrentPractice()">현재 표 연습 삭제</button><button class="red small" onclick="clearAllPractice()">전체 연습 삭제</button></div>
-<div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">✓</th><th class="num">번호</th><th class="kr">한글 <button class="green small" onclick="displayRow('ko', this)">숨기기</button><button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="green small" onclick="displayRow('en', this)">숨기기</button><button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="actions actions-header">기능 <button id="actionsToggleBtn" class="green small" onclick="toggleActionsColumn(this)">숨기기</button></th><th class="practice-cell practice-hidden">✍ 연습</th></tr></thead><tbody></tbody></table></div>
+<div id="mode-scramble" class="card mode-panel">
+<b>🔤 단어 배열 연습</b>
+<div class="scramble-box">
+  <div class="flash-options">
+    <label>모드
+      <select id="scrambleMode" onchange="resetScramble()">
+        <option value="ko_en">한글 보고 영어 배열</option>
+        <option value="en_ko">영어 보고 한글 배열</option>
+      </select>
+    </label>
+    <label>순서
+      <select id="scrambleOrder" onchange="resetScramble()">
+        <option value="seq">순서대로</option>
+        <option value="random">랜덤</option>
+      </select>
+    </label>
+    <button class="green small" onclick="startScramble()">시작</button>
+    <span id="scrambleProgress" class="flash-progress">0 / 0</span>
+  </div>
+  <div class="flash-bar"><div id="scrambleBarInner" class="flash-bar-inner"></div></div>
+
+  <div id="scramblePrompt" class="scramble-prompt">표를 불러온 뒤 시작을 눌러줘.</div>
+  <div id="scramblePool" class="scramble-pool"></div>
+
+  <div class="scramble-answer-row">
+    <input id="scrambleInput" class="scramble-input" placeholder="단어를 눌러서 순서대로 배열하거나, 직접 타이핑해도 돼" oninput="onScrambleInputChange()" onkeydown="scrambleInputKeydown(event)" disabled>
+    <button class="secondary small" onclick="scrambleUndo()">⌫ 되돌리기</button>
+    <button class="gray small" onclick="scrambleResetInput()">지우기</button>
+  </div>
+
+  <div class="flash-options">
+    <button class="green small" onclick="checkScramble()">✅ 정답 확인</button>
+    <button class="secondary small" onclick="nextScramble()">다음 ▶</button>
+  </div>
+
+  <div id="scrambleFeedback" class="scramble-feedback flash-hidden"></div>
+  <div id="scrambleResult" class="scramble-result flash-hidden"></div>
+  <div class="flash-help">단어 칩을 순서대로 눌러서 문장을 완성하거나, 입력창에 직접 타이핑해도 돼. "정답 확인"으로 채점하고 "다음"으로 넘어가면, 끝났을 때 틀린 문장만 표 번호와 함께 모아서 보여줘.</div>
+</div>
+</div>
 </div>
 <script>
 let rows=[],practiceVisible=false,actionsVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[];
@@ -480,7 +559,7 @@ function renderItemSelect(){
    select.innerHTML='<option value="">선택한 Unit에 문장이 없음</option>';
    return;
  }
- select.innerHTML='<option value="__ALL__">▲ 전체 불러오기</option>'+list.map(i=>`<option value="${escapeAttr(i.key)}">${escapeHtml(i.label)}</option>`).join('');
+ select.innerHTML='<option value="__ALL__">▲ 전체 문장</option>'+list.map(i=>`<option value="${escapeAttr(i.key)}">${escapeHtml(i.label)}</option>`).join('');
 }
 
 function itemToPairs(item){return item.answers.map(a=>({ko:a.ko,en:a.en,important:!!a.important,notMemorized:!!a.notMemorized}));}
@@ -680,7 +759,23 @@ function renderTable(){
  applyActionsVisibility();
  applyForgetOnlyButton();
  resetFlashcard();
+ resetScramble();
+ applyStudyAreaVisibility();
  setTimeout(refreshPracticeHeights,0);
+}
+function applyStudyAreaVisibility(){
+ const area=document.getElementById('studyArea');
+ const loadArea=document.getElementById('loadArea');
+ if(area) area.style.display = rows.length ? 'block' : 'none';
+ if(loadArea) loadArea.style.display = rows.length ? 'none' : 'block';
+}
+function toggleManualEntry(){
+ const box=document.getElementById('manualEntryBox');
+ const btn=document.getElementById('manualEntryToggleBtn');
+ if(!box)return;
+ const showing=box.style.display!=='none';
+ box.style.display=showing?'none':'block';
+ if(btn)btn.textContent=showing?'✏ 데이터 직접 넣기':'✏ 숨기기';
 }
 function getVisibleRowIndices(){
  return rows.map((r,i)=>({r,i})).filter(x=>!showOnlyNotMemorized || x.r.notMemorized).map(x=>x.i);
@@ -702,6 +797,7 @@ function toggleForgetOnly(btn){
  updateCountInfo();
  applyForgetOnlyButton();
  resetFlashcard();
+ resetScramble();
 }
 
 
@@ -762,14 +858,8 @@ function renderFlashcard(autoSpeak=false){
    speakFlashText(flashRevealed?back:front);
  }
 }
-function shouldSpeakFlashSide(side){
- if(!side||!side.lang)return false;
- const mode=document.getElementById('flashAutoSpeakMode')?.value || 'all';
- return mode==='all' || mode===side.lang;
-}
 async function speakFlashText(side){
  if(!side||!side.plain)return;
- if(!shouldSpeakFlashSide(side))return;
  stopSpeak();
  await sleep(100);
  const token=++playToken;
@@ -812,6 +902,174 @@ function copyFlashText(lang){
  navigator.clipboard.writeText(text);
  alert((lang==='ko'?'한글':'영어')+'을 복사했어.');
 }
+
+let scrambleOrderList=[],scrambleIndex=0,scrambleTokens=[],scrambleChipOrder=[],scrambleUsedStack=[],scrambleWrongs=[],scrambleFinished=false;
+function tokenizeSentence(text){
+ const clean=stripStress(text||'').trim();
+ if(!clean)return[];
+ return clean.split(/\s+/).filter(Boolean);
+}
+function normalizeForCompare(text){
+ return String(text||'').toLowerCase().replace(/[.,!?'"“”‘’]/g,'').replace(/\s+/g,' ').trim();
+}
+function buildScrambleOrder(){
+ const indices=getVisibleRowIndices().filter(i=>rows[i]&&((rows[i].ko||'').trim()||(rows[i].en||'').trim()));
+ scrambleOrderList=document.getElementById('scrambleOrder')?.value==='random'?shuffleArray(indices):indices;
+ scrambleIndex=0;
+ scrambleWrongs=[];
+ scrambleFinished=false;
+}
+function resetScramble(){
+ buildScrambleOrder();
+ renderScrambleQuestion();
+ const res=document.getElementById('scrambleResult');
+ if(res){res.classList.add('flash-hidden');res.innerHTML='';}
+}
+function startScramble(){
+ if(!rows.length){alert('먼저 표를 생성해줘.');return;}
+ buildScrambleOrder();
+ renderScrambleQuestion();
+ const res=document.getElementById('scrambleResult');
+ if(res){res.classList.add('flash-hidden');res.innerHTML='';}
+}
+function currentScrambleRow(){
+ if(!scrambleOrderList.length)return null;
+ const rowIndex=scrambleOrderList[scrambleIndex];
+ return {rowIndex,row:rows[rowIndex]};
+}
+function scrambleSides(row){
+ const mode=document.getElementById('scrambleMode')?.value||'ko_en';
+ const promptLang=mode==='ko_en'?'ko':'en';
+ const answerLang=mode==='ko_en'?'en':'ko';
+ return {
+  promptLang,answerLang,
+  promptText:promptLang==='ko'?(row.ko||''):stripStress(row.en||''),
+  answerText:answerLang==='ko'?(row.ko||''):stripStress(row.en||'')
+ };
+}
+function renderScrambleQuestion(){
+ const promptEl=document.getElementById('scramblePrompt');
+ const poolEl=document.getElementById('scramblePool');
+ const inputEl=document.getElementById('scrambleInput');
+ const prog=document.getElementById('scrambleProgress');
+ const bar=document.getElementById('scrambleBarInner');
+ const fb=document.getElementById('scrambleFeedback');
+ if(!promptEl||!poolEl||!inputEl)return;
+ if(fb){fb.className='scramble-feedback flash-hidden';fb.innerHTML='';}
+ if(!scrambleOrderList.length){
+   promptEl.textContent=rows.length?'현재 조건에 배열할 문장이 없어.':'표를 불러온 뒤 시작을 눌러줘.';
+   poolEl.innerHTML='';inputEl.value='';inputEl.disabled=true;
+   if(prog)prog.textContent='0 / 0';
+   if(bar)bar.style.width='0%';
+   return;
+ }
+ const cur=currentScrambleRow();
+ if(!cur||!cur.row)return;
+ const {promptText,answerText}=scrambleSides(cur.row);
+ promptEl.textContent=promptText||'(내용 없음)';
+ scrambleTokens=tokenizeSentence(answerText);
+ scrambleChipOrder=shuffleArray(scrambleTokens.map((t,idx)=>idx));
+ scrambleUsedStack=[];
+ inputEl.value='';
+ inputEl.disabled=false;
+ renderScramblePool();
+ if(prog)prog.textContent=`${scrambleIndex+1} / ${scrambleOrderList.length}`;
+ if(bar)bar.style.width=`${Math.round(scrambleIndex/scrambleOrderList.length*100)}%`;
+}
+function renderScramblePool(){
+ const poolEl=document.getElementById('scramblePool');
+ if(!poolEl)return;
+ poolEl.innerHTML=scrambleChipOrder.map(idx=>{
+   const used=scrambleUsedStack.includes(idx);
+   return `<button type="button" class="scramble-chip${used?' used':''}" onclick="scrambleClickChip(${idx})">${escapeHtml(scrambleTokens[idx])}</button>`;
+ }).join('');
+}
+function scrambleClickChip(idx){
+ if(scrambleUsedStack.includes(idx))return;
+ scrambleUsedStack.push(idx);
+ const inputEl=document.getElementById('scrambleInput');
+ if(inputEl){
+   const cur=inputEl.value.replace(/\s+$/,'');
+   inputEl.value=cur?(cur+' '+scrambleTokens[idx]):scrambleTokens[idx];
+   inputEl.focus();
+ }
+ renderScramblePool();
+}
+function scrambleUndo(){
+ if(!scrambleUsedStack.length)return;
+ scrambleUsedStack.pop();
+ const inputEl=document.getElementById('scrambleInput');
+ if(inputEl){
+   const parts=inputEl.value.trim().split(/\s+/).filter(Boolean);
+   parts.pop();
+   inputEl.value=parts.join(' ');
+ }
+ renderScramblePool();
+}
+function scrambleResetInput(){
+ scrambleUsedStack=[];
+ const inputEl=document.getElementById('scrambleInput');
+ if(inputEl)inputEl.value='';
+ renderScramblePool();
+}
+function onScrambleInputChange(){}
+function scrambleInputKeydown(e){
+ if(e.key==='Enter'){e.preventDefault();checkScramble();}
+}
+function checkScramble(){
+ const cur=currentScrambleRow();
+ if(!cur||!cur.row){alert('먼저 시작을 눌러줘.');return;}
+ const {answerText}=scrambleSides(cur.row);
+ const inputEl=document.getElementById('scrambleInput');
+ const userText=inputEl?inputEl.value:'';
+ const correct=normalizeForCompare(userText)===normalizeForCompare(answerText);
+ if(!correct){
+   scrambleWrongs.push({rowIndex:cur.rowIndex,ko:cur.row.ko||'',en:cur.row.en||''});
+ }
+ const fb=document.getElementById('scrambleFeedback');
+ if(fb){
+   fb.className='scramble-feedback '+(correct?'correct':'wrong');
+   fb.innerHTML=correct?'✅ 정답이야!':`❌ 오답이야. 정답: <b>${escapeHtml(stripStress(answerText))}</b>`;
+ }
+}
+function nextScramble(){
+ if(!scrambleOrderList.length)return;
+ if(scrambleIndex>=scrambleOrderList.length-1){finishScramble();return;}
+ scrambleIndex++;
+ renderScrambleQuestion();
+}
+function finishScramble(){
+ scrambleFinished=true;
+ const promptEl=document.getElementById('scramblePrompt');
+ const poolEl=document.getElementById('scramblePool');
+ const inputEl=document.getElementById('scrambleInput');
+ const prog=document.getElementById('scrambleProgress');
+ const bar=document.getElementById('scrambleBarInner');
+ const fb=document.getElementById('scrambleFeedback');
+ const res=document.getElementById('scrambleResult');
+ if(promptEl)promptEl.textContent='🎉 이번 배열 연습 끝!';
+ if(poolEl)poolEl.innerHTML='';
+ if(inputEl){inputEl.value='';inputEl.disabled=true;}
+ if(prog)prog.textContent=`${scrambleOrderList.length} / ${scrambleOrderList.length}`;
+ if(bar)bar.style.width='100%';
+ if(fb){fb.className='scramble-feedback flash-hidden';fb.innerHTML='';}
+ if(res){
+   res.classList.remove('flash-hidden');
+   const total=scrambleOrderList.length;
+   const wrongCount=scrambleWrongs.length;
+   const correctCount=total-wrongCount;
+   let html=`<div><b>결과: ${total}문장 중 정답 ${correctCount}개 / 오답 ${wrongCount}개</b></div>`;
+   if(wrongCount){
+     html+='<table><thead><tr><th class="num-col">번호</th><th>한글</th><th>영어</th></tr></thead><tbody>';
+     html+=scrambleWrongs.map(w=>`<tr><td class="num-col">${w.rowIndex+1}</td><td>${escapeHtml(w.ko)}</td><td>${formatStress(w.en)}</td></tr>`).join('');
+     html+='</tbody></table>';
+   }else{
+     html+='<div style="margin-top:8px">오답 없이 전부 맞췄어! 🎉</div>';
+   }
+   res.innerHTML=html;
+ }
+}
+
 document.addEventListener('keydown',function(e){
  const tag=(e.target&&e.target.tagName||'').toLowerCase();
  if(tag==='input'||tag==='textarea'||tag==='select')return;
@@ -893,6 +1151,16 @@ function applyPracticeVisibility(){document.querySelectorAll('.practice-cell').f
 function togglePracticeColumn(btn){practiceVisible=!practiceVisible;applyPracticeVisibility();if(practiceVisible)setTimeout(refreshPracticeHeights,0);}
 function applyActionsVisibility(){document.querySelectorAll('.actions-col,.actions-header').forEach(el=>{el.classList.toggle('actions-hidden',!actionsVisible);});const btn=document.getElementById('actionsToggleBtn');if(btn)btn.textContent=actionsVisible?'숨기기':'보이기';}
 function toggleActionsColumn(btn){actionsVisible=!actionsVisible;applyActionsVisibility();}
+let currentMode='table';
+function switchMode(mode){
+ currentMode=mode;
+ ['table','flash','scramble'].forEach(m=>{
+   const panel=document.getElementById('mode-'+m);
+   const btn=document.getElementById('modeBtn-'+m);
+   if(panel)panel.classList.toggle('active', m===mode);
+   if(btn)btn.classList.toggle('active', m===mode);
+ });
+}
 document.getElementById('fileInput').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;const name=file.name.toLowerCase();if(name.endsWith('.txt')||name.endsWith('.csv')){document.getElementById('inputText').value=await file.text();parseText();return;}const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];const arr=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false});rows=[];arr.forEach(line=>{const ko=val(line,0),en=val(line,1);if(ko&&en&&!isHeader(ko,en))rows.push({ko,en,important:false,notMemorized:false,done:false});});document.getElementById('inputText').value=rows.map(r=>`${r.ko}\t${r.en}`).join('\n');renderTable();});
 function rateToEdge(v){const n=Number(v||1),pct=Math.round((n-1)*100);return pct===0?'+0%':pct>0?`+${pct}%`:`${pct}%`;}
 function getPythonDataBlock(){return rows.map(r=>`    (${pyStr(r.ko)}, ${pyStr(stripStress(r.en))})`).join(',\n');}
