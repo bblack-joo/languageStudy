@@ -311,7 +311,7 @@ tr.only-forget-hidden{display:none!important}
     <textarea
         id="scrambleInput"
         class="scramble-input"
-        placeholder="단어를 눌러서 순서대로 배열하거나, 직접 입력해도 돼"
+        placeholder="단어를 눌러서 순서대로 배열하거나, 직접 타이핑해도 돼"
         oninput="onScrambleInputChange(); saveScrambleCursor(); autoGrowScramble(this);"
         onclick="saveScrambleCursor()"
         onkeyup="saveScrambleCursor()"
@@ -320,25 +320,25 @@ tr.only-forget-hidden{display:none!important}
         disabled
     ></textarea>
 
-    <div class="scramble-buttons">
+</div>
 
-        <button class="orange small" onclick="startScrambleSpeech()">
-            🎙 입력 시작
-        </button>
+<div class="scramble-button-row">
 
-        <button class="red small" onclick="stopScrambleSpeech()">
-            ⏹ 입력 종료
-        </button>
+    <button class="orange small" onclick="startScrambleSpeech()">
+        🎙 입력 시작
+    </button>
 
-        <button class="secondary small" onclick="scrambleUndo()">
-            ⌫ 되돌리기
-        </button>
+    <button class="red small" onclick="stopScrambleSpeech()">
+        ⏹ 입력 종료
+    </button>
 
-        <button class="gray small" onclick="scrambleResetInput()">
-            지우기
-        </button>
+    <button class="secondary small" onclick="scrambleUndo()">
+        ⌫ 되돌리기
+    </button>
 
-    </div>
+    <button class="gray small" onclick="scrambleResetInput()">
+        지우기
+    </button>
 
 </div>
 
