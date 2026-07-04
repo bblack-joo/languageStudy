@@ -287,6 +287,8 @@ tr.only-forget-hidden{display:none!important}
 
   <div class="scramble-answer-row">
     <input id="scrambleInput" class="scramble-input" placeholder="단어를 눌러서 순서대로 배열하거나, 직접 타이핑해도 돼" oninput="onScrambleInputChange()" onkeydown="scrambleInputKeydown(event)" disabled readonly>
+    <button class="orange small" onclick="startScrambleSpeech()">🎙 입력 시작</button>
+    <button class="red small" onclick="stopScrambleSpeech()">⏹ 입력 종료</button>
     <button class="secondary small" onclick="scrambleUndo()">⌫ 되돌리기</button>
     <button class="gray small" onclick="scrambleResetInput()">지우기</button>
   </div>
@@ -992,7 +994,7 @@ function scrambleClickChip(idx){
  if(inputEl){
    const cur=inputEl.value.replace(/\s+$/,'');
    inputEl.value=cur?(cur+' '+scrambleTokens[idx]):scrambleTokens[idx];
-   inputEl.focus();
+   //inputEl.focus();
  }
  renderScramblePool();
 }
@@ -1017,6 +1019,79 @@ function onScrambleInputChange(){}
 function scrambleInputKeydown(e){
  if(e.key==='Enter'){e.preventDefault();checkScramble();}
 }
+
+let scrambleRecognition = null;
+
+function startScrambleSpeech(){
+  const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if(!SpeechRecognition){
+    alert('이 브라우저는 음성인식을 지원하지 않아. Chrome/Edge에서 사용해줘.');
+    return;
+  }
+
+  const input = document.getElementById('scrambleInput');
+  if(input){
+    input.removeAttribute('readonly');
+  }
+
+  scrambleRecognition = new SpeechRecognition();
+  scrambleRecognition.lang =
+    document.getElementById('scrambleMode').value === 'ko_en'
+      ? 'en-US'
+      : 'ko-KR';
+
+  scrambleRecognition.interimResults = true;
+  scrambleRecognition.continuous = true;
+
+  let finalText = input ? input.value.trim() : '';
+
+  scrambleRecognition.onresult = function(event){
+    let interim = '';
+
+    for(let i = event.resultIndex; i < event.results.length; i++){
+      const text = event.results[i][0].transcript.trim();
+
+      if(event.results[i].isFinal){
+        finalText = finalText ? finalText + ' ' + text : text;
+      }else{
+        interim = text;
+      }
+    }
+
+    if(input){
+      input.value = (finalText + ' ' + interim).trim();
+    }
+  };
+
+  scrambleRecognition.onerror = function(){
+    alert('음성인식이 잘 안 됐어. 다시 눌러줘.');
+  };
+
+  scrambleRecognition.start();
+}
+
+function stopScrambleSpeech(){
+  if(scrambleRecognition){
+    scrambleRecognition.stop();
+    scrambleRecognition = null;
+  }
+
+  const input = document.getElementById('scrambleInput');
+  if(input){
+    input.setAttribute('readonly', true);
+  }
+}
+
+function enableScrambleTyping(){
+  const input = document.getElementById('scrambleInput');
+  if(!input) return;
+
+  input.removeAttribute('readonly');
+  input.focus();
+}
+
 function checkScramble(){
  const cur=currentScrambleRow();
  if(!cur||!cur.row){alert('먼저 시작을 눌러줘.');return;}
