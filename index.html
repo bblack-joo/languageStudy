@@ -191,6 +191,13 @@ tr.only-forget-hidden{display:none!important}
       </select>
     </label>
     <label><input type="checkbox" id="flashAutoSpeak"> 자동 음성</label>
+    <label>음성 범위
+      <select id="flashAutoSpeakMode">
+        <option value="all">모두 읽기</option>
+        <option value="ko">한글만 읽기</option>
+        <option value="en">영어만 읽기</option>
+      </select>
+    </label>
     <button class="green small" onclick="startFlashcards()">시작</button>
     <button class="secondary small" onclick="prevFlashcard()">◀ 이전</button>
     <button class="secondary small" onclick="flipFlashcard()">뒤집기</button>
@@ -755,8 +762,14 @@ function renderFlashcard(autoSpeak=false){
    speakFlashText(flashRevealed?back:front);
  }
 }
+function shouldSpeakFlashSide(side){
+ if(!side||!side.lang)return false;
+ const mode=document.getElementById('flashAutoSpeakMode')?.value || 'all';
+ return mode==='all' || mode===side.lang;
+}
 async function speakFlashText(side){
  if(!side||!side.plain)return;
+ if(!shouldSpeakFlashSide(side))return;
  stopSpeak();
  await sleep(100);
  const token=++playToken;
