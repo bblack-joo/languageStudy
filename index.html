@@ -136,8 +136,29 @@ tr.only-forget-hidden{display:none!important}
 .scramble-chip{background:#fff;border:1px solid var(--primary);color:var(--primary-dark);border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer;font-size:14.5px}
 .scramble-chip:hover{background:var(--primary-tint)}
 .scramble-chip.used{opacity:.28;pointer-events:none}
-.scramble-answer-row{display:flex;gap:6px;align-items:center;margin:8px 0;flex-wrap:wrap}
-.scramble-input{flex:1;min-width:220px;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:15px}
+.scramble-answer-row{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin:10px 0;
+}
+.scramble-input{
+    width:100%;
+    min-height:70px;
+    padding:10px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    font-size:15px;
+    line-height:1.6;
+    resize:none;
+    overflow:hidden;
+    box-sizing:border-box;
+}
+.scramble-buttons{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+}
 .scramble-feedback{margin-top:8px;padding:9px 11px;border-radius:8px;font-weight:700;font-size:14px}
 .scramble-feedback.correct{background:var(--success-tint);color:var(--success-dark)}
 .scramble-feedback.wrong{background:var(--danger-tint);color:var(--danger-dark)}
@@ -989,7 +1010,7 @@ function renderScrambleQuestion(){
  if(fb){fb.className='scramble-feedback flash-hidden';fb.innerHTML='';}
  if(!scrambleOrderList.length){
    promptEl.textContent=rows.length?'현재 조건에 배열할 문장이 없어.':'표를 불러온 뒤 시작을 눌러줘.';
-   poolEl.innerHTML='';inputEl.value='';inputEl.disabled=true;
+   poolEl.innerHTML='';inputEl.value='';autoGrowScramble(inputEl);inputEl.disabled=true;
    if(prog)prog.textContent='0 / 0';
    if(bar)bar.style.width='0%';
    return;
@@ -1037,6 +1058,7 @@ function scrambleClickChip(idx){
 
   scrambleUsedStack.push(idx);
   renderScramblePool();
+  autoGrowScramble(input);
 }
 
 function scrambleUndo(){
@@ -1051,15 +1073,27 @@ function scrambleUndo(){
  renderScramblePool();
 }
 function scrambleResetInput(){
- scrambleUsedStack=[];
- const inputEl=document.getElementById('scrambleInput');
- if(inputEl)inputEl.value='';
- renderScramblePool();
+
+    scrambleUsedStack=[];
+
+    const inputEl=document.getElementById('scrambleInput');
+
+    if(inputEl){
+
+        inputEl.value='';
+
+        autoGrowScramble(inputEl);
+
+    }
+
+    renderScramblePool();
+
 }
 function onScrambleInputChange(){}
 function scrambleInputKeydown(e){
  if(e.key==='Enter'){e.preventDefault();checkScramble();}
 }
+
 
 
 function startScrambleSpeech(){
@@ -1191,6 +1225,12 @@ function saveScrambleCursor(){
   if(!input) return;
   scrambleCursorPos = input.selectionStart ?? input.value.length;
 }
+function autoGrowScramble(el){
+
+    el.style.height = 'auto';
+
+    el.style.height = Math.max(70, el.scrollHeight) + 'px';
+
 
 document.addEventListener('keydown',function(e){
  const tag=(e.target&&e.target.tagName||'').toLowerCase();
