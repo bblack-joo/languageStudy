@@ -1020,8 +1020,6 @@ function scrambleInputKeydown(e){
  if(e.key==='Enter'){e.preventDefault();checkScramble();}
 }
 
-let scrambleRecognition = null;
-
 function startScrambleSpeech(){
   const SpeechRecognition =
     window.SpeechRecognition || window.webkitSpeechRecognition;
