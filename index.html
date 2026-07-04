@@ -286,12 +286,40 @@ tr.only-forget-hidden{display:none!important}
   <div id="scramblePool" class="scramble-pool"></div>
 
   <div class="scramble-answer-row">
-    <input id="scrambleInput" class="scramble-input" placeholder="단어를 눌러서 순서대로 배열하거나, 직접 타이핑해도 돼" oninput="onScrambleInputChange()" onkeydown="scrambleInputKeydown(event)" disabled >
-    <button class="orange small" onclick="startScrambleSpeech()">🎙 입력 시작</button>
-    <button class="red small" onclick="stopScrambleSpeech()">⏹ 입력 종료</button>
-    <button class="secondary small" onclick="scrambleUndo()">⌫ 되돌리기</button>
-    <button class="gray small" onclick="scrambleResetInput()">지우기</button>
-  </div>
+
+    <textarea
+        id="scrambleInput"
+        class="scramble-input"
+        placeholder="단어를 눌러서 순서대로 배열하거나, 직접 입력해도 돼"
+        oninput="onScrambleInputChange(); saveScrambleCursor(); autoGrowScramble(this);"
+        onclick="saveScrambleCursor()"
+        onkeyup="saveScrambleCursor()"
+        onselect="saveScrambleCursor()"
+        onkeydown="scrambleInputKeydown(event)"
+        disabled
+    ></textarea>
+
+    <div class="scramble-buttons">
+
+        <button class="orange small" onclick="startScrambleSpeech()">
+            🎙 입력 시작
+        </button>
+
+        <button class="red small" onclick="stopScrambleSpeech()">
+            ⏹ 입력 종료
+        </button>
+
+        <button class="secondary small" onclick="scrambleUndo()">
+            ⌫ 되돌리기
+        </button>
+
+        <button class="gray small" onclick="scrambleResetInput()">
+            지우기
+        </button>
+
+    </div>
+
+</div>
 
   <div class="flash-options">
     <button class="green small" onclick="checkScramble()">✅ 정답 확인</button>
@@ -988,16 +1016,29 @@ function renderScramblePool(){
  }).join('');
 }
 function scrambleClickChip(idx){
- if(scrambleUsedStack.includes(idx))return;
- scrambleUsedStack.push(idx);
- const inputEl=document.getElementById('scrambleInput');
- if(inputEl){
-   const cur=inputEl.value.replace(/\s+$/,'');
-   inputEl.value=cur?(cur+' '+scrambleTokens[idx]):scrambleTokens[idx];
-   //inputEl.focus();
- }
- renderScramblePool();
+  if(scrambleUsedStack.includes(idx)) return;
+
+  const input = document.getElementById('scrambleInput');
+  if(!input) return;
+
+  const word = scrambleTokens[idx];
+
+  const pos = Math.max(0, Math.min(scrambleCursorPos, input.value.length));
+  const before = input.value.slice(0, pos);
+  const after = input.value.slice(pos);
+
+  const leftSpace = before && !before.endsWith(' ') ? ' ' : '';
+  const rightSpace = after && !after.startsWith(' ') ? ' ' : '';
+
+  const insert = leftSpace + word + rightSpace;
+
+  input.value = before + insert + after;
+  scrambleCursorPos = before.length + insert.length;
+
+  scrambleUsedStack.push(idx);
+  renderScramblePool();
 }
+
 function scrambleUndo(){
  if(!scrambleUsedStack.length)return;
  scrambleUsedStack.pop();
@@ -1019,6 +1060,7 @@ function onScrambleInputChange(){}
 function scrambleInputKeydown(e){
  if(e.key==='Enter'){e.preventDefault();checkScramble();}
 }
+
 
 function startScrambleSpeech(){
   const SpeechRecognition =
@@ -1142,6 +1184,12 @@ function finishScramble(){
    }
    res.innerHTML=html;
  }
+}
+
+function saveScrambleCursor(){
+  const input = document.getElementById('scrambleInput');
+  if(!input) return;
+  scrambleCursorPos = input.selectionStart ?? input.value.length;
 }
 
 document.addEventListener('keydown',function(e){
