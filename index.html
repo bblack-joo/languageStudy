@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>한글 영어 읽기 프로그램</title>
+<title>언어 공부 프로그램</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
-  --primary:#40301F;--primary-dark:#2f2315;--primary-tint:#F1E9DC;
+  --primary:#40301F;--primary-dark:#2f2315;--primary-tint:#F1E9DC;ㅇ
   --neutral:#6E6A63;--neutral-dark:#57534c;--neutral-tint:#F1EFEB;
   --filter:#8A6A46;--filter-dark:#725636;--filter-tint:#F5EFE4;
   --success:#5C4A32;--success-dark:#4a3a28;--success-tint:#F1EAE0;
@@ -128,18 +128,7 @@ tr.only-forget-hidden{display:none!important}
 .flash-back{font-size:22px;line-height:1.55;margin-top:18px;padding-top:16px;border-top:1px dashed var(--border);width:100%;white-space:pre-wrap}
 .flash-help{font-size:12.5px;color:var(--text-muted);margin-top:8px}
 .flash-hidden{display:none!important}
-.flash-practice-input{
-    width:100%;
-    min-height:90px;
-    margin-top:10px;
-    padding:10px;
-    border:1px solid var(--border);
-    border-radius:10px;
-    font-size:16px;
-    line-height:1.6;
-    resize:vertical;
-    background:#fff;
-}
+.flash-scratch-box{margin-top:14px;padding-top:14px;border-top:1px dashed var(--border)}
 
 .scramble-box{background:#fbf9f6;border:1px solid var(--neutral);border-left:4px solid var(--primary);border-radius:12px;padding:14px;margin:10px 0 14px}
 .scramble-box b{margin-bottom:0}
@@ -148,6 +137,11 @@ tr.only-forget-hidden{display:none!important}
 .scramble-chip{background:#fff;border:1px solid var(--primary);color:var(--primary-dark);border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer;font-size:14.5px}
 .scramble-chip:hover{background:var(--primary-tint)}
 .scramble-chip.used{opacity:.28;pointer-events:none}
+.scramble-answer-zone{display:flex;flex-wrap:wrap;gap:8px;min-height:52px;margin:10px 0;padding:10px;border:2px dashed var(--filter);border-radius:10px;background:#fff;align-items:center}
+.scramble-answer-placeholder{font-size:13px;color:var(--text-muted)}
+.scramble-chip.placed{background:var(--primary-tint);border:1px solid var(--primary);color:var(--primary-dark)}
+.scramble-chip.placed:hover{background:#fff}
+.scramble-pool.flash-hidden{display:none!important}
 .scramble-answer-row{
     display:flex;
     flex-direction:column;
@@ -198,8 +192,8 @@ tr.only-forget-hidden{display:none!important}
 <body>
 <div class="wrap">
 <div class="brand">
-  <h1 class="brand-title"><span class="brand-repeat-1">Repeat</span><span class="brand-repeat-2">Repeat</span></h1>
-  <div class="brand-tagline">한글 · 영어 문장 암기 트레이너</div>
+  <h1 class="brand-title" onclick="location.reload()"><span class="brand-repeat-1">Repeat</span><span class="brand-repeat-2">Repeat</span></h1>
+  <div class="brand-tagline">A language learning tool for studying any two languages.</div>
 </div>
 
 <div id="loadArea">
@@ -238,14 +232,14 @@ tr.only-forget-hidden{display:none!important}
 <div class="card">
   <b>학습 모드 선택</b>
   <div class="toolbar mode-switch">
-    <button id="modeBtn-table" class="mode-btn active" onclick="switchMode('table')">📋 표</button>
-    <button id="modeBtn-flash" class="mode-btn" onclick="switchMode('flash')">🧠 플래시카드</button>
+    <button id="modeBtn-table" class="mode-btn" onclick="switchMode('table')">📋 표</button>
+    <button id="modeBtn-flash" class="mode-btn active" onclick="switchMode('flash')">🧠 플래시카드</button>
     <button id="modeBtn-scramble" class="mode-btn" onclick="switchMode('scramble')">🔤 단어 배열</button>
     <button class="gray" onclick="clearAll()">초기화</button>
   </div>
 </div>
 
-<div id="mode-table" class="card mode-panel active">
+<div id="mode-table" class="card mode-panel">
 <b>표 · 읽기 설정</b>
 <div class="toolbar-label">재생</div>
 <div class="toolbar"><button onclick="readAll('both')">▶ 표 읽기</button><button onclick="readAll('ko')">한글</button><button onclick="readAll('en')">영어</button><button class="orange" onclick="readRandom()">🎲 랜덤 읽기</button><button class="secondary" onclick="pauseSpeak()">⏸ 일시정지</button><button class="green" onclick="resumeSpeak()">▶ 이어읽기</button><button class="red" onclick="stopSpeak()">■ 정지</button></div>
@@ -265,7 +259,7 @@ tr.only-forget-hidden{display:none!important}
 <div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">✓</th><th class="num">번호</th><th class="kr">한글 <button class="green small" onclick="displayRow('ko', this)">숨기기</button><button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="green small" onclick="displayRow('en', this)">숨기기</button><button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="actions actions-header">기능 <button id="actionsToggleBtn" class="green small" onclick="toggleActionsColumn(this)">숨기기</button></th><th class="practice-cell practice-hidden">✍ 연습</th></tr></thead><tbody></tbody></table></div>
 </div>
 
-<div id="mode-flash" class="card mode-panel">
+<div id="mode-flash" class="card mode-panel active">
 <b>🧠 플래시카드로 암기하기</b>
 <div class="flash-card-box">
   <div class="flash-options">
@@ -298,24 +292,22 @@ tr.only-forget-hidden{display:none!important}
   <div class="flash-bar"><div id="flashBarInner" class="flash-bar-inner"></div></div>
   <div id="flashCard" class="flash-card" onclick="handleFlashCardClick()">
     <div id="flashFront" class="flash-front">표를 불러온 뒤 시작을 눌러줘.</div>
-    <div id="flashBack" class="flash-back flash-hidden"></div>   
+    <div id="flashBack" class="flash-back flash-hidden"></div>
   </div>
-
   <div class="flash-options">
     <button class="secondary small" onclick="copyFlashText('ko')">한글 복사</button>
     <button class="secondary small" onclick="copyFlashText('en')">영어 복사</button>
   </div>
-  <div class="flash-help">카드 클릭: 정답 보기 → 다음 카드 / Space: 뒤집기 / ← →: 이전·다음</div>
-
-  <textarea
-  id="flashPracticeInput"
-  class="flash-practice-input"
-  placeholder="여기에 직접 써보며 연습"
-  onkeydown="flashPracticeKeydown(event)"
-></textarea>
+  <div class="flash-help">카드 클릭: 정답 보기 → 다음 카드 / Space·Enter: 뒤집기·다음 / ← →: 이전·다음</div>
 </div>
 
-
+<div class="flash-scratch-box">
+  <div class="flash-help">아래는 채점 기능 없는 자유 연습장이야. 다음 카드로 넘어가면 자동으로 지워져.</div>
+  <textarea id="flashScratchInput" placeholder="자유롭게 써보면서 연습해봐" style="height:90px"></textarea>
+  <div class="flash-options">
+    <button class="green small" onclick="handleFlashCardClick()">확인</button>
+  </div>
+</div>
 </div>
 
 <div id="mode-scramble" class="card mode-panel">
@@ -334,13 +326,25 @@ tr.only-forget-hidden{display:none!important}
         <option value="random">랜덤</option>
       </select>
     </label>
+    <label>음성
+      <select id="scrambleSpeakMode">
+        <option value="both">둘 다 읽기</option>
+        <option value="ko">한글만 읽기</option>
+        <option value="en">영어만 읽기</option>
+        <option value="off">안 듣기</option>
+      </select>
+    </label>
     <button class="green small" onclick="startScramble()">시작</button>
+    <button class="secondary small" id="scramblePoolToggleBtn" onclick="toggleScramblePool()">🙈 단어 숨기기</button>
     <span id="scrambleProgress" class="flash-progress">0 / 0</span>
   </div>
   <div class="flash-bar"><div id="scrambleBarInner" class="flash-bar-inner"></div></div>
 
   <div id="scramblePrompt" class="scramble-prompt">표를 불러온 뒤 시작을 눌러줘.</div>
-  <div id="scramblePool" class="scramble-pool"></div>
+
+  <div id="scrambleAnswerZone" class="scramble-answer-zone" ondragover="scrambleAllowDrop(event)" ondrop="scrambleDropOnAnswer(event, null)"><span class="scramble-answer-placeholder">여기로 단어를 드래그하거나, 아래에서 단어를 눌러 순서대로 채워줘</span></div>
+
+  <div id="scramblePool" class="scramble-pool" ondragover="scrambleAllowDrop(event)" ondrop="scrambleDropOnPool(event)"></div>
 
   <div class="scramble-answer-row">
 
@@ -386,7 +390,7 @@ tr.only-forget-hidden{display:none!important}
 
   <div id="scrambleFeedback" class="scramble-feedback flash-hidden"></div>
   <div id="scrambleResult" class="scramble-result flash-hidden"></div>
-  <div class="flash-help">단어 칩을 순서대로 눌러서 문장을 완성하거나, 입력창에 직접 타이핑해도 돼. "정답 확인"으로 채점하고 "다음"으로 넘어가면, 끝났을 때 틀린 문장만 표 번호와 함께 모아서 보여줘.</div>
+  <div class="flash-help">단어 칩을 드래그해서 정답 영역에 놓거나, 클릭해서 순서대로 채울 수 있어. 입력창에 직접 타이핑해도 되고, "🙈 단어 숨기기"로 힌트 없이 연습할 수도 있어. "정답 확인"으로 채점하고 "다음"으로 넘어가면, 끝났을 때 틀린 문장만 표 번호와 함께 모아서 보여줘.</div>
 </div>
 </div>
 </div>
@@ -892,11 +896,16 @@ function toggleForgetOnly(btn){
 }
 
 
+function clearFlashScratch(){
+ const el=document.getElementById('flashScratchInput');
+ if(el) el.value='';
+}
 function buildFlashOrder(){
  const indices=getVisibleRowIndices().filter(i=>rows[i]&&((rows[i].ko||'').trim()||(rows[i].en||'').trim()));
  flashOrderList=document.getElementById('flashOrder')?.value==='random'?shuffleArray(indices):indices;
  flashIndex=0;
  flashRevealed=false;
+ clearFlashScratch();
 }
 function resetFlashcard(){
  buildFlashOrder();
@@ -978,7 +987,7 @@ function nextFlashcard(){
  if(!flashOrderList.length)return;
  flashIndex=(flashIndex+1)%flashOrderList.length;
  flashRevealed=false;
- clearFlashPractice();
+ clearFlashScratch();
  renderFlashcard(true);
 }
 function prevFlashcard(){
@@ -986,28 +995,13 @@ function prevFlashcard(){
  if(!flashOrderList.length)return;
  flashIndex=(flashIndex-1+flashOrderList.length)%flashOrderList.length;
  flashRevealed=false;
- clearFlashPractice();
+ clearFlashScratch();
  renderFlashcard(true);
 }
 function handleFlashCardClick(){
  if(!flashOrderList.length){startFlashcards();return;}
  if(!flashRevealed){flipFlashcard();}
  else{nextFlashcard();}
-}
-function flashPracticeKeydown(e){
-
-    if(e.key !== 'Enter') return;
-
-    if(e.shiftKey) return;   // Shift+Enter는 줄바꿈
-
-    e.preventDefault();
-
-    if(!flashRevealed){
-        flipFlashcard();
-    }else{
-        nextFlashcard();
-    }
-
 }
 function copyFlashText(lang){
  const row=getFlashCurrent();
@@ -1016,15 +1010,6 @@ function copyFlashText(lang){
  if(!text.trim()){alert('복사할 내용이 없어.');return;}
  navigator.clipboard.writeText(text);
  alert((lang==='ko'?'한글':'영어')+'을 복사했어.');
-}
-function resetFlashcard(){
- buildFlashOrder();
- clearFlashPractice();
- renderFlashcard(false);
-}
-function clearFlashPractice(){
-  const input = document.getElementById('flashPracticeInput');
-  if(input) input.value = '';
 }
 
 let scrambleOrderList=[],scrambleIndex=0,scrambleTokens=[],scrambleChipOrder=[],scrambleUsedStack=[],scrambleWrongs=[],scrambleFinished=false;
@@ -1047,14 +1032,14 @@ function buildScrambleOrder(){
 }
 function resetScramble(){
  buildScrambleOrder();
- renderScrambleQuestion();
+ renderScrambleQuestion(false);
  const res=document.getElementById('scrambleResult');
  if(res){res.classList.add('flash-hidden');res.innerHTML='';}
 }
 function startScramble(){
  if(!rows.length){alert('먼저 표를 생성해줘.');return;}
  buildScrambleOrder();
- renderScrambleQuestion();
+ renderScrambleQuestion(true);
  const res=document.getElementById('scrambleResult');
  if(res){res.classList.add('flash-hidden');res.innerHTML='';}
 }
@@ -1073,7 +1058,7 @@ function scrambleSides(row){
   answerText:answerLang==='ko'?(row.ko||''):stripStress(row.en||'')
  };
 }
-function renderScrambleQuestion(){
+function renderScrambleQuestion(autoSpeak=false){
  const promptEl=document.getElementById('scramblePrompt');
  const poolEl=document.getElementById('scramblePool');
  const inputEl=document.getElementById('scrambleInput');
@@ -1084,90 +1069,149 @@ function renderScrambleQuestion(){
  if(fb){fb.className='scramble-feedback flash-hidden';fb.innerHTML='';}
  if(!scrambleOrderList.length){
    promptEl.textContent=rows.length?'현재 조건에 배열할 문장이 없어.':'표를 불러온 뒤 시작을 눌러줘.';
+   scrambleTokens=[];scrambleChipOrder=[];scrambleUsedStack=[];
    poolEl.innerHTML='';inputEl.value='';autoGrowScramble(inputEl);inputEl.disabled=true;
+   renderScrambleAnswerZone();
    if(prog)prog.textContent='0 / 0';
    if(bar)bar.style.width='0%';
    return;
  }
  const cur=currentScrambleRow();
  if(!cur||!cur.row)return;
- const {promptText,answerText}=scrambleSides(cur.row);
+ const {promptLang,promptText,answerText}=scrambleSides(cur.row);
  promptEl.textContent=promptText||'(내용 없음)';
  scrambleTokens=tokenizeSentence(answerText);
  scrambleChipOrder=shuffleArray(scrambleTokens.map((t,idx)=>idx));
  scrambleUsedStack=[];
- inputEl.value='';
  scrambleCursorPos=0;
- autoGrowScramble(inputEl);
  inputEl.disabled=false;
- renderScramblePool();
+ syncScrambleAnswer();
  if(prog)prog.textContent=`${scrambleIndex+1} / ${scrambleOrderList.length}`;
  if(bar)bar.style.width=`${Math.round(scrambleIndex/scrambleOrderList.length*100)}%`;
+ if(autoSpeak) speakScramblePromptAuto(promptLang,promptText);
+}
+function syncScrambleAnswer(){
+ renderScramblePool();
+ renderScrambleAnswerZone();
 }
 function renderScramblePool(){
  const poolEl=document.getElementById('scramblePool');
  if(!poolEl)return;
- poolEl.innerHTML=scrambleChipOrder.map(idx=>{
-   const used=scrambleUsedStack.includes(idx);
-   return `<button type="button" class="scramble-chip${used?' used':''}" onclick="scrambleClickChip(${idx})">${escapeHtml(scrambleTokens[idx])}</button>`;
- }).join('');
+ const remaining=scrambleChipOrder.filter(idx=>!scrambleUsedStack.includes(idx));
+ poolEl.innerHTML=remaining.map(idx=>
+   `<button type="button" class="scramble-chip" draggable="true" data-idx="${idx}" ondragstart="scrambleDragStart(event,{origin:'pool',idx:${idx}})" onclick="scrambleClickChip(${idx})">${escapeHtml(scrambleTokens[idx])}</button>`
+ ).join('');
+ applyScramblePoolVisibility();
+}
+function renderScrambleAnswerZone(){
+ const zone=document.getElementById('scrambleAnswerZone');
+ if(!zone)return;
+ if(!scrambleUsedStack.length){
+   zone.innerHTML='<span class="scramble-answer-placeholder">여기로 단어를 드래그하거나, 아래에서 단어를 눌러 순서대로 채워줘</span>';
+ }else{
+   zone.innerHTML=scrambleUsedStack.map((idx,pos)=>
+     `<button type="button" class="scramble-chip placed" draggable="true" data-pos="${pos}" ondragstart="scrambleDragStart(event,{origin:'answer',pos:${pos}})" ondragover="scrambleAllowDrop(event)" ondrop="scrambleDropOnAnswer(event, ${pos})" onclick="scrambleRemoveFromAnswer(${pos})">${escapeHtml(scrambleTokens[idx])}</button>`
+   ).join('');
+ }
+ const inputEl=document.getElementById('scrambleInput');
+ if(inputEl){
+   inputEl.value=scrambleUsedStack.map(idx=>scrambleTokens[idx]).join(' ');
+   scrambleCursorPos=inputEl.value.length;
+   autoGrowScramble(inputEl);
+ }
+}
+let scramblePoolHidden=false;
+function toggleScramblePool(){
+ scramblePoolHidden=!scramblePoolHidden;
+ applyScramblePoolVisibility();
+}
+function applyScramblePoolVisibility(){
+ const poolEl=document.getElementById('scramblePool');
+ const btn=document.getElementById('scramblePoolToggleBtn');
+ if(poolEl) poolEl.classList.toggle('flash-hidden', scramblePoolHidden);
+ if(btn) btn.textContent = scramblePoolHidden ? '👁 단어 보이기' : '🙈 단어 숨기기';
+}
+let scrambleDragPayload=null;
+function scrambleDragStart(e,payload){
+ scrambleDragPayload=payload;
+ try{e.dataTransfer.setData('text/plain',JSON.stringify(payload));}catch(_){/* noop */}
+ e.dataTransfer.effectAllowed='move';
+}
+function scrambleAllowDrop(e){e.preventDefault();}
+function readScrambleDragPayload(e){
+ try{
+   const raw=e.dataTransfer.getData('text/plain');
+   if(raw) return JSON.parse(raw);
+ }catch(_){/* noop */}
+ return scrambleDragPayload;
+}
+function scrambleDropOnAnswer(e,targetPos){
+ e.preventDefault();
+ e.stopPropagation();
+ const payload=readScrambleDragPayload(e);
+ scrambleDragPayload=null;
+ if(!payload)return;
+ if(payload.origin==='pool'){
+   const idx=payload.idx;
+   if(scrambleUsedStack.includes(idx))return;
+   const insertAt=targetPos==null?scrambleUsedStack.length:targetPos;
+   scrambleUsedStack.splice(insertAt,0,idx);
+ }else if(payload.origin==='answer'){
+   const fromPos=payload.pos;
+   if(fromPos<0||fromPos>=scrambleUsedStack.length)return;
+   const [moved]=scrambleUsedStack.splice(fromPos,1);
+   let insertAt=targetPos==null?scrambleUsedStack.length:targetPos;
+   if(fromPos<insertAt) insertAt--;
+   scrambleUsedStack.splice(insertAt,0,moved);
+ }
+ syncScrambleAnswer();
+}
+function scrambleDropOnPool(e){
+ e.preventDefault();
+ const payload=readScrambleDragPayload(e);
+ scrambleDragPayload=null;
+ if(!payload||payload.origin!=='answer')return;
+ scrambleUsedStack.splice(payload.pos,1);
+ syncScrambleAnswer();
+}
+function scrambleRemoveFromAnswer(pos){
+ if(pos<0||pos>=scrambleUsedStack.length)return;
+ scrambleUsedStack.splice(pos,1);
+ syncScrambleAnswer();
 }
 function scrambleClickChip(idx){
-  if(scrambleUsedStack.includes(idx)) return;
-
-  const input = document.getElementById('scrambleInput');
-  if(!input) return;
-
-  const word = scrambleTokens[idx];
-
-  const pos = Math.max(0, Math.min(scrambleCursorPos, input.value.length));
-  const before = input.value.slice(0, pos);
-  const after = input.value.slice(pos);
-
-  const leftSpace = before && !before.endsWith(' ') ? ' ' : '';
-  const rightSpace = after && !after.startsWith(' ') ? ' ' : '';
-
-  const insert = leftSpace + word + rightSpace;
-
-  input.value = before + insert + after;
-  scrambleCursorPos = before.length + insert.length;
-
-  scrambleUsedStack.push(idx);
-  renderScramblePool();
-  autoGrowScramble(input);
+ if(scrambleUsedStack.includes(idx))return;
+ scrambleUsedStack.push(idx);
+ syncScrambleAnswer();
 }
 
 function scrambleUndo(){
  if(!scrambleUsedStack.length)return;
  scrambleUsedStack.pop();
- const inputEl=document.getElementById('scrambleInput');
- if(inputEl){
-   const parts=inputEl.value.trim().split(/\s+/).filter(Boolean);
-   parts.pop();
-   inputEl.value=parts.join(' ');
- }
- renderScramblePool();
+ syncScrambleAnswer();
 }
 function scrambleResetInput(){
-
-    scrambleUsedStack=[];
-
-    const inputEl=document.getElementById('scrambleInput');
-
-    if(inputEl){
-
-        inputEl.value='';
-
-        autoGrowScramble(inputEl);
-
-    }
-
-    renderScramblePool();
-
+ scrambleUsedStack=[];
+ syncScrambleAnswer();
 }
 function onScrambleInputChange(){}
 function scrambleInputKeydown(e){
  if(e.key==='Enter'){e.preventDefault();checkScramble();}
+}
+function scrambleSpeakMode(){return document.getElementById('scrambleSpeakMode')?.value||'both';}
+function speakScramblePromptAuto(promptLang,promptText){
+ const mode=scrambleSpeakMode();
+ if(mode==='off'||!promptText)return;
+ if(mode==='both'||mode===promptLang){
+   speakFlashText({lang:promptLang,plain:promptText});
+ }
+}
+function speakScrambleAnswerAuto(answerLang,answerText){
+ const mode=scrambleSpeakMode();
+ if(mode==='off'||!answerText)return;
+ if(mode==='both'||mode===answerLang){
+   speakFlashText({lang:answerLang,plain:answerText});
+ }
 }
 
 
@@ -1240,7 +1284,7 @@ function enableScrambleTyping(){
 function checkScramble(){
  const cur=currentScrambleRow();
  if(!cur||!cur.row){alert('먼저 시작을 눌러줘.');return;}
- const {answerText}=scrambleSides(cur.row);
+ const {answerLang,answerText}=scrambleSides(cur.row);
  const inputEl=document.getElementById('scrambleInput');
  const userText=inputEl?inputEl.value:'';
  const correct=normalizeForCompare(userText)===normalizeForCompare(answerText);
@@ -1252,12 +1296,13 @@ function checkScramble(){
    fb.className='scramble-feedback '+(correct?'correct':'wrong');
    fb.innerHTML=correct?'✅ 정답이야!':`❌ 오답이야. 정답: <b>${escapeHtml(stripStress(answerText))}</b>`;
  }
+ speakScrambleAnswerAuto(answerLang,answerText);
 }
 function nextScramble(){
  if(!scrambleOrderList.length)return;
  if(scrambleIndex>=scrambleOrderList.length-1){finishScramble();return;}
  scrambleIndex++;
- renderScrambleQuestion();
+ renderScrambleQuestion(true);
 }
 function finishScramble(){
  scrambleFinished=true;
@@ -1306,6 +1351,7 @@ document.addEventListener('keydown',function(e){
  const tag=(e.target&&e.target.tagName||'').toLowerCase();
  if(tag==='input'||tag==='textarea'||tag==='select')return;
  if(e.code==='Space'){e.preventDefault();flipFlashcard();}
+ else if(e.key==='Enter'){e.preventDefault();handleFlashCardClick();}
  else if(e.key==='ArrowRight'){nextFlashcard();}
  else if(e.key==='ArrowLeft'){prevFlashcard();}
 });
@@ -1383,7 +1429,7 @@ function applyPracticeVisibility(){document.querySelectorAll('.practice-cell').f
 function togglePracticeColumn(btn){practiceVisible=!practiceVisible;applyPracticeVisibility();if(practiceVisible)setTimeout(refreshPracticeHeights,0);}
 function applyActionsVisibility(){document.querySelectorAll('.actions-col,.actions-header').forEach(el=>{el.classList.toggle('actions-hidden',!actionsVisible);});const btn=document.getElementById('actionsToggleBtn');if(btn)btn.textContent=actionsVisible?'숨기기':'보이기';}
 function toggleActionsColumn(btn){actionsVisible=!actionsVisible;applyActionsVisibility();}
-let currentMode='table';
+let currentMode='flash';
 function switchMode(mode){
  currentMode=mode;
  ['table','flash','scramble'].forEach(m=>{
