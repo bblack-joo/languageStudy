@@ -264,19 +264,19 @@ tr.only-forget-hidden{display:none!important}
 <div class="flash-card-box">
   <div class="flash-options">
     <label>모드
-      <select id="flashMode" onchange="resetFlashcard()">
+      <select id="flashMode" onchange="resetFlashcard();this.blur();">
         <option value="ko_en">한글 → 영어</option>
         <option value="en_ko">영어 → 한글</option>
       </select>
     </label>
     <label>순서
-      <select id="flashOrder" onchange="resetFlashcard()">
+      <select id="flashOrder" onchange="resetFlashcard();this.blur();">
         <option value="seq">순서대로</option>
         <option value="random">랜덤</option>
       </select>
     </label>
     <label>음성
-      <select id="flashSpeakMode">
+      <select id="flashSpeakMode" onchange="this.blur();">
         <option value="both">둘 다 읽기</option>
         <option value="ko">한글만 읽기</option>
         <option value="en">영어만 읽기</option>
@@ -302,6 +302,13 @@ tr.only-forget-hidden{display:none!important}
 </div>
 
 <div class="flash-scratch-box">
+  <div class="toolbar"><button class="secondary small" id="flashSpeakToggleBtn" onclick="toggleFlashSpeakBox()">🔊 음성 재생 보이기</button></div>
+  <div id="flashSpeakBox" style="display:none">
+    <div class="flash-options">
+      <label>반복 <input id="flashSpeakRepeat" type="number" min="1" value="1" style="width:60px"> 회</label>
+      <button class="green small" onclick="playFlashSpeak()">🔊 듣기</button>
+    </div>
+  </div>
   <div class="flash-help">아래는 채점 기능 없는 자유 연습장이야. 다음 카드로 넘어가면 자동으로 지워져.</div>
   <textarea id="flashScratchInput" placeholder="자유롭게 써보면서 연습해봐" style="height:90px"></textarea>
   <div class="flash-options">
@@ -315,13 +322,13 @@ tr.only-forget-hidden{display:none!important}
 <div class="scramble-box">
   <div class="flash-options">
     <label>모드
-      <select id="scrambleMode" onchange="resetScramble()">
+      <select id="scrambleMode" onchange="resetScramble();this.blur();">
         <option value="ko_en">한글 보고 영어 배열</option>
         <option value="en_ko">영어 보고 한글 배열</option>
       </select>
     </label>
     <label>순서
-      <select id="scrambleOrder" onchange="resetScramble()">
+      <select id="scrambleOrder" onchange="resetScramble();this.blur();">
         <option value="seq">순서대로</option>
         <option value="random">랜덤</option>
       </select>
@@ -899,6 +906,25 @@ function toggleForgetOnly(btn){
 function clearFlashScratch(){
  const el=document.getElementById('flashScratchInput');
  if(el) el.value='';
+}
+function toggleFlashSpeakBox(){
+ const box=document.getElementById('flashSpeakBox');
+ const btn=document.getElementById('flashSpeakToggleBtn');
+ if(!box)return;
+ const showing=box.style.display!=='none';
+ box.style.display=showing?'none':'block';
+ if(btn)btn.textContent=showing?'🔊 음성 재생 보이기':'🔊 숨기기';
+}
+async function playFlashSpeak(){
+ const row=getFlashCurrent();
+ if(!row){alert('먼저 플래시카드를 시작해줘.');return;}
+ const side=flashSide(row,flashRevealed?'back':'front');
+ if(!side.plain){alert('읽을 내용이 없어.');return;}
+ const repeat=Math.max(1,Number(document.getElementById('flashSpeakRepeat')?.value||1));
+ for(let k=0;k<repeat;k++){
+   await speakFlashText(side);
+   if(k<repeat-1) await sleep(400);
+ }
 }
 function buildFlashOrder(){
  const indices=getVisibleRowIndices().filter(i=>rows[i]&&((rows[i].ko||'').trim()||(rows[i].en||'').trim()));
