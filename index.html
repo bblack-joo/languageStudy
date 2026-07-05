@@ -159,6 +159,13 @@ tr.only-forget-hidden{display:none!important}
     flex-wrap:wrap;
     gap:6px;
 }
+.scramble-button-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-top:8px;
+    margin-bottom:10px;
+}
 .scramble-feedback{margin-top:8px;padding:9px 11px;border-radius:8px;font-weight:700;font-size:14px}
 .scramble-feedback.correct{background:var(--success-tint);color:var(--success-dark)}
 .scramble-feedback.wrong{background:var(--danger-tint);color:var(--danger-dark)}
@@ -316,6 +323,7 @@ tr.only-forget-hidden{display:none!important}
         onclick="saveScrambleCursor()"
         onkeyup="saveScrambleCursor()"
         onselect="saveScrambleCursor()"
+        onblur="saveScrambleCursor()"
         onkeydown="scrambleInputKeydown(event)"
         disabled
     ></textarea>
@@ -344,7 +352,6 @@ tr.only-forget-hidden{display:none!important}
 
   <div class="flash-options">
     <button class="green small" onclick="checkScramble()">✅ 정답 확인</button>
-    <button class="orange small" onclick="startScrambleSpeech()">🎙 음성 입력</button>
     <button class="secondary small" onclick="nextScramble()">다음 ▶</button>
   </div>
 
@@ -956,6 +963,8 @@ function copyFlashText(lang){
 }
 
 let scrambleOrderList=[],scrambleIndex=0,scrambleTokens=[],scrambleChipOrder=[],scrambleUsedStack=[],scrambleWrongs=[],scrambleFinished=false;
+let scrambleCursorPos=0;
+let scrambleRecognition=null;
 function tokenizeSentence(text){
  const clean=stripStress(text||'').trim();
  if(!clean)return[];
@@ -1023,6 +1032,8 @@ function renderScrambleQuestion(){
  scrambleChipOrder=shuffleArray(scrambleTokens.map((t,idx)=>idx));
  scrambleUsedStack=[];
  inputEl.value='';
+ scrambleCursorPos=0;
+ autoGrowScramble(inputEl);
  inputEl.disabled=false;
  renderScramblePool();
  if(prog)prog.textContent=`${scrambleIndex+1} / ${scrambleOrderList.length}`;
@@ -1106,9 +1117,6 @@ function startScrambleSpeech(){
   }
 
   const input = document.getElementById('scrambleInput');
-  if(input){
-    input.removeAttribute('readonly');
-  }
 
   scrambleRecognition = new SpeechRecognition();
   scrambleRecognition.lang =
@@ -1136,6 +1144,8 @@ function startScrambleSpeech(){
 
     if(input){
       input.value = (finalText + ' ' + interim).trim();
+      scrambleCursorPos = input.value.length;
+      autoGrowScramble(input);
     }
   };
 
@@ -1152,17 +1162,13 @@ function stopScrambleSpeech(){
     scrambleRecognition = null;
   }
 
-  const input = document.getElementById('scrambleInput');
-  if(input){
-    input.setAttribute('readonly', true);
-  }
 }
+
 
 function enableScrambleTyping(){
   const input = document.getElementById('scrambleInput');
   if(!input) return;
 
-  input.removeAttribute('readonly');
   input.focus();
 }
 
@@ -1226,11 +1232,10 @@ function saveScrambleCursor(){
   scrambleCursorPos = input.selectionStart ?? input.value.length;
 }
 function autoGrowScramble(el){
-
+    if(!el) return;
     el.style.height = 'auto';
-
     el.style.height = Math.max(70, el.scrollHeight) + 'px';
-
+}
 
 document.addEventListener('keydown',function(e){
  const tag=(e.target&&e.target.tagName||'').toLowerCase();
@@ -1331,38 +1336,7 @@ function baseSettings(){return{base:document.getElementById('baseName').value||'
 function generatePython(mode='both'){if(!rows.length){alert('먼저 표를 생성해줘.');return '';}const s=baseSettings();let code='';if(mode==='both')code=["# pip install edge-tts","import asyncio","import random","from pathlib import Path","import edge_tts","",`BASE_NAME = ${pyStr(s.base)}`,`REPEAT_COUNT = ${s.repeat}`,`RANDOM_ORDER = ${s.random?'True':'False'}`,`KO_VOICE = "ko-KR-SunHiNeural"`,`EN_VOICE = "en-US-JennyNeural"`,`KO_RATE = ${pyStr(s.koRate)}`,`EN_RATE = ${pyStr(s.enRate)}`,"DATA = [",s.data,"]","out_dir = Path(BASE_NAME)","out_dir.mkdir(exist_ok=True)","async def make_mp3(text, voice, rate, path):","    communicate = edge_tts.Communicate(text, voice=voice, rate=rate)","    await communicate.save(str(path))","async def main():","    sequence = list(DATA)","    clip_no = 1","    for _ in range(REPEAT_COUNT):","        if RANDOM_ORDER:","            random.shuffle(sequence)","        for ko, en in sequence:","            no = f'{clip_no:03d}'","            await make_mp3(ko, KO_VOICE, KO_RATE, out_dir / f'{no}_ko.mp3')","            await make_mp3(en, EN_VOICE, EN_RATE, out_dir / f'{no}_en.mp3')","            print(f'saved {no}')","            clip_no += 1","    print('완료!')","if __name__ == '__main__':","    asyncio.run(main())"].join('\n');else{const isKo=mode==='ko';code=["# pip install edge-tts","import asyncio","from pathlib import Path","import edge_tts","",`BASE_NAME = ${pyStr(s.base)}`,`SELECT_TXT = ${pyStr(mode)}`,`VOICE = ${pyStr(isKo?'ko-KR-SunHiNeural':'en-US-JennyNeural')}`,`RATE = ${pyStr(isKo?s.koRate:s.enRate)}`,"DATA = [",s.data,"]","out_dir = Path(BASE_NAME)","out_dir.mkdir(exist_ok=True)","async def make_mp3(text, voice, rate, path):","    communicate = edge_tts.Communicate(text, voice=voice, rate=rate)","    await communicate.save(str(path))","    print(f'생성 완료: {path}')","async def main():",isKo?"    final_text = ' '.join([ko for ko, en in DATA])":"    final_text = ' '.join([en for ko, en in DATA])",`    await make_mp3(final_text, VOICE, RATE, out_dir / ${pyStr(isKo?'ko.mp3':'en.mp3')})`,"if __name__ == '__main__':","    asyncio.run(main())"].join('\n');}return setPythonCode(code,mode);}
 function copyPython(){let code=document.getElementById('pythonCode').textContent||generatePython(currentPythonMode);if(!code)return;navigator.clipboard.writeText(code);alert('코드 복사했어.');}
 function downloadPython(){let code=document.getElementById('pythonCode').textContent||generatePython(currentPythonMode);if(!code)return;const suffix=currentPythonMode==='ko'?'_ko_onefile':currentPythonMode==='en'?'_en_onefile':'_sentence_files';const blob=new Blob([code],{type:'text/x-python'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(document.getElementById('baseName').value||'opic_practice')+suffix+'.py';a.click();URL.revokeObjectURL(a.href);}
-let scrambleRecognition = null;
 
-function startScrambleSpeech(){
-  const SpeechRecognition =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  if(!SpeechRecognition){
-    alert('이 브라우저는 음성인식을 지원하지 않아. Chrome/Edge에서 사용해줘.');
-    return;
-  }
-
-  scrambleRecognition = new SpeechRecognition();
-  scrambleRecognition.lang = document.getElementById('scrambleMode').value === 'ko_en'
-    ? 'en-US'
-    : 'ko-KR';
-
-  scrambleRecognition.interimResults = false;
-  scrambleRecognition.continuous = false;
-
-  scrambleRecognition.onresult = function(event){
-    const text = event.results[0][0].transcript;
-    const input = document.getElementById('scrambleInput');
-    input.value = text;
-    input.focus();
-  };
-
-  scrambleRecognition.onerror = function(){
-    alert('음성인식이 잘 안 됐어. 다시 눌러줘.');
-  };
-
-  scrambleRecognition.start();
-}
 
 </script>
 </body>
