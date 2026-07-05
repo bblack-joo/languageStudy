@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>언어 공부 프로그램</title>
+<title>한글 영어 읽기 프로그램</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
-  --primary:#40301F;--primary-dark:#2f2315;--primary-tint:#F1E9DC;ㅇ
+  --primary:#40301F;--primary-dark:#2f2315;--primary-tint:#F1E9DC;
   --neutral:#6E6A63;--neutral-dark:#57534c;--neutral-tint:#F1EFEB;
   --filter:#8A6A46;--filter-dark:#725636;--filter-tint:#F5EFE4;
   --success:#5C4A32;--success-dark:#4a3a28;--success-tint:#F1EAE0;
@@ -192,8 +192,8 @@ tr.only-forget-hidden{display:none!important}
 <body>
 <div class="wrap">
 <div class="brand">
-  <h1 class="brand-title" href="https://bblack-joo.github.io/langugeStudy/"><span class="brand-repeat-1">Repeat</span><span class="brand-repeat-2">Repeat</span></h1>
-  <div class="brand-tagline">A language learning tool for studying any two languages.</div>
+  <h1 class="brand-title"><span class="brand-repeat-1">Repeat</span><span class="brand-repeat-2">Repeat</span></h1>
+  <div class="brand-tagline">한글 · 영어 문장 암기 트레이너</div>
 </div>
 
 <div id="loadArea">
@@ -232,14 +232,14 @@ tr.only-forget-hidden{display:none!important}
 <div class="card">
   <b>학습 모드 선택</b>
   <div class="toolbar mode-switch">
-    <button id="modeBtn-table" class="mode-btn" onclick="switchMode('table')">📋 표</button>
-    <button id="modeBtn-flash" class="mode-btn active" onclick="switchMode('flash')">🧠 플래시카드</button>
+    <button id="modeBtn-table" class="mode-btn active" onclick="switchMode('table')">📋 표</button>
+    <button id="modeBtn-flash" class="mode-btn" onclick="switchMode('flash')">🧠 플래시카드</button>
     <button id="modeBtn-scramble" class="mode-btn" onclick="switchMode('scramble')">🔤 단어 배열</button>
     <button class="gray" onclick="clearAll()">초기화</button>
   </div>
 </div>
 
-<div id="mode-table" class="card mode-panel">
+<div id="mode-table" class="card mode-panel active">
 <b>표 · 읽기 설정</b>
 <div class="toolbar-label">재생</div>
 <div class="toolbar"><button onclick="readAll('both')">▶ 표 읽기</button><button onclick="readAll('ko')">한글</button><button onclick="readAll('en')">영어</button><button class="orange" onclick="readRandom()">🎲 랜덤 읽기</button><button class="secondary" onclick="pauseSpeak()">⏸ 일시정지</button><button class="green" onclick="resumeSpeak()">▶ 이어읽기</button><button class="red" onclick="stopSpeak()">■ 정지</button></div>
@@ -259,7 +259,7 @@ tr.only-forget-hidden{display:none!important}
 <div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">✓</th><th class="num">번호</th><th class="kr">한글 <button class="green small" onclick="displayRow('ko', this)">숨기기</button><button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="green small" onclick="displayRow('en', this)">숨기기</button><button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="actions actions-header">기능 <button id="actionsToggleBtn" class="green small" onclick="toggleActionsColumn(this)">숨기기</button></th><th class="practice-cell practice-hidden">✍ 연습</th></tr></thead><tbody></tbody></table></div>
 </div>
 
-<div id="mode-flash" class="card mode-panel active">
+<div id="mode-flash" class="card mode-panel">
 <b>🧠 플래시카드로 암기하기</b>
 <div class="flash-card-box">
   <div class="flash-options">
@@ -955,14 +955,14 @@ function renderFlashcard(autoSpeak=false){
  if(prog)prog.textContent=`${flashIndex+1} / ${flashOrderList.length}`;
  if(bar)bar.style.width=`${Math.round(((flashIndex+1)/flashOrderList.length)*100)}%`;
  const speakMode=document.getElementById('flashSpeakMode')?.value||'both';
+ const displayedSide=flashRevealed?back:front;
  if(autoSpeak && speakMode!=='off'){
-   if(speakMode==='ko'){
-     speakFlashText({lang:'ko',plain:row.ko||''});
-   }else if(speakMode==='en'){
-     speakFlashText({lang:'en',plain:stripStress(row.en||'')});
-   }else{
-     speakFlashText(flashRevealed?back:front);
+   if(speakMode==='both'){
+     speakFlashText(displayedSide);
+   }else if(speakMode===displayedSide.lang){
+     speakFlashText(displayedSide);
    }
+   // 선택한 언어와 지금 보이는 면의 언어가 다르면 재생하지 않음
  }
 }
 async function speakFlashText(side){
@@ -1012,7 +1012,7 @@ function copyFlashText(lang){
  alert((lang==='ko'?'한글':'영어')+'을 복사했어.');
 }
 
-let scrambleOrderList=[],scrambleIndex=0,scrambleTokens=[],scrambleChipOrder=[],scrambleUsedStack=[],scrambleWrongs=[],scrambleFinished=false;
+let scrambleOrderList=[],scrambleIndex=0,scrambleTokens=[],scrambleChipOrder=[],scrambleUsedStack=[],scrambleWrongs=[],scrambleFinished=false,scrambleChecked=false;
 let scrambleCursorPos=0;
 let scrambleRecognition=null;
 function tokenizeSentence(text){
@@ -1067,6 +1067,7 @@ function renderScrambleQuestion(autoSpeak=false){
  const fb=document.getElementById('scrambleFeedback');
  if(!promptEl||!poolEl||!inputEl)return;
  if(fb){fb.className='scramble-feedback flash-hidden';fb.innerHTML='';}
+ scrambleChecked=false;
  if(!scrambleOrderList.length){
    promptEl.textContent=rows.length?'현재 조건에 배열할 문장이 없어.':'표를 불러온 뒤 시작을 눌러줘.';
    scrambleTokens=[];scrambleChipOrder=[];scrambleUsedStack=[];
@@ -1196,7 +1197,11 @@ function scrambleResetInput(){
 }
 function onScrambleInputChange(){}
 function scrambleInputKeydown(e){
- if(e.key==='Enter'){e.preventDefault();checkScramble();}
+ if(e.key==='Enter'){
+   e.preventDefault();
+   if(!scrambleChecked){checkScramble();}
+   else{nextScramble();}
+ }
 }
 function scrambleSpeakMode(){return document.getElementById('scrambleSpeakMode')?.value||'both';}
 function speakScramblePromptAuto(promptLang,promptText){
@@ -1297,6 +1302,7 @@ function checkScramble(){
    fb.innerHTML=correct?'✅ 정답이야!':`❌ 오답이야. 정답: <b>${escapeHtml(stripStress(answerText))}</b>`;
  }
  speakScrambleAnswerAuto(answerLang,answerText);
+ scrambleChecked=true;
 }
 function nextScramble(){
  if(!scrambleOrderList.length)return;
@@ -1429,7 +1435,7 @@ function applyPracticeVisibility(){document.querySelectorAll('.practice-cell').f
 function togglePracticeColumn(btn){practiceVisible=!practiceVisible;applyPracticeVisibility();if(practiceVisible)setTimeout(refreshPracticeHeights,0);}
 function applyActionsVisibility(){document.querySelectorAll('.actions-col,.actions-header').forEach(el=>{el.classList.toggle('actions-hidden',!actionsVisible);});const btn=document.getElementById('actionsToggleBtn');if(btn)btn.textContent=actionsVisible?'숨기기':'보이기';}
 function toggleActionsColumn(btn){actionsVisible=!actionsVisible;applyActionsVisibility();}
-let currentMode='flash';
+let currentMode='table';
 function switchMode(mode){
  currentMode=mode;
  ['table','flash','scramble'].forEach(m=>{
