@@ -269,7 +269,14 @@ tr.only-forget-hidden{display:none!important}
         <option value="random">랜덤</option>
       </select>
     </label>
-    <label><input type="checkbox" id="flashAutoSpeak"> 자동 음성</label>
+    <label>음성
+      <select id="flashSpeakMode">
+        <option value="both">둘 다 읽기</option>
+        <option value="ko">한글만 읽기</option>
+        <option value="en">영어만 읽기</option>
+        <option value="off">안 듣기</option>
+      </select>
+    </label>
     <button class="green small" onclick="startFlashcards()">시작</button>
     <button class="secondary small" onclick="prevFlashcard()">◀ 이전</button>
     <button class="secondary small" onclick="flipFlashcard()">뒤집기</button>
@@ -618,7 +625,10 @@ function renderItemSelect(){
    select.innerHTML='<option value="">선택한 Unit에 문장이 없음</option>';
    return;
  }
- select.innerHTML='<option value="__ALL__">▲ 전체 문장</option>'+list.map(i=>`<option value="${escapeAttr(i.key)}">${escapeHtml(i.label)}</option>`).join('');
+ select.innerHTML='<option value="__ALL__">▲ 전체 문장</option>'+list.map(i=>{
+   const label=(isItemImportant(i)?'★ ':'')+i.label;
+   return `<option value="${escapeAttr(i.key)}">${escapeHtml(label)}</option>`;
+ }).join('');
 }
 
 function itemToPairs(item){return item.answers.map(a=>({ko:a.ko,en:a.en,important:!!a.important,notMemorized:!!a.notMemorized}));}
@@ -913,8 +923,15 @@ function renderFlashcard(autoSpeak=false){
  backEl.classList.toggle('flash-hidden',!flashRevealed);
  if(prog)prog.textContent=`${flashIndex+1} / ${flashOrderList.length}`;
  if(bar)bar.style.width=`${Math.round(((flashIndex+1)/flashOrderList.length)*100)}%`;
- if(autoSpeak || document.getElementById('flashAutoSpeak')?.checked){
-   speakFlashText(flashRevealed?back:front);
+ const speakMode=document.getElementById('flashSpeakMode')?.value||'both';
+ if(autoSpeak && speakMode!=='off'){
+   if(speakMode==='ko'){
+     speakFlashText({lang:'ko',plain:row.ko||''});
+   }else if(speakMode==='en'){
+     speakFlashText({lang:'en',plain:stripStress(row.en||'')});
+   }else{
+     speakFlashText(flashRevealed?back:front);
+   }
  }
 }
 async function speakFlashText(side){
