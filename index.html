@@ -519,14 +519,21 @@ function parseAnswerSheet(ws,sheetName){
  let notMemorizedCol=headerCells.findIndex(v=>['안외워짐','안외움','미암기','안외워진','안외워짐체크'].includes(v));
  if(notMemorizedCol<0 && importanceCol>=0) notMemorizedCol=importanceCol+1;
 
+ // 안외워짐 옆의 "메모" 읽기
+ // 1순위: 헤더명 "메모 / 비고 / note / memo"
+ // 2순위: 안외워짐 열 바로 다음 열
+ let memoCol=headerCells.findIndex(v=>['메모','비고','note','memo'].includes(v));
+ if(memoCol<0 && notMemorizedCol>=0) memoCol=notMemorizedCol+1;
+
  const blocks=[];
  let answers=[];
  let refs=[];
  let flows=[];
+ let memo='';
  let blockNo=1;
  let lastUnit='';
  let lastGroup='';
- const cols=[header.cols.unit,header.cols.group,header.cols.qno,header.cols.ko,header.cols.en,flowCol,importanceCol,notMemorizedCol];
+ const cols=[header.cols.unit,header.cols.group,header.cols.qno,header.cols.ko,header.cols.en,flowCol,importanceCol,notMemorizedCol,memoCol];
 
  function addRef(u,g,q){
    const unitNo=idCell(u||lastUnit);
@@ -542,9 +549,15 @@ function parseAnswerSheet(ws,sheetName){
    if(!flows.includes(t)) flows.push(t);
  }
 
+ function addMemoIfAny(text){
+   if(memo) return;
+   const t=String(text||'').trim();
+   if(t) memo=t;
+ }
+
  function saveBlock(){
    if(answers.length===0){
-     refs=[]; flows=[]; lastUnit=''; lastGroup='';
+     refs=[]; flows=[]; memo=''; lastUnit=''; lastGroup='';
      return;
    }
    blocks.push({
@@ -552,11 +565,13 @@ function parseAnswerSheet(ws,sheetName){
      blockNo:blockNo++,
      refs:uniqueRefs(refs),
      answers:[...answers],
-     flows:[...flows]
+     flows:[...flows],
+     memo
    });
    answers=[];
    refs=[];
    flows=[];
+   memo='';
    lastUnit='';
    lastGroup='';
  }
@@ -576,11 +591,13 @@ function parseAnswerSheet(ws,sheetName){
    const important=String(importance).trim()==='1';
    const notMemorizedValue=val(line,notMemorizedCol);
    const notMemorized=String(notMemorizedValue).trim()==='1';
+   const memoValue=val(line,memoCol);
 
    if(unitNo) lastUnit=unitNo;
    if(groupNo) lastGroup=groupNo;
    if(questionNo) addRef(unitNo,groupNo,questionNo);
    addFlow(flow);
+   addMemoIfAny(memoValue);
 
    if(ko||en){
      answers.push({ko,en,important,notMemorized});
@@ -624,7 +641,8 @@ async function loadWorkbookFiles(fileList){
       refs:b.refs,
       questions,
       answers:b.answers,
-      flows:b.flows||[]
+      flows:b.flows||[],
+      memo:b.memo||''
      });
     });
    });
@@ -665,7 +683,7 @@ function renderItemSelect(){
    return;
  }
  select.innerHTML='<option value="__ALL__">▲ 전체 문장</option>'+list.map(i=>{
-   const label=(isItemImportant(i)?'★ ':'')+i.label;
+   const label=(isItemImportant(i)?'★ ':'')+i.label+(i.memo?`_[${i.memo}]`:'');
    return `<option value="${escapeAttr(i.key)}">${escapeHtml(label)}</option>`;
  }).join('');
 }
