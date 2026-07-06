@@ -232,14 +232,14 @@ tr.only-forget-hidden{display:none!important}
 <div class="card">
   <b>학습 모드 선택</b>
   <div class="toolbar mode-switch">
-    <button id="modeBtn-table" class="mode-btn active" onclick="switchMode('table')">📋 표</button>
-    <button id="modeBtn-flash" class="mode-btn" onclick="switchMode('flash')">🧠 플래시카드</button>
+    <button id="modeBtn-flash" class="mode-btn active" onclick="switchMode('flash')">🧠 플래시카드</button>
+    <button id="modeBtn-table" class="mode-btn" onclick="switchMode('table')">📋 표</button>
     <button id="modeBtn-scramble" class="mode-btn" onclick="switchMode('scramble')">🔤 단어 배열</button>
     <button class="gray" onclick="clearAll()">초기화</button>
   </div>
 </div>
 
-<div id="mode-table" class="card mode-panel active">
+<div id="mode-table" class="card mode-panel">
 <b>표 · 읽기 설정</b>
 <div class="toolbar-label">재생</div>
 <div class="toolbar"><button onclick="readAll('both')">▶ 표 읽기</button><button onclick="readAll('ko')">한글</button><button onclick="readAll('en')">영어</button><button class="orange" onclick="readRandom()">🎲 랜덤 읽기</button><button class="secondary" onclick="pauseSpeak()">⏸ 일시정지</button><button class="green" onclick="resumeSpeak()">▶ 이어읽기</button><button class="red" onclick="stopSpeak()">■ 정지</button></div>
@@ -259,7 +259,7 @@ tr.only-forget-hidden{display:none!important}
 <div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">✓</th><th class="num">번호</th><th class="kr">한글 <button class="green small" onclick="displayRow('ko', this)">숨기기</button><button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="green small" onclick="displayRow('en', this)">숨기기</button><button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="actions actions-header">기능 <button id="actionsToggleBtn" class="green small" onclick="toggleActionsColumn(this)">숨기기</button></th><th class="practice-cell practice-hidden">✍ 연습</th></tr></thead><tbody></tbody></table></div>
 </div>
 
-<div id="mode-flash" class="card mode-panel">
+<div id="mode-flash" class="card mode-panel active">
 <b>🧠 플래시카드로 암기하기</b>
 <div class="flash-card-box">
   <div class="flash-options">
@@ -1405,6 +1405,10 @@ const BAD_VOICE_NAMES=['albert','bad news','bahh','bells','boing','bubbles','cel
 function getVoice(lang){
  const voices=speechSynthesis.getVoices();
  const matches=voices.filter(v=>v.lang.toLowerCase().startsWith(lang));
+ if(lang==='en'){
+   const victoria=matches.find(v=>v.name.toLowerCase().includes('victoria'));
+   if(victoria) return victoria;
+ }
  const clean=matches.filter(v=>!BAD_VOICE_NAMES.some(bad=>v.name.toLowerCase().includes(bad)));
  return clean[0]||matches[0]||null;
 }
@@ -1424,7 +1428,7 @@ async function speakRow(i,mode,token){
  const gap=Number(document.getElementById('pairGapSec').value||0)*1000;
  const koRate=document.getElementById('koRate').value;
  const enRate=document.getElementById('enRate').value;
- await speakText(`${i+1}`,'ko',koRate,token);
+ await speakText(`Number ${i+1}`,'en',enRate,token);
  let ok=await sleepWithToken(500,token);
  if(!ok)return;
  if(mode==='ko'){
@@ -1469,7 +1473,7 @@ function applyPracticeVisibility(){document.querySelectorAll('.practice-cell').f
 function togglePracticeColumn(btn){practiceVisible=!practiceVisible;applyPracticeVisibility();if(practiceVisible)setTimeout(refreshPracticeHeights,0);}
 function applyActionsVisibility(){document.querySelectorAll('.actions-col,.actions-header').forEach(el=>{el.classList.toggle('actions-hidden',!actionsVisible);});const btn=document.getElementById('actionsToggleBtn');if(btn)btn.textContent=actionsVisible?'숨기기':'보이기';}
 function toggleActionsColumn(btn){actionsVisible=!actionsVisible;applyActionsVisibility();}
-let currentMode='table';
+let currentMode='flash';
 function switchMode(mode){
  currentMode=mode;
  ['table','flash','scramble'].forEach(m=>{
