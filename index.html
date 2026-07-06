@@ -238,6 +238,11 @@ tr.only-forget-hidden{display:none!important}
     <button class="gray" onclick="clearAll()">초기화</button>
   </div>
   <div id="currentItemInfo" class="hint"></div>
+  <div class="toolbar">
+    <span id="timerDisplay" class="flash-progress">00:00</span>
+    <button class="green small" onclick="startTimer()">⏱ 시작</button>
+    <button class="red small" onclick="stopTimer()">⏹ 종료</button>
+  </div>
 </div>
 
 <div id="mode-table" class="card mode-panel">
@@ -666,6 +671,32 @@ function renderItemSelect(){
 }
 
 function itemToPairs(item){return item.answers.map(a=>({ko:a.ko,en:a.en,important:!!a.important,notMemorized:!!a.notMemorized}));}
+let timerInterval=null,timerStartTime=0;
+function formatTimer(ms){
+ const totalSec=Math.floor(ms/1000);
+ const h=Math.floor(totalSec/3600);
+ const m=Math.floor((totalSec%3600)/60);
+ const s=totalSec%60;
+ const pad=n=>String(n).padStart(2,'0');
+ return h>0?`${pad(h)}:${pad(m)}:${pad(s)}`:`${pad(m)}:${pad(s)}`;
+}
+function startTimer(){
+ if(timerInterval)return;
+ timerStartTime=Date.now();
+ const el=document.getElementById('timerDisplay');
+ if(el)el.textContent='00:00';
+ timerInterval=setInterval(()=>{
+   const el=document.getElementById('timerDisplay');
+   if(el)el.textContent=formatTimer(Date.now()-timerStartTime);
+ },250);
+}
+function stopTimer(){
+ if(!timerInterval)return;
+ clearInterval(timerInterval);
+ timerInterval=null;
+ const el=document.getElementById('timerDisplay');
+ if(el)el.textContent=formatTimer(Date.now()-timerStartTime);
+}
 function updateCurrentItemInfo(){
  const el=document.getElementById('currentItemInfo');
  if(!el)return;
