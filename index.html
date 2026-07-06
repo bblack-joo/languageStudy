@@ -1401,9 +1401,17 @@ function currentQuestionPracticeKeys(){const keys=[];(currentQuestionItems||[]).
 function clearCurrentPractice(){if(!confirm('현재 표와 질문의 연습 내용을 삭제할까요?'))return;rows.forEach(r=>localStorage.removeItem(getPracticeKey(r)));currentQuestionPracticeKeys().forEach(k=>localStorage.removeItem(k));renderTable();showQuestions(currentQuestionItems);alert('현재 연습 내용을 삭제했어.');}
 function clearAllPractice(){if(!confirm('저장된 연습 내용을 전부 삭제할까요?'))return;Object.keys(localStorage).forEach(k=>{if(k.startsWith('ls_practice_')||k.startsWith('ls_qpractice_'))localStorage.removeItem(k);});renderTable();showQuestions(currentQuestionItems);alert('전체 연습 내용을 삭제했어.');}
 
-function getVoice(lang){const voices=speechSynthesis.getVoices();return voices.find(v=>v.lang.toLowerCase().startsWith(lang))||null;}
+const BAD_VOICE_NAMES=['albert','bad news','bahh','bells','boing','bubbles','cellos','deranged','good news','hysterical','pipe organ','trinoids','whisper','zarvox','wobble','jester','junior','kathy','fred','ralph','organ','superstar','rocko','sandy'];
+function getVoice(lang){
+ const voices=speechSynthesis.getVoices();
+ const matches=voices.filter(v=>v.lang.toLowerCase().startsWith(lang));
+ const clean=matches.filter(v=>!BAD_VOICE_NAMES.some(bad=>v.name.toLowerCase().includes(bad)));
+ return clean[0]||matches[0]||null;
+}
 function sleepWithToken(ms,token){return new Promise(resolve=>{const start=Date.now();const tick=()=>{if(token!==playToken||!speaking){resolve(false);return;}const remain=ms-(Date.now()-start);if(remain<=0){resolve(true);return;}setTimeout(tick,Math.min(100,remain));};tick();});}
-function speakText(text,lang,rate,token){return new Promise(resolve=>{if(!text||token!==playToken||!speaking){resolve(false);return;}const u=new SpeechSynthesisUtterance(text);u.lang=lang==='ko'?'ko-KR':'en-US';u.rate=Number(rate)||1;const v=getVoice(lang);if(v)u.voice=v;let fin=false;const done=ok=>{if(fin)return;fin=true;resolve(ok)};u.onend=()=>done(true);u.onerror=()=>done(false);speechSynthesis.speak(u);const watcher=setInterval(()=>{if(fin){clearInterval(watcher);return;}if(token!==playToken||!speaking){clearInterval(watcher);done(false);}},100);});}
+function speakText(text,lang,rate,token){return new Promise(resolve=>{if(!text||token!==playToken||!speaking){resolve(false);return;}const u=new SpeechSynthesisUtterance(text);u.lang=lang==='ko'?'ko-KR':'en-US';u.rate=Number(rate)||1;u.pitch=1;const v=getVoice(lang);if(v)u.voice=v;let fin=false;const done=ok=>{if(fin)return;fin=true;resolve(ok)};u.onend=()=>done(true);u.onerror=()=>done(false);speechSynthesis.speak(u);const watcher=setInterval(()=>{if(fin){clearInterval(watcher);return;}if(token!==playToken||!speaking){clearInterval(watcher);done(false);}},100);});}
+speechSynthesis.getVoices();
+if('onvoiceschanged' in speechSynthesis) speechSynthesis.onvoiceschanged=()=>{speechSynthesis.getVoices();};
 function markActive(i){currentIndex=i;document.querySelectorAll('tr').forEach(x=>x.classList.remove('active'));const tr=document.getElementById('row'+i);if(tr)tr.classList.add('active');}
 function clearActive(){document.querySelectorAll('tr').forEach(x=>x.classList.remove('active'));}
 function markDone(i){const tr=document.getElementById('row'+i);if(tr)tr.classList.add('done');}
