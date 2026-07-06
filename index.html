@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>A language learning tool for studying any two languages.</title>
+<title>한글 영어 읽기 프로그램</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
@@ -192,8 +192,8 @@ tr.only-forget-hidden{display:none!important}
 <body>
 <div class="wrap">
 <div class="brand">
-  <h1 class="brand-title"><span class="brand-repeat-1">Repeat</span><span class="brand-repeat-2">Repeat</span></h1>
-  <div class="brand-tagline">한글 · 영어 문장 암기 트레이너</div>
+  <h1 class="brand-title" onclick="location.reload()" style="cursor:pointer" title="새로고침"><span class="brand-repeat-1">Repeat</span><span class="brand-repeat-2">Repeat</span></h1>
+  <div class="brand-tagline">A language learning tool for studying any two languages.</div>
 </div>
 
 <div id="loadArea">
@@ -237,6 +237,7 @@ tr.only-forget-hidden{display:none!important}
     <button id="modeBtn-scramble" class="mode-btn" onclick="switchMode('scramble')">🔤 단어 배열</button>
     <button class="gray" onclick="clearAll()">초기화</button>
   </div>
+  <div id="currentItemInfo" class="hint"></div>
 </div>
 
 <div id="mode-table" class="card mode-panel">
@@ -665,8 +666,21 @@ function renderItemSelect(){
 }
 
 function itemToPairs(item){return item.answers.map(a=>({ko:a.ko,en:a.en,important:!!a.important,notMemorized:!!a.notMemorized}));}
+function updateCurrentItemInfo(){
+ const el=document.getElementById('currentItemInfo');
+ if(!el)return;
+ const items=currentQuestionItems||[];
+ if(!items.length){el.textContent='';return;}
+ if(items.length===1){
+   el.textContent=`현재 문제: ${items[0].sheetName} - ${items[0].label}`;
+ }else{
+   const names=items.map(i=>`${i.sheetName} - ${i.label}`);
+   el.textContent=`현재 문제 (${items.length}개): ${names.join(', ')}`;
+ }
+}
 function showQuestions(items){
  currentQuestionItems=items||[];
+ updateCurrentItemInfo();
  const box=document.getElementById('questionBox'), list=document.getElementById('questionList');
  const html=[];
  currentQuestionTexts=[];
@@ -779,7 +793,7 @@ function copyKeyword(id){
  navigator.clipboard.writeText(box.textContent||'');
  alert('키워드 복사했어.');
 }
-function hideQuestions(){currentQuestionItems=[];document.getElementById('questionBox').style.display='none';document.getElementById('questionList').innerHTML='';}
+function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();document.getElementById('questionBox').style.display='none';document.getElementById('questionList').innerHTML='';}
 function setRows(pairs){document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,done:false})).filter(i=>i.ko||i.en);renderTable();}
 function loadSelectedItem(){stopSpeak();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));}
 function isItemImportant(item){return item.answers.some(a=>a.important);}
