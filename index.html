@@ -252,7 +252,7 @@ tr.only-forget-hidden{display:none!important}
 <div class="toolbar-label">Python 코드</div>
 <div class="toolbar"><button class="green" onclick="generatePython('both')">🐍 문장별 생성 코드</button><button class="green" onclick="generatePython('ko')">🇰🇷 한글 한 파일 코드</button><button class="green" onclick="generatePython('en')">🇺🇸 영어 한 파일 코드</button><button class="green" onclick="downloadPython()">💾 .py 저장</button><button class="secondary" onclick="copyPython()">📋 코드 복사</button></div>
 <div class="toolbar-label">옵션</div>
-<div class="toolbar"><label>읽기 순서<select id="orderMode"><option value="ko_en">한글 → 영어</option><option value="en_ko">영어 → 한글</option></select></label><label>반복 <input id="repeatCount" type="number" min="1" value="1" style="width:60px"> 회</label><label>한글/영어 사이 쉬기 <input id="pairGapSec" type="number" min="0" step="0.1" value="5" style="width:70px"> 초</label><label>문장 사이 쉬기 <input id="gapSec" type="number" min="0" step="0.1" value="1.0" style="width:70px"> 초</label><label>키워드 사이 쉬기 <input id="keywordGapSec" type="number" min="0" step="0.5" value="5" style="width:70px"> 초</label><label><input id="pythonRandom" type="checkbox"> Python 랜덤 순서</label><label>한글 속도 <input id="koRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label><label>영어 속도 <input id="enRate" type="number" min="0.5" max="2" step="0.1" value="1.0" style="width:70px"></label><label>파일명 <input id="baseName" value="opic_practice" style="width:150px"></label></div>
+<div class="toolbar"><label>읽기 순서<select id="orderMode"><option value="ko_en">한글 → 영어</option><option value="en_ko">영어 → 한글</option></select></label><label>반복 <input id="repeatCount" type="number" min="1" value="1" style="width:60px"> 회</label><label>한글/영어 사이 쉬기 <input id="pairGapSec" type="number" min="0" step="0.1" value="5" style="width:70px"> 초</label><label>문장 사이 쉬기 <input id="gapSec" type="number" min="0" step="0.1" value="1.0" style="width:70px"> 초</label><label>키워드 사이 쉬기 <input id="keywordGapSec" type="number" min="0" step="0.5" value="5" style="width:70px"> 초</label><label><input id="skipNumberRead" type="checkbox"> 숫자 안읽기</label><label><input id="pythonRandom" type="checkbox"> Python 랜덤 순서</label><label>한글 속도 <input id="koRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label><label>영어 속도 <input id="enRate" type="number" min="0.5" max="2" step="0.1" value="1.0" style="width:70px"></label><label>파일명 <input id="baseName" value="opic_practice" style="width:150px"></label></div>
 
 <div id="pythonCard" style="display:none;margin-top:10px"><b>생성된 Python 코드</b><pre id="pythonCode"></pre></div>
 
@@ -1546,9 +1546,12 @@ async function speakRow(i,mode,token){
  const gap=Number(document.getElementById('pairGapSec').value||0)*1000;
  const koRate=document.getElementById('koRate').value;
  const enRate=document.getElementById('enRate').value;
- await speakText(`Number ${i+1}`,'en',enRate,token);
- let ok=await sleepWithToken(500,token);
- if(!ok)return;
+ let ok=true;
+ if(!document.getElementById('skipNumberRead')?.checked){
+   await speakText(`Number ${i+1}`,'en',enRate,token);
+   ok=await sleepWithToken(500,token);
+   if(!ok)return;
+ }
  if(mode==='ko'){
    await speakText(koText,'ko',koRate,token);
  }else if(mode==='en'){
