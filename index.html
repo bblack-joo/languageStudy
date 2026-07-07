@@ -267,6 +267,7 @@ tr.only-forget-hidden{display:none!important}
 
 <div id="mode-flash" class="card mode-panel active">
 <b>🧠 플래시카드로 암기하기</b>
+<div id="flashQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="flashQuestionList"></div></div>
 <div class="flash-card-box">
   <div class="flash-options">
     <label>모드
@@ -325,6 +326,7 @@ tr.only-forget-hidden{display:none!important}
 
 <div id="mode-scramble" class="card mode-panel">
 <b>🔤 단어 배열 연습</b>
+<div id="scrambleQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="scrambleQuestionList"></div></div>
 <div class="scramble-box">
   <div class="flash-options">
     <label>모드
@@ -727,14 +729,11 @@ function updateCurrentItemInfo(){
    el.textContent=`현재 문제 (${items.length}개): ${names.join(', ')}`;
  }
 }
-function showQuestions(items){
- currentQuestionItems=items||[];
- updateCurrentItemInfo();
- const box=document.getElementById('questionBox'), list=document.getElementById('questionList');
+function buildQuestionHtml(items,prefix){
  const html=[];
- currentQuestionTexts=[];
- QUESTION_AUDIO={};
- KEYWORD_AUDIO={};
+ const questionTexts=[];
+ const questionAudio={};
+ const keywordAudio={};
  let itemNo=0;
  let qAudioNo=0;
  let keywordNo=0;
@@ -745,11 +744,11 @@ function showQuestions(items){
   }else{
     item.questions.forEach(q=>{
       const qText=String(q.content||'').trim();
-      if(qText) currentQuestionTexts.push(qText);
+      if(qText) questionTexts.push(qText);
       const no=compactNo(q.unitNo,q.groupNo,q.questionNo);
-      const koId=`qko_${itemNo}_${qAudioNo}`;
-      const qAudioId=`question_audio_${itemNo}_${qAudioNo}`;
-      QUESTION_AUDIO[qAudioId]=stripStress(qText);
+      const koId=`${prefix}_qko_${itemNo}_${qAudioNo}`;
+      const qAudioId=`${prefix}_question_audio_${itemNo}_${qAudioNo}`;
+      questionAudio[qAudioId]=stripStress(qText);
       const koHtml=q.trans
         ? `<button class="ko-toggle" onclick="toggleQuestionKo('${koId}', this)">한글 보기</button><div id="${koId}" class="q-ko">${escapeHtml(q.trans)}</div>`
         : '';
@@ -765,14 +764,35 @@ function showQuestions(items){
   // 답변 시트 H열의 "키워드/답변 흐름"은 질문 아래에 한 번만 표시한다.
   const flowText=(item.flows||[]).map(x=>String(x).trim()).filter(Boolean).join('\n');
   if(flowText){
-    const flowId=`keyword_${keywordNo++}`;
-    KEYWORD_AUDIO[flowId]=flowText;
+    const flowId=`${prefix}_keyword_${keywordNo++}`;
+    keywordAudio[flowId]=flowText;
     html.push(`<div class="question-item"><button class="keyword-toggle" onclick="readKeywordAudio('${flowId}')">📝 키워드 재생</button><label class="keyword-gap-label">쉬기 <input id="${flowId}_gap" class="keyword-gap-input" type="number" min="0" step="0.5" value="5"> 초</label><button class="secondary small" onclick="pauseSpeak()">⏸ 일시정지</button><button class="green small" onclick="resumeSpeak()">▶ 다시 시작</button><button class="red small" onclick="stopSpeak()">■ 정지</button><button class="keyword-toggle" onclick="toggleKeyword('${flowId}', this)">키워드 보기</button><button class="keyword-copy" onclick="copyKeyword('${flowId}')">복사</button><div id="${flowId}" class="keyword-box">${escapeHtml(flowText)}</div></div>`);
   }
   itemNo++;
  });
- list.innerHTML=html.join('');
- box.style.display=html.length?'block':'none';
+ return {html,questionTexts,questionAudio,keywordAudio};
+}
+
+function renderQuestionBox(boxId,listId,items,prefix,collect=false){
+ const box=document.getElementById(boxId), list=document.getElementById(listId);
+ if(!box||!list)return;
+ const built=buildQuestionHtml(items,prefix);
+ list.innerHTML=built.html.join('');
+ box.style.display=built.html.length?'block':'none';
+ Object.assign(QUESTION_AUDIO,built.questionAudio);
+ Object.assign(KEYWORD_AUDIO,built.keywordAudio);
+ if(collect) currentQuestionTexts=built.questionTexts;
+}
+
+function showQuestions(items){
+ currentQuestionItems=items||[];
+ updateCurrentItemInfo();
+ currentQuestionTexts=[];
+ QUESTION_AUDIO={};
+ KEYWORD_AUDIO={};
+ renderQuestionBox('questionBox','questionList',currentQuestionItems,'table',true);
+ renderQuestionBox('flashQuestionBox','flashQuestionList',currentQuestionItems,'flash');
+ renderQuestionBox('scrambleQuestionBox','scrambleQuestionList',currentQuestionItems,'scramble');
  setTimeout(refreshPracticeHeights,0);
 }
 
@@ -842,7 +862,7 @@ function copyKeyword(id){
  navigator.clipboard.writeText(box.textContent||'');
  alert('키워드 복사했어.');
 }
-function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();document.getElementById('questionBox').style.display='none';document.getElementById('questionList').innerHTML='';}
+function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});}
 function setRows(pairs){document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,done:false})).filter(i=>i.ko||i.en);renderTable();}
 function loadSelectedItem(){stopSpeak();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));}
 function isItemImportant(item){return item.answers.some(a=>a.important);}
