@@ -248,7 +248,7 @@ tr.only-forget-hidden{display:none!important}
 <div id="mode-table" class="card mode-panel">
 <b>표 · 읽기 설정</b>
 <div class="toolbar-label">재생</div>
-<div class="toolbar"><button onclick="readAll('both')">▶ 표 읽기</button><button onclick="readAll('ko')">한글</button><button onclick="readAll('en')">영어</button><button class="orange" onclick="readRandom()">🎲 랜덤 읽기</button><button class="secondary" onclick="pauseSpeak()">⏸ 일시정지</button><button class="green" onclick="resumeSpeak()">▶ 이어읽기</button><button class="red" onclick="stopSpeak()">■ 정지</button></div>
+<div class="toolbar"><button onclick="readAll('en')">▶ 표 읽기</button><button onclick="readAll('ko')">한글</button><button onclick="readAll('en')">영어</button><button class="orange" onclick="readRandom()">🎲 랜덤 읽기</button><button class="secondary" onclick="pauseSpeak()">⏸ 일시정지</button><button class="green" onclick="resumeSpeak()">▶ 이어읽기</button><button class="red" onclick="stopSpeak()">■ 정지</button></div>
 <div class="toolbar-label">Python 코드</div>
 <div class="toolbar"><button class="green" onclick="generatePython('both')">🐍 문장별 생성 코드</button><button class="green" onclick="generatePython('ko')">🇰🇷 한글 한 파일 코드</button><button class="green" onclick="generatePython('en')">🇺🇸 영어 한 파일 코드</button><button class="green" onclick="downloadPython()">💾 .py 저장</button><button class="secondary" onclick="copyPython()">📋 코드 복사</button></div>
 <div class="toolbar-label">옵션</div>
@@ -286,11 +286,12 @@ tr.only-forget-hidden{display:none!important}
       <select id="flashSpeakMode" onchange="this.blur();">
         <option value="both">둘 다 읽기</option>
         <option value="ko">한글만 읽기</option>
-        <option value="en">영어만 읽기</option>
+        <option value="en" selected>영어만 읽기</option>
         <option value="off">안 듣기</option>
       </select>
     </label>
     <button class="green small" onclick="startFlashcards()">시작</button>
+    <button class="secondary small" onclick="playFlashSpeak()">🔊 듣기</button>
     <button class="secondary small" onclick="prevFlashcard()">◀ 이전</button>
     <button class="secondary small" onclick="flipFlashcard()">뒤집기</button>
     <button class="secondary small" onclick="nextFlashcard()">다음 ▶</button>
@@ -350,6 +351,7 @@ tr.only-forget-hidden{display:none!important}
       </select>
     </label>
     <button class="green small" onclick="startScramble()">시작</button>
+    <button class="secondary small" onclick="playScramblePrompt()">🔊 듣기</button>
     <button class="secondary small" id="scramblePoolToggleBtn" onclick="toggleScramblePool()">🙈 단어 숨기기</button>
     <span id="scrambleProgress" class="flash-progress">0 / 0</span>
   </div>
@@ -400,6 +402,7 @@ tr.only-forget-hidden{display:none!important}
 
   <div class="flash-options">
     <button class="green small" onclick="checkScramble()">✅ 정답 확인</button>
+    <button class="secondary small" onclick="prevScramble()">◀ 이전</button>
     <button class="secondary small" onclick="nextScramble()">다음 ▶</button>
   </div>
 
@@ -796,6 +799,12 @@ function showQuestions(items){
  setTimeout(refreshPracticeHeights,0);
 }
 
+function guessSpeakLang(text){
+ return /[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(String(text||''))?'ko':'en';
+}
+function cleanSpeechText(text){
+ return String(text||'').replace(/\s+/g,' ').trim();
+}
 async function readQuestionAudio(id){
  const text=QUESTION_AUDIO[id];
  if(!text)return;
@@ -805,10 +814,11 @@ async function readQuestionAudio(id){
  speaking=true;
  paused=false;
  loopOne=false;
- const enRate=document.getElementById('enRate').value;
- await speakText('Question.','en',enRate,token);
+ const lang=guessSpeakLang(text);
+ const rate=document.getElementById(lang==='ko'?'koRate':'enRate').value;
+ await speakText(lang==='ko'?'질문.':'Question.',lang,rate,token);
  let ok=await sleepWithToken(350,token);
- if(ok&&speaking&&token===playToken) await speakText(text,'en',enRate,token);
+ if(ok&&speaking&&token===playToken) await speakText(cleanSpeechText(text),lang,rate,token);
  if(token===playToken) speaking=false;
 }
 
@@ -1313,13 +1323,20 @@ function scrambleInputKeydown(e){
    else{nextScramble();}
  }
 }
-function scrambleSpeakMode(){return document.getElementById('scrambleSpeakMode')?.value||'both';}
+function scrambleSpeakMode(){return document.getElementById('scrambleSpeakMode')?.value||'en';}
 function speakScramblePromptAuto(promptLang,promptText){
  const mode=scrambleSpeakMode();
  if(mode==='off'||!promptText)return;
  if(mode==='both'||mode===promptLang){
    speakFlashText({lang:promptLang,plain:promptText});
  }
+}
+function playScramblePrompt(){
+ const cur=currentScrambleRow();
+ if(!cur||!cur.row){alert('먼저 단어 배열을 시작해줘.');return;}
+ const {promptLang,promptText}=scrambleSides(cur.row);
+ if(!promptText){alert('읽을 내용이 없어.');return;}
+ speakFlashText({lang:promptLang,plain:promptText});
 }
 function speakScrambleAnswerAuto(answerLang,answerText){
  const mode=scrambleSpeakMode();
@@ -1418,6 +1435,18 @@ function nextScramble(){
  if(!scrambleOrderList.length)return;
  if(scrambleIndex>=scrambleOrderList.length-1){finishScramble();return;}
  scrambleIndex++;
+ renderScrambleQuestion(true);
+}
+function prevScramble(){
+ if(!scrambleOrderList.length)return;
+ const res=document.getElementById('scrambleResult');
+ if(res){res.classList.add('flash-hidden');res.innerHTML='';}
+ if(scrambleFinished){
+   scrambleFinished=false;
+   scrambleIndex=Math.max(0,scrambleOrderList.length-1);
+ }else if(scrambleIndex>0){
+   scrambleIndex--;
+ }
  renderScrambleQuestion(true);
 }
 function finishScramble(){
