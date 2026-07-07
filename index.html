@@ -259,10 +259,10 @@ tr.only-forget-hidden{display:none!important}
 <div class="hint" style="margin-top:10px">각 행의 ▶전체 / 한글 / 영어 / 🔁 버튼으로 그 문장만 읽을 수 있어.</div>
 <div id="questionBox" class="question-box" style="display:none"><b>질문</b><div id="questionList"></div></div>
 <div class="toolbar-label">보기 옵션</div>
-<div class="toolbar"><button id="practiceToggleBtn" class="green small" onclick="togglePracticeColumn(this)">✍ 연습칸 보이기</button><button id="forgetOnlyBtn" class="orange small" onclick="toggleForgetOnly(this)">☑ 안 외워진 것만 보기</button></div>
+<div class="toolbar"><button id="koToggleBtn" class="green small" onclick="displayRow('ko')">한글 숨기기</button><button id="enToggleBtn" class="green small" onclick="displayRow('en')">영어 숨기기</button><button id="practiceToggleBtn" class="green small" onclick="togglePracticeColumn(this)">✍ 연습칸 숨기기</button><button id="actionsToggleBtn" class="green small" onclick="toggleActionsColumn(this)">기능 숨기기</button><button id="forgetOnlyBtn" class="orange small" onclick="toggleForgetOnly(this)">☑ 안 외워진 것만 보기</button></div>
 <div class="toolbar-label">연습 관리</div>
 <div class="toolbar"><span class="hint" style="margin:0 4px 0 0">연습칸에 적어보며 외우기</span><button class="green small" onclick="copyPracticeColumn()">✍ 연습 복사</button><button class="gray small" onclick="clearCurrentPractice()">현재 표 연습 삭제</button><button class="red small" onclick="clearAllPractice()">전체 연습 삭제</button></div>
-<div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">✓</th><th class="num">번호</th><th class="kr">한글 <button class="green small" onclick="displayRow('ko', this)">숨기기</button><button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="green small" onclick="displayRow('en', this)">숨기기</button><button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="actions actions-header">기능 <button id="actionsToggleBtn" class="green small" onclick="toggleActionsColumn(this)">숨기기</button></th><th class="practice-cell practice-hidden">✍ 연습</th></tr></thead><tbody></tbody></table></div>
+<div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">✓</th><th class="num">번호</th><th class="kr">한글 <button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="practice-cell">✍ 연습</th><th class="actions actions-header">기능</th></tr></thead><tbody></tbody></table></div>
 </div>
 
 <div id="mode-flash" class="card mode-panel active">
@@ -410,7 +410,7 @@ tr.only-forget-hidden{display:none!important}
 </div>
 </div>
 <script>
-let rows=[],practiceVisible=false,actionsVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[];
+let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[];
 let flashOrderList=[],flashIndex=0,flashRevealed=false;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
@@ -936,10 +936,11 @@ function renderTable(){
   tr.id='row'+i;
   if(showOnlyNotMemorized && !r.notMemorized) tr.classList.add('only-forget-hidden');
   const pKey=getPracticeKey(r);
-  tr.innerHTML=`<td class="check-col"><input type="checkbox" class="forget-check" ${r.notMemorized?'checked':''} disabled></td><td class="num">${i+1}</td><td class="${r.important?'important-text':''}">${escapeHtml(r.ko)}</td><td class="${r.important?'important-text':''}">${formatStress(r.en)}</td><td class="actions actions-col"><button class="small" onclick="readOne(${i},'both')">▶전체</button><button class="small" onclick="readOne(${i},'ko')">한글</button><button class="small" onclick="readOne(${i},'en')">영어</button><button class="small orange" onclick="repeatOne(${i})">🔁</button></td><td class="practice-cell practice-hidden"><textarea class="practice-input" data-key="${escapeAttr(pKey)}" placeholder="" oninput="savePracticeInput(this)" onkeydown="practiceKeydown(event,this)">${escapeHtml(getSavedPractice(pKey))}</textarea></td>`;
+  tr.innerHTML=`<td class="check-col"><input type="checkbox" class="forget-check" ${r.notMemorized?'checked':''} disabled></td><td class="num">${i+1}</td><td class="${r.important?'important-text':''}">${escapeHtml(r.ko)}</td><td class="${r.important?'important-text':''}">${formatStress(r.en)}</td><td class="practice-cell"><textarea class="practice-input" data-key="${escapeAttr(pKey)}" placeholder="" oninput="savePracticeInput(this)" onkeydown="practiceKeydown(event,this)">${escapeHtml(getSavedPractice(pKey))}</textarea></td><td class="actions actions-col"><button class="small" onclick="readOne(${i},'both')">▶전체</button><button class="small" onclick="readOne(${i},'ko')">한글</button><button class="small" onclick="readOne(${i},'en')">영어</button><button class="small orange" onclick="repeatOne(${i})">🔁</button></td>`;
   tb.appendChild(tr);
  });
  updateCountInfo();
+ applyLanguageColumnVisibility();
  applyPracticeVisibility();
  applyActionsVisibility();
  applyForgetOnlyButton();
@@ -1543,7 +1544,25 @@ async function readRandom(){stopSpeak();await sleep(150);const token=++playToken
 function pauseSpeak(){if(speechSynthesis.speaking&&!speechSynthesis.paused){paused=true;speechSynthesis.pause();}}
 function resumeSpeak(){if(paused||speechSynthesis.paused){paused=false;speechSynthesis.resume();}}
 function stopSpeak(){playToken++;speaking=false;loopOne=false;paused=false;currentIndex=0;speechSynthesis.cancel();clearActive();const first=document.getElementById('row0');if(first)first.classList.add('active');}
-function displayRow(lang,btn){const colIndex=lang==='ko'?2:3;const hide=btn.dataset.hide!=='1';document.querySelectorAll('#dataTable tr').forEach(tr=>{if(tr.parentElement.tagName==='THEAD')return;const cell=tr.children[colIndex];if(cell)cell.style.display=hide?'none':'';});btn.dataset.hide=hide?'1':'0';btn.textContent=hide?'보이기':'숨기기';}
+function applyLanguageColumnVisibility(){
+ const states={ko:koColumnVisible,en:enColumnVisible};
+ Object.keys(states).forEach(lang=>{
+  const colIndex=lang==='ko'?2:3;
+  document.querySelectorAll('#dataTable tr').forEach(tr=>{
+   const cell=tr.children[colIndex];
+   if(cell)cell.style.display=states[lang]?'':'none';
+  });
+ });
+ const koBtn=document.getElementById('koToggleBtn');
+ const enBtn=document.getElementById('enToggleBtn');
+ if(koBtn)koBtn.textContent=koColumnVisible?'한글 숨기기':'한글 보이기';
+ if(enBtn)enBtn.textContent=enColumnVisible?'영어 숨기기':'영어 보이기';
+}
+function displayRow(lang){
+ if(lang==='ko')koColumnVisible=!koColumnVisible;
+ if(lang==='en')enColumnVisible=!enColumnVisible;
+ applyLanguageColumnVisibility();
+}
 function copyColumn(lang){
  const colIndex=lang==='ko'?2:3;
  const text=[...document.querySelectorAll('#dataTable tbody tr')]
@@ -1559,7 +1578,7 @@ function copyColumn(lang){
 }
 function applyPracticeVisibility(){document.querySelectorAll('.practice-cell').forEach(cell=>{cell.classList.toggle('practice-hidden',!practiceVisible);});const btn=document.getElementById('practiceToggleBtn');if(btn)btn.textContent=practiceVisible?'✍ 연습칸 숨기기':'✍ 연습칸 보이기';}
 function togglePracticeColumn(btn){practiceVisible=!practiceVisible;applyPracticeVisibility();if(practiceVisible)setTimeout(refreshPracticeHeights,0);}
-function applyActionsVisibility(){document.querySelectorAll('.actions-col,.actions-header').forEach(el=>{el.classList.toggle('actions-hidden',!actionsVisible);});const btn=document.getElementById('actionsToggleBtn');if(btn)btn.textContent=actionsVisible?'숨기기':'보이기';}
+function applyActionsVisibility(){document.querySelectorAll('.actions-col,.actions-header').forEach(el=>{el.classList.toggle('actions-hidden',!actionsVisible);});const btn=document.getElementById('actionsToggleBtn');if(btn)btn.textContent=actionsVisible?'기능 숨기기':'기능 보이기';}
 function toggleActionsColumn(btn){actionsVisible=!actionsVisible;applyActionsVisibility();}
 let currentMode='flash';
 function switchMode(mode){
