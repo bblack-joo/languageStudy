@@ -238,6 +238,7 @@ tr.only-forget-hidden{display:none!important}
     <button id="modeBtn-table" class="mode-btn" onclick="switchMode('table')">📋 표</button>
     <button id="modeBtn-scramble" class="mode-btn" onclick="switchMode('scramble')">🔤 단어 배열</button>
     <button id="modeBtn-keywordWrite" class="mode-btn" onclick="switchMode('keywordWrite')">📝 키워드 보고 적기</button>
+    <button id="modeBtn-englishOnly" class="mode-btn" onclick="switchMode('englishOnly')">📖 문장 읽기</button>
     <button class="gray" onclick="clearAll()">초기화</button>
   </div>
   <div id="currentItemInfo" class="hint"></div>
@@ -440,8 +441,13 @@ tr.only-forget-hidden{display:none!important}
   <div class="flash-scratch-box">
     <textarea id="keywordWriteInput" placeholder="키워드를 보고 문장을 적어봐" style="height:110px" oninput="saveKeywordWriteAnswer(); autoGrow(this);" disabled></textarea>
   </div>
-  <div id="keywordWriteResult" class="scramble-result flash-hidden"></div>
+<div id="keywordWriteResult" class="scramble-result flash-hidden"></div>
 </div>
+</div>
+
+<div id="mode-englishOnly" class="card mode-panel">
+<b>📖 문장 읽기</b>
+<div id="englishOnlyList" class="scramble-result"></div>
 </div>
 </div>
 <script>
@@ -725,7 +731,7 @@ function renderItemSelect(){
  }).join('');
 }
 
-function itemToPairs(item){return item.answers.map(a=>({ko:a.ko,en:a.en,important:!!a.important,notMemorized:!!a.notMemorized}));}
+function itemToPairs(item){const flowText=(item.flows||[]).map(x=>String(x).trim()).filter(Boolean).join('\n');return item.answers.map(a=>({ko:a.ko,en:a.en,important:!!a.important,notMemorized:!!a.notMemorized,itemLabel:item.label||'',sheetName:item.sheetName||'',flowText}));}
 let timerInterval=null,timerStartTime=0;
 function formatTimer(ms){
  const totalSec=Math.floor(ms/1000);
@@ -905,7 +911,7 @@ function copyKeyword(id){
  alert('키워드 복사했어.');
 }
 function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});}
-function setRows(pairs){document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,done:false})).filter(i=>i.ko||i.en);renderTable();}
+function setRows(pairs){document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',flowText:i.flowText||'',done:false})).filter(i=>i.ko||i.en);renderTable();}
 function loadSelectedItem(){stopSpeak();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));}
 function isItemImportant(item){return item.answers.some(a=>a.important);}
 function loadImportantItems(){
@@ -955,7 +961,7 @@ function loadRandomItems(){
  if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}
  const list=getFilteredItems();
  if(!list.length){alert('선택한 범위에 불러올 문장이 없어.');return;}
- const allPairs=list.flatMap(item=>itemToPairs(item).map(p=>({...p,__itemKey:item.key})));
+ const allPairs=list.flatMap(item=>itemToPairs(item).map(p=>({...p,__itemKey:item.key,itemLabel:item.label||'',sheetName:item.sheetName||''})));
  if(!allPairs.length){alert('선택한 범위에 불러올 문장이 없어.');return;}
  const count=Math.max(1,Number(document.getElementById('randomCount').value||10));
  const picked=shuffleArray(allPairs).slice(0,Math.min(count,allPairs.length));
@@ -989,6 +995,7 @@ function renderTable(){
  resetFlashcard();
  resetScramble();
  resetKeywordWrite();
+ renderEnglishOnly();
  applyStudyAreaVisibility();
  setTimeout(refreshPracticeHeights,0);
 }
@@ -1679,6 +1686,32 @@ function showKeywordWriteResult(){
  res.classList.remove('flash-hidden');
 }
 
+function renderEnglishOnly(){
+ const box=document.getElementById('englishOnlyList');
+ if(!box)return;
+ const list=rows.map((r,i)=>({i,en:stripStress(r.en||'').trim(),title:[r.sheetName,r.itemLabel].filter(Boolean).join(' - '),flowText:String(r.flowText||'').trim()})).filter(x=>x.en);
+ if(!list.length){
+  box.innerHTML='<div>표를 불러오면 문장이 여기에 표시돼.</div>';
+  return;
+ }
+ const titles=[...new Set(list.map(x=>x.title).filter(Boolean))];
+ let lastTitle=null;
+ const lines=[];
+ list.forEach((x,idx)=>{
+  if(titles.length>1 && x.title && x.title!==lastTitle){
+   lines.push(`<div class="question-group-title">${escapeHtml(x.title)} /</div>`);
+   lastTitle=x.title;
+  }
+  lines.push(`<div class="question-item">${escapeHtml(x.en)}</div>`);
+  const next=list[idx+1];
+  const isGroupEnd=!next || next.title!==x.title;
+  if(isGroupEnd && x.flowText){
+   lines.push(`<div class="keyword-box" style="display:block">${escapeHtml(x.flowText)}</div>`);
+  }
+ });
+ box.innerHTML=lines.join('');
+}
+
 function saveScrambleCursor(){
   const input = document.getElementById('scrambleInput');
   if(!input) return;
@@ -1813,7 +1846,7 @@ function toggleActionsColumn(btn){actionsVisible=!actionsVisible;applyActionsVis
 let currentMode='flash';
 function switchMode(mode){
  currentMode=mode;
- ['table','flash','scramble','keywordWrite'].forEach(m=>{
+ ['table','flash','scramble','keywordWrite','englishOnly'].forEach(m=>{
    const panel=document.getElementById('mode-'+m);
    const btn=document.getElementById('modeBtn-'+m);
    if(panel)panel.classList.toggle('active', m===mode);
