@@ -274,6 +274,8 @@ tr.only-forget-hidden{display:none!important}
       <select id="flashMode" onchange="resetFlashcard();this.blur();">
         <option value="ko_en">한글 → 영어</option>
         <option value="en_ko">영어 → 한글</option>
+        <option value="ko_only">한글만 보기</option>
+        <option value="en_only">영어만 보기</option>
       </select>
     </label>
     <label>순서
@@ -306,6 +308,7 @@ tr.only-forget-hidden{display:none!important}
     <button class="secondary small" onclick="copyFlashText('ko')">한글 복사</button>
     <button class="secondary small" onclick="copyFlashText('en')">영어 복사</button>
   </div>
+  <div id="flashResult" class="scramble-result flash-hidden"></div>
   <div class="flash-help">카드 클릭: 정답 보기 → 다음 카드 / Space·Enter: 뒤집기·다음 / ← →: 이전·다음</div>
 </div>
 
@@ -414,7 +417,7 @@ tr.only-forget-hidden{display:none!important}
 </div>
 <script>
 let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[];
-let flashOrderList=[],flashIndex=0,flashRevealed=false;
+let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
 function norm(s){return String(s??'').trim().replace(/\s+/g,'').toLowerCase();}
@@ -1025,7 +1028,9 @@ function buildFlashOrder(){
  flashOrderList=document.getElementById('flashOrder')?.value==='random'?shuffleArray(indices):indices;
  flashIndex=0;
  flashRevealed=false;
+ flashFinished=false;
  clearFlashScratch();
+ hideFlashResult();
 }
 function resetFlashcard(){
  buildFlashOrder();
@@ -1036,15 +1041,23 @@ function startFlashcards(){
  buildFlashOrder();
  renderFlashcard(true);
 }
+function hideFlashResult(){
+ const res=document.getElementById('flashResult');
+ if(res){res.classList.add('flash-hidden');res.innerHTML='';}
+}
 function getFlashCurrent(){
  if(!flashOrderList.length) buildFlashOrder();
  const rowIndex=flashOrderList[flashIndex];
  return rows[rowIndex]||null;
 }
+function isFlashSingleMode(){
+ const mode=document.getElementById('flashMode')?.value||'ko_en';
+ return mode==='ko_only'||mode==='en_only';
+}
 function flashSide(row,side){
  const mode=document.getElementById('flashMode')?.value||'ko_en';
- const frontLang=mode==='ko_en'?'ko':'en';
- const backLang=mode==='ko_en'?'en':'ko';
+ const frontLang=mode==='ko_only'?'ko':mode==='en_only'?'en':mode==='ko_en'?'ko':'en';
+ const backLang=mode==='ko_only'?'ko':mode==='en_only'?'en':mode==='ko_en'?'en':'ko';
  const lang=side==='front'?frontLang:backLang;
  const raw=lang==='ko'?(row.ko||''):(row.en||'');
  const html=lang==='ko'?escapeHtml(raw):formatStress(raw);
@@ -1057,6 +1070,14 @@ function renderFlashcard(autoSpeak=false){
  const prog=document.getElementById('flashProgress');
  const bar=document.getElementById('flashBarInner');
  if(!frontEl||!backEl)return;
+ if(flashFinished){
+   frontEl.textContent='🎉 이번 플래시카드 끝!';
+   backEl.innerHTML='';
+   backEl.classList.add('flash-hidden');
+   if(prog)prog.textContent=`${flashOrderList.length} / ${flashOrderList.length}`;
+   if(bar)bar.style.width='100%';
+   return;
+ }
  if(!flashOrderList.length){
    frontEl.textContent=rows.length?'현재 조건에 표시할 카드가 없어.':'표를 불러온 뒤 시작을 눌러줘.';
    backEl.innerHTML='';
@@ -1071,11 +1092,17 @@ function renderFlashcard(autoSpeak=false){
  const back=flashSide(row,'back');
  frontEl.innerHTML=front.html;
  backEl.innerHTML=back.html;
- backEl.classList.toggle('flash-hidden',!flashRevealed);
+ const singleMode=isFlashSingleMode();
+ if(singleMode){
+   backEl.innerHTML='';
+   backEl.classList.add('flash-hidden');
+ }else{
+   backEl.classList.toggle('flash-hidden',!flashRevealed);
+ }
  if(prog)prog.textContent=`${flashIndex+1} / ${flashOrderList.length}`;
  if(bar)bar.style.width=`${Math.round(((flashIndex+1)/flashOrderList.length)*100)}%`;
  const speakMode=document.getElementById('flashSpeakMode')?.value||'both';
- const displayedSide=flashRevealed?back:front;
+ const displayedSide=flashRevealed&&!singleMode?back:front;
  if(autoSpeak && speakMode!=='off'){
    if(speakMode==='both'){
      speakFlashText(displayedSide);
@@ -1099,28 +1126,59 @@ async function speakFlashText(side){
 function flipFlashcard(){
  if(!flashOrderList.length) startFlashcards();
  if(!flashOrderList.length)return;
+ if(flashFinished)return;
+ if(isFlashSingleMode()){nextFlashcard();return;}
  flashRevealed=!flashRevealed;
  renderFlashcard(true);
 }
 function nextFlashcard(){
  if(!flashOrderList.length) startFlashcards();
  if(!flashOrderList.length)return;
- flashIndex=(flashIndex+1)%flashOrderList.length;
+ if(flashFinished)return;
+ if(flashIndex>=flashOrderList.length-1){finishFlashcards();return;}
+ flashIndex++;
  flashRevealed=false;
  clearFlashScratch();
+ hideFlashResult();
  renderFlashcard(true);
 }
 function prevFlashcard(){
  if(!flashOrderList.length) startFlashcards();
  if(!flashOrderList.length)return;
- flashIndex=(flashIndex-1+flashOrderList.length)%flashOrderList.length;
+ if(flashFinished){
+   flashFinished=false;
+   flashIndex=Math.max(0,flashOrderList.length-1);
+ }else if(flashIndex>0){
+   flashIndex--;
+ }
  flashRevealed=false;
  clearFlashScratch();
+ hideFlashResult();
  renderFlashcard(true);
+}
+function finishFlashcards(){
+ flashFinished=true;
+ flashRevealed=false;
+ clearFlashScratch();
+ renderFlashcard(false);
+ showFlashAllSentences();
+}
+function showFlashAllSentences(){
+ const res=document.getElementById('flashResult');
+ if(!res)return;
+ const items=flashOrderList.map((rowIndex,pos)=>({pos:pos+1,row:rows[rowIndex]})).filter(x=>x.row);
+ if(!items.length){hideFlashResult();return;}
+ let html='<div><b>전체 문장</b></div><table><thead><tr><th class="num-col">번호</th><th>한글</th><th>영어</th></tr></thead><tbody>';
+ html+=items.map(item=>`<tr><td class="num-col">${item.pos}</td><td>${escapeHtml(item.row.ko||'')}</td><td>${formatStress(item.row.en||'')}</td></tr>`).join('');
+ html+='</tbody></table>';
+ res.innerHTML=html;
+ res.classList.remove('flash-hidden');
 }
 function handleFlashCardClick(){
  if(!flashOrderList.length){startFlashcards();return;}
- if(!flashRevealed){flipFlashcard();}
+ if(flashFinished)return;
+ if(isFlashSingleMode()){nextFlashcard();}
+ else if(!flashRevealed){flipFlashcard();}
  else{nextFlashcard();}
 }
 function copyFlashText(lang){
