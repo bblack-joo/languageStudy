@@ -1233,9 +1233,7 @@ let scrambleRecognition=null;
 function tokenizeSentence(text){
  const clean=stripStress(text||'').trim();
  if(!clean)return[];
- const tokens=clean.split(/\s+/).filter(Boolean);
- if(tokens.length) tokens[0]=tokens[0].replace(/^[A-Z]/,ch=>ch.toLowerCase());
- return tokens;
+ return clean.split(/\s+/).filter(Boolean).map(token=>token==='I'?token:token.toLowerCase());
 }
 function normalizeForCompare(text){
  return String(text||'').toLowerCase().replace(/[.,!?'"“”‘’]/g,'').replace(/\s+/g,' ').trim();
