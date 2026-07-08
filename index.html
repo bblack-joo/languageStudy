@@ -179,6 +179,8 @@ tr.only-forget-hidden{display:none!important}
 .scramble-result table{width:100%;border-collapse:collapse;margin-top:8px;background:#fff}
 .scramble-result td,.scramble-result th{border:1px solid var(--border);padding:6px 8px;font-size:13.5px;text-align:left}
 .scramble-result .num-col{width:52px;text-align:center}
+.keyword-write-result table{table-layout:fixed}
+.keyword-write-result .keyword-col{width:24%;word-break:break-word;white-space:pre-wrap}
 
 .mode-switch{gap:10px}
 .mode-btn{background:#fff;border:1px solid var(--border);color:var(--text-muted);font-weight:800;padding:10px 18px;font-size:14.5px}
@@ -235,6 +237,7 @@ tr.only-forget-hidden{display:none!important}
     <button id="modeBtn-flash" class="mode-btn active" onclick="switchMode('flash')">🧠 플래시카드</button>
     <button id="modeBtn-table" class="mode-btn" onclick="switchMode('table')">📋 표</button>
     <button id="modeBtn-scramble" class="mode-btn" onclick="switchMode('scramble')">🔤 단어 배열</button>
+    <button id="modeBtn-keywordWrite" class="mode-btn" onclick="switchMode('keywordWrite')">📝 키워드 보고 적기</button>
     <button class="gray" onclick="clearAll()">초기화</button>
   </div>
   <div id="currentItemInfo" class="hint"></div>
@@ -412,6 +415,32 @@ tr.only-forget-hidden{display:none!important}
   <div id="scrambleFeedback" class="scramble-feedback flash-hidden"></div>
   <div id="scrambleResult" class="scramble-result flash-hidden"></div>
   <div class="flash-help">단어 칩을 드래그해서 정답 영역에 놓거나, 클릭해서 순서대로 채울 수 있어. 입력창에 직접 타이핑해도 되고, "🙈 단어 숨기기"로 힌트 없이 연습할 수도 있어. "정답 확인"으로 채점하고 "다음"으로 넘어가면, 끝났을 때 틀린 문장만 표 번호와 함께 모아서 보여줘.</div>
+</div>
+</div>
+
+<div id="mode-keywordWrite" class="card mode-panel">
+<b>📝 키워드 보고 적기</b>
+<div class="flash-card-box">
+  <div class="flash-options">
+    <label>순서
+      <select id="keywordWriteOrder" onchange="resetKeywordWrite();this.blur();">
+        <option value="seq">순서대로</option>
+        <option value="random">랜덤</option>
+      </select>
+    </label>
+    <button class="green small" onclick="startKeywordWrite()">시작</button>
+    <button class="secondary small" onclick="prevKeywordWrite()">◀ 이전</button>
+    <button class="secondary small" onclick="nextKeywordWrite()">다음 ▶</button>
+    <span id="keywordWriteProgress" class="flash-progress">0 / 0</span>
+  </div>
+  <div class="flash-bar"><div id="keywordWriteBarInner" class="flash-bar-inner"></div></div>
+  <div id="keywordWriteCard" class="flash-card" onclick="nextKeywordWrite()">
+    <div id="keywordWritePrompt" class="flash-front">표를 불러온 뒤 시작을 눌러줘.</div>
+  </div>
+  <div class="flash-scratch-box">
+    <textarea id="keywordWriteInput" placeholder="키워드를 보고 문장을 적어봐" style="height:110px" oninput="saveKeywordWriteAnswer(); autoGrow(this);" disabled></textarea>
+  </div>
+  <div id="keywordWriteResult" class="scramble-result flash-hidden"></div>
 </div>
 </div>
 </div>
@@ -959,6 +988,7 @@ function renderTable(){
  applyForgetOnlyButton();
  resetFlashcard();
  resetScramble();
+ resetKeywordWrite();
  applyStudyAreaVisibility();
  setTimeout(refreshPracticeHeights,0);
 }
@@ -1196,7 +1226,9 @@ let scrambleRecognition=null;
 function tokenizeSentence(text){
  const clean=stripStress(text||'').trim();
  if(!clean)return[];
- return clean.split(/\s+/).filter(Boolean);
+ const tokens=clean.split(/\s+/).filter(Boolean);
+ if(tokens.length) tokens[0]=tokens[0].replace(/^[A-Z]/,ch=>ch.toLowerCase());
+ return tokens;
 }
 function normalizeForCompare(text){
  return String(text||'').toLowerCase().replace(/[.,!?'"“”‘’]/g,'').replace(/\s+/g,' ').trim();
@@ -1539,6 +1571,114 @@ function finishScramble(){
  }
 }
 
+let keywordWriteList=[],keywordWriteIndex=0,keywordWriteFinished=false,keywordWriteAnswers=[];
+function buildKeywordWriteList(){
+ const entries=[];
+ (currentQuestionItems||[]).forEach(item=>{
+  const flows=(item.flows||[]).map(x=>String(x).trim()).filter(Boolean);
+  const koText=(item.answers||[]).map(a=>String(a.ko||'').trim()).filter(Boolean).join('\n');
+  const enText=(item.answers||[]).map(a=>stripStress(a.en||'').trim()).filter(Boolean).join('\n');
+  flows.forEach(flow=>entries.push({keyword:flow,ko:koText,en:enText,label:item.label||''}));
+ });
+ keywordWriteList=document.getElementById('keywordWriteOrder')?.value==='random'?shuffleArray(entries):entries;
+ keywordWriteIndex=0;
+ keywordWriteFinished=false;
+ keywordWriteAnswers=new Array(keywordWriteList.length).fill('');
+ hideKeywordWriteResult();
+}
+function resetKeywordWrite(){
+ buildKeywordWriteList();
+ renderKeywordWrite(false);
+}
+function startKeywordWrite(){
+ if(!currentQuestionItems.length){alert('먼저 엑셀에서 문장을 불러와줘.');return;}
+ buildKeywordWriteList();
+ if(!keywordWriteList.length){alert('현재 불러온 묶음에 키워드가 없어.');return;}
+ renderKeywordWrite(true);
+}
+function hideKeywordWriteResult(){
+ const res=document.getElementById('keywordWriteResult');
+ if(res){res.classList.add('flash-hidden');res.innerHTML='';}
+}
+function saveKeywordWriteAnswer(){
+ const input=document.getElementById('keywordWriteInput');
+ if(!input||keywordWriteFinished||!keywordWriteList.length)return;
+ keywordWriteAnswers[keywordWriteIndex]=input.value;
+}
+function renderKeywordWrite(focusInput=false){
+ const prompt=document.getElementById('keywordWritePrompt');
+ const input=document.getElementById('keywordWriteInput');
+ const prog=document.getElementById('keywordWriteProgress');
+ const bar=document.getElementById('keywordWriteBarInner');
+ if(!prompt||!input)return;
+ if(keywordWriteFinished){
+  prompt.textContent='🎉 키워드 보고 적기 끝!';
+  input.value='';
+  input.disabled=true;
+  if(prog)prog.textContent=`${keywordWriteList.length} / ${keywordWriteList.length}`;
+  if(bar)bar.style.width='100%';
+  return;
+ }
+ if(!keywordWriteList.length){
+  prompt.textContent=currentQuestionItems.length?'현재 불러온 묶음에 키워드가 없어.':'표를 불러온 뒤 시작을 눌러줘.';
+  input.value='';
+  input.disabled=true;
+  if(prog)prog.textContent='0 / 0';
+  if(bar)bar.style.width='0%';
+  return;
+ }
+ const item=keywordWriteList[keywordWriteIndex];
+ prompt.textContent=item.keyword||'(키워드 없음)';
+ input.disabled=false;
+ input.value=keywordWriteAnswers[keywordWriteIndex]||'';
+ autoGrow(input);
+ if(prog)prog.textContent=`${keywordWriteIndex+1} / ${keywordWriteList.length}`;
+ if(bar)bar.style.width=`${Math.round(((keywordWriteIndex+1)/keywordWriteList.length)*100)}%`;
+ if(focusInput)setTimeout(()=>input.focus(),0);
+}
+function nextKeywordWrite(){
+ if(!keywordWriteList.length){startKeywordWrite();return;}
+ if(keywordWriteFinished)return;
+ saveKeywordWriteAnswer();
+ if(keywordWriteIndex>=keywordWriteList.length-1){finishKeywordWrite();return;}
+ keywordWriteIndex++;
+ hideKeywordWriteResult();
+ renderKeywordWrite(true);
+}
+function prevKeywordWrite(){
+ if(!keywordWriteList.length){startKeywordWrite();return;}
+ saveKeywordWriteAnswer();
+ if(keywordWriteFinished){
+  keywordWriteFinished=false;
+  keywordWriteIndex=Math.max(0,keywordWriteList.length-1);
+ }else if(keywordWriteIndex>0){
+  keywordWriteIndex--;
+ }
+ hideKeywordWriteResult();
+ renderKeywordWrite(true);
+}
+function finishKeywordWrite(){
+ saveKeywordWriteAnswer();
+ keywordWriteFinished=true;
+ renderKeywordWrite(false);
+ showKeywordWriteResult();
+}
+function showKeywordWriteResult(){
+ const res=document.getElementById('keywordWriteResult');
+ if(!res)return;
+ let html='<div><b>결과</b></div><table class="keyword-write-result"><thead><tr><th class="keyword-col">키워드</th><th>적은 것</th></tr></thead><tbody>';
+ html+=keywordWriteList.map((item,i)=>{
+  return `<tr><td class="keyword-col">${escapeHtml(item.keyword||'')}</td><td>${escapeHtml(keywordWriteAnswers[i]||'')}</td></tr>`;
+ }).join('');
+ html+='</tbody></table>';
+ const originals=[...new Set(keywordWriteList.map(item=>String(item.en||'').trim()).filter(Boolean))];
+ if(originals.length){
+  html+=`<div style="margin-top:12px"><b>원래 문장 전체</b><div class="keyword-box" style="display:block">${formatStress(originals.join('\n\n'))}</div></div>`;
+ }
+ res.innerHTML=html;
+ res.classList.remove('flash-hidden');
+}
+
 function saveScrambleCursor(){
   const input = document.getElementById('scrambleInput');
   if(!input) return;
@@ -1673,7 +1813,7 @@ function toggleActionsColumn(btn){actionsVisible=!actionsVisible;applyActionsVis
 let currentMode='flash';
 function switchMode(mode){
  currentMode=mode;
- ['table','flash','scramble'].forEach(m=>{
+ ['table','flash','scramble','keywordWrite'].forEach(m=>{
    const panel=document.getElementById('mode-'+m);
    const btn=document.getElementById('modeBtn-'+m);
    if(panel)panel.classList.toggle('active', m===mode);
