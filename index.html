@@ -341,6 +341,8 @@ tr.only-forget-hidden{display:none!important}
   <div id="flashSpeakBox" style="display:none">
     <div class="flash-options">
       <label>반복 <input id="flashSpeakRepeat" type="number" min="1" value="1" style="width:60px"> 회</label>
+      <label>한글 속도 <input id="flashKoRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label>
+      <label>영어 속도 <input id="flashEnRate" type="number" min="0.5" max="2" step="0.1" value="1.0" style="width:70px"></label>
       <button class="green small" onclick="playFlashSpeak()">🔊 듣기</button>
     </div>
   </div>
@@ -1181,9 +1183,14 @@ async function playFlashSpeak(){
  if(!side.plain){alert('읽을 내용이 없어.');return;}
  const repeat=Math.max(1,Number(document.getElementById('flashSpeakRepeat')?.value||1));
  for(let k=0;k<repeat;k++){
-   await speakFlashText(side);
+   await speakFlashText(side,getFlashSpeakRate(side.lang));
    if(k<repeat-1) await sleep(400);
  }
+}
+function getFlashSpeakRate(lang){
+ const id=lang==='ko'?'flashKoRate':'flashEnRate';
+ const fallback=lang==='ko'?'koRate':'enRate';
+ return document.getElementById(id)?.value || document.getElementById(fallback)?.value || 1;
 }
 function buildFlashOrder(){
  const indices=getVisibleRowIndices().filter(i=>rows[i]&&((rows[i].ko||'').trim()||(rows[i].en||'').trim()));
@@ -1269,21 +1276,21 @@ function renderFlashcard(autoSpeak=false){
  const displayedSide=flashRevealed&&!singleMode?back:front;
  if(autoSpeak && speakMode!=='off'){
    if(speakMode==='both'){
-     speakFlashText(displayedSide);
+     speakFlashText(displayedSide,getFlashSpeakRate(displayedSide.lang));
    }else if(speakMode===displayedSide.lang){
-     speakFlashText(displayedSide);
+     speakFlashText(displayedSide,getFlashSpeakRate(displayedSide.lang));
    }
    // 선택한 언어와 지금 보이는 면의 언어가 다르면 재생하지 않음
  }
 }
-async function speakFlashText(side){
+async function speakFlashText(side,rateOverride=null){
  if(!side||!side.plain)return;
  stopSpeak();
  await sleep(100);
  const token=++playToken;
  speaking=true;
  paused=false;
- const rate=side.lang==='ko'?document.getElementById('koRate').value:document.getElementById('enRate').value;
+ const rate=rateOverride ?? (side.lang==='ko'?document.getElementById('koRate').value:document.getElementById('enRate').value);
  await speakText(side.plain,side.lang,rate,token);
  if(token===playToken)speaking=false;
 }
