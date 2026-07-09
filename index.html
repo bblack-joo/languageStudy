@@ -351,6 +351,7 @@ tr.only-forget-hidden{display:none!important}
   <div class="flash-help">아래에 쓴 내용은 카드별로 기억했다가 마지막에 정답과 비교해서 보여줘.</div>
   <textarea id="flashScratchInput" placeholder="자유롭게 써보면서 연습해봐" style="height:90px" oninput="saveFlashScratch(); autoGrow(this);"></textarea>
   <div class="flash-options">
+    <button class="secondary small" onclick="flipFlashcard()">뒤집기</button>
     <button class="green small" onclick="handleFlashCardClick()">확인</button>
   </div>
 </div>
