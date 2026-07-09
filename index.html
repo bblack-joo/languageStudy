@@ -234,6 +234,20 @@ tr.only-forget-hidden{display:none!important}
 </div>
 </div>
 
+<div class="card">
+<div class="toolbar"><button class="secondary small" id="chatGptToggleBtn" onclick="toggleChatGptBox()">💬 ChatGPT에 묻기</button></div>
+<div id="chatGptBox" style="display:none">
+<div class="hint">단어, 표현, 문장을 적고 원하는 질문을 누르면 ChatGPT 새 탭이 열려. 질문문은 클립보드에도 같이 복사돼.</div>
+<textarea id="chatGptInput" placeholder="예: get used to / I usually spend time at home." style="height:70px" oninput="autoGrow(this)"></textarea>
+<div class="toolbar">
+  <button class="green small" onclick="askChatGpt('meaning')">뜻 물어보기</button>
+  <button class="green small" onclick="askChatGpt('examples')">예문 물어보기</button>
+  <button class="orange small" onclick="askChatGpt('opic')">오픽식으로 바꾸기</button>
+  <button class="secondary small" onclick="askChatGpt('fix')">내 문장 고쳐달라 하기</button>
+</div>
+</div>
+</div>
+
 <div id="studyArea" style="display:none">
 <div class="card">
   <b>학습 모드 선택</b>
@@ -1085,6 +1099,33 @@ function toggleManualEntry(){
  const showing=box.style.display!=='none';
  box.style.display=showing?'none':'block';
  if(btn)btn.textContent=showing?'✏ 데이터 직접 넣기':'✏ 숨기기';
+}
+function toggleChatGptBox(){
+ const box=document.getElementById('chatGptBox');
+ const btn=document.getElementById('chatGptToggleBtn');
+ if(!box)return;
+ const showing=box.style.display!=='none';
+ box.style.display=showing?'none':'block';
+ if(btn)btn.textContent=showing?'💬 ChatGPT에 묻기':'💬 숨기기';
+ const input=document.getElementById('chatGptInput');
+ if(!showing&&input)setTimeout(()=>input.focus(),0);
+}
+function buildChatGptPrompt(kind,text){
+ const value=String(text||'').trim();
+ if(kind==='meaning')return `영어 표현 "${value}"의 뜻을 한국어로 쉽게 설명하고, 자연스러운 영어 예문 5개와 오픽 답변에서 쓸 수 있는 짧은 문장 3개를 알려줘.`;
+ if(kind==='examples')return `영어 표현 "${value}"을 실제 회화와 오픽 답변에서 자연스럽게 쓰는 예문을 알려줘. 쉬운 문장부터 조금 긴 문장까지 단계별로 보여줘.`;
+ if(kind==='opic')return `다음 표현이나 문장을 오픽 답변에서 자연스럽게 쓸 수 있게 바꿔줘. 쉬운 버전, 자연스러운 버전, 조금 더 길게 말하는 버전으로 보여줘: "${value}"`;
+ if(kind==='fix')return `내 영어 문장을 자연스럽게 고쳐줘. 틀린 부분을 한국어로 짧게 설명하고, 오픽 답변처럼 말하기 쉬운 버전도 만들어줘: "${value}"`;
+ return value;
+}
+async function askChatGpt(kind){
+ const input=document.getElementById('chatGptInput');
+ const text=(input?.value||'').trim();
+ if(!text){alert('먼저 물어볼 단어나 문장을 적어줘.');return;}
+ const prompt=buildChatGptPrompt(kind,text);
+ try{await navigator.clipboard.writeText(prompt);}catch(e){}
+ const url='https://chatgpt.com/?q='+encodeURIComponent(prompt);
+ window.open(url,'_blank','noopener');
 }
 function getVisibleRowIndices(){
  return rows.map((r,i)=>({r,i})).filter(x=>!showOnlyNotMemorized || x.r.notMemorized).map(x=>x.i);
