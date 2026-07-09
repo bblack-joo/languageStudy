@@ -141,6 +141,9 @@ tr.only-forget-hidden{display:none!important}
 .scramble-answer-placeholder{font-size:13px;color:var(--text-muted)}
 .scramble-chip.placed{background:var(--primary-tint);border:1px solid var(--primary);color:var(--primary-dark)}
 .scramble-chip.placed:hover{background:#fff}
+.scramble-chip.drop-before{box-shadow:-8px 0 0 var(--neutral-tint);border-left:3px solid #9b948a}
+.scramble-answer-zone.drop-at-end::after{content:"";display:block;min-width:54px;height:34px;border:2px dashed #9b948a;background:var(--neutral-tint);border-radius:8px;opacity:.9}
+.scramble-answer-zone.drop-empty{background:var(--neutral-tint)}
 .scramble-pool.flash-hidden{display:none!important}
 .scramble-answer-row{
     display:flex;
@@ -366,7 +369,7 @@ tr.only-forget-hidden{display:none!important}
 
   <div id="scramblePrompt" class="scramble-prompt">표를 불러온 뒤 시작을 눌러줘.</div>
 
-  <div id="scrambleAnswerZone" class="scramble-answer-zone" ondragover="scrambleAllowDrop(event)" ondrop="scrambleDropOnAnswer(event, null)"><span class="scramble-answer-placeholder">여기로 단어를 드래그하거나, 아래에서 단어를 눌러 순서대로 채워줘</span></div>
+  <div id="scrambleAnswerZone" class="scramble-answer-zone" ondragover="scrambleDragOverAnswer(event, null)" ondragleave="scrambleClearDropPreview(event)" ondrop="scrambleDropOnAnswer(event, null)"><span class="scramble-answer-placeholder">여기로 단어를 드래그하거나, 아래에서 단어를 눌러 순서대로 채워줘</span></div>
 
   <div id="scramblePool" class="scramble-pool" ondragover="scrambleAllowDrop(event)" ondrop="scrambleDropOnPool(event)"></div>
 
@@ -1233,7 +1236,7 @@ function copyFlashText(lang){
  alert((lang==='ko'?'한글':'영어')+'을 복사했어.');
 }
 
-let scrambleOrderList=[],scrambleIndex=0,scrambleTokens=[],scrambleChipOrder=[],scrambleUsedStack=[],scrambleHintCount=0,scrambleWrongs=[],scrambleFinished=false,scrambleChecked=false;
+let scrambleOrderList=[],scrambleIndex=0,scrambleTokens=[],scrambleChipOrder=[],scrambleUsedStack=[],scrambleHintCount=0,scrambleDropPreviewPos=null,scrambleWrongs=[],scrambleFinished=false,scrambleChecked=false;
 let scrambleCursorPos=0;
 let scrambleRecognition=null;
 function tokenizeSentence(text){
@@ -1296,6 +1299,7 @@ function renderScrambleQuestion(autoSpeak=false){
    promptEl.textContent=rows.length?'현재 조건에 배열할 문장이 없어.':'표를 불러온 뒤 시작을 눌러줘.';
    scrambleTokens=[];scrambleChipOrder=[];scrambleUsedStack=[];
    scrambleHintCount=0;
+   scrambleDropPreviewPos=null;
    poolEl.innerHTML='';inputEl.value='';autoGrowScramble(inputEl);inputEl.disabled=true;
    renderScrambleAnswerZone();
    renderScrambleHintBox();
@@ -1311,6 +1315,7 @@ function renderScrambleQuestion(autoSpeak=false){
  scrambleChipOrder=shuffleArray(scrambleTokens.map((t,idx)=>idx));
  scrambleUsedStack=[];
  scrambleHintCount=0;
+ scrambleDropPreviewPos=null;
  scrambleCursorPos=0;
  inputEl.disabled=false;
  syncScrambleAnswer();
@@ -1343,18 +1348,19 @@ function renderScramblePool(){
  if(!poolEl)return;
  const remaining=scrambleChipOrder.filter(idx=>!scrambleUsedStack.includes(idx));
  poolEl.innerHTML=remaining.map(idx=>
-   `<button type="button" class="scramble-chip" draggable="true" data-idx="${idx}" ondragstart="scrambleDragStart(event,{origin:'pool',idx:${idx}})" onclick="scrambleClickChip(${idx})">${escapeHtml(scrambleTokens[idx])}</button>`
+   `<button type="button" class="scramble-chip" draggable="true" data-idx="${idx}" ondragstart="scrambleDragStart(event,{origin:'pool',idx:${idx}})" ondragend="scrambleEndDrag()" onclick="scrambleClickChip(${idx})">${escapeHtml(scrambleTokens[idx])}</button>`
  ).join('');
  applyScramblePoolVisibility();
 }
 function renderScrambleAnswerZone(){
  const zone=document.getElementById('scrambleAnswerZone');
  if(!zone)return;
+ zone.classList.remove('drop-at-end','drop-empty');
  if(!scrambleUsedStack.length){
    zone.innerHTML='<span class="scramble-answer-placeholder">여기로 단어를 드래그하거나, 아래에서 단어를 눌러 순서대로 채워줘</span>';
  }else{
    zone.innerHTML=scrambleUsedStack.map((idx,pos)=>
-     `<button type="button" class="scramble-chip placed" draggable="true" data-pos="${pos}" ondragstart="scrambleDragStart(event,{origin:'answer',pos:${pos}})" ondragover="scrambleAllowDrop(event)" ondrop="scrambleDropOnAnswer(event, ${pos})" onclick="scrambleRemoveFromAnswer(${pos})">${escapeHtml(scrambleTokens[idx])}</button>`
+     `<button type="button" class="scramble-chip placed" draggable="true" data-pos="${pos}" ondragstart="scrambleDragStart(event,{origin:'answer',pos:${pos}})" ondragend="scrambleEndDrag()" ondragover="scrambleDragOverAnswer(event, ${pos})" ondrop="scrambleDropOnAnswer(event, ${pos})" onclick="scrambleRemoveFromAnswer(${pos})">${escapeHtml(scrambleTokens[idx])}</button>`
    ).join('');
  }
  const inputEl=document.getElementById('scrambleInput');
@@ -1381,7 +1387,37 @@ function scrambleDragStart(e,payload){
  try{e.dataTransfer.setData('text/plain',JSON.stringify(payload));}catch(_){/* noop */}
  e.dataTransfer.effectAllowed='move';
 }
+function scrambleEndDrag(){
+ scrambleDragPayload=null;
+ scrambleDropPreviewPos=null;
+ updateScrambleDropPreview();
+}
 function scrambleAllowDrop(e){e.preventDefault();}
+function scrambleDragOverAnswer(e,targetPos){
+ e.preventDefault();
+ e.stopPropagation();
+ const nextPos=targetPos==null?scrambleUsedStack.length:targetPos;
+ if(scrambleDropPreviewPos!==nextPos){
+  scrambleDropPreviewPos=nextPos;
+  updateScrambleDropPreview();
+ }
+}
+function scrambleClearDropPreview(e){
+ const zone=document.getElementById('scrambleAnswerZone');
+ if(zone&&e.relatedTarget&&zone.contains(e.relatedTarget))return;
+ scrambleDropPreviewPos=null;
+ updateScrambleDropPreview();
+}
+function updateScrambleDropPreview(){
+ const zone=document.getElementById('scrambleAnswerZone');
+ if(!zone)return;
+ zone.classList.toggle('drop-empty', scrambleDropPreviewPos===0 && !scrambleUsedStack.length);
+ zone.classList.toggle('drop-at-end', scrambleDropPreviewPos===scrambleUsedStack.length && !!scrambleUsedStack.length);
+ zone.querySelectorAll('.scramble-chip.placed').forEach(chip=>{
+  const pos=Number(chip.dataset.pos);
+  chip.classList.toggle('drop-before', scrambleDropPreviewPos===pos);
+ });
+}
 function readScrambleDragPayload(e){
  try{
    const raw=e.dataTransfer.getData('text/plain');
@@ -1394,6 +1430,7 @@ function scrambleDropOnAnswer(e,targetPos){
  e.stopPropagation();
  const payload=readScrambleDragPayload(e);
  scrambleDragPayload=null;
+ scrambleDropPreviewPos=null;
  if(!payload)return;
  if(payload.origin==='pool'){
    const idx=payload.idx;
@@ -1414,27 +1451,32 @@ function scrambleDropOnPool(e){
  e.preventDefault();
  const payload=readScrambleDragPayload(e);
  scrambleDragPayload=null;
+ scrambleDropPreviewPos=null;
  if(!payload||payload.origin!=='answer')return;
  scrambleUsedStack.splice(payload.pos,1);
  syncScrambleAnswer();
 }
 function scrambleRemoveFromAnswer(pos){
  if(pos<0||pos>=scrambleUsedStack.length)return;
+ scrambleDropPreviewPos=null;
  scrambleUsedStack.splice(pos,1);
  syncScrambleAnswer();
 }
 function scrambleClickChip(idx){
  if(scrambleUsedStack.includes(idx))return;
+ scrambleDropPreviewPos=null;
  scrambleUsedStack.push(idx);
  syncScrambleAnswer();
 }
 
 function scrambleUndo(){
  if(!scrambleUsedStack.length)return;
+ scrambleDropPreviewPos=null;
  scrambleUsedStack.pop();
  syncScrambleAnswer();
 }
 function scrambleResetInput(){
+ scrambleDropPreviewPos=null;
  scrambleUsedStack=[];
  syncScrambleAnswer();
 }
