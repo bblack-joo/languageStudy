@@ -141,6 +141,7 @@ tr.only-forget-hidden{display:none!important}
 .scramble-answer-placeholder{font-size:13px;color:var(--text-muted)}
 .scramble-chip.placed{background:var(--primary-tint);border:1px solid var(--primary);color:var(--primary-dark)}
 .scramble-chip.placed:hover{background:#fff}
+.molgong-empty-slot{display:inline-block;min-width:54px;height:34px;border:1px dashed var(--border);background:var(--neutral-tint);border-radius:8px}
 .scramble-chip.drop-before{box-shadow:-8px 0 0 var(--neutral-tint);border-left:3px solid #9b948a}
 .scramble-answer-zone.drop-at-end::after{content:"";display:block;min-width:54px;height:34px;border:2px dashed #9b948a;background:var(--neutral-tint);border-radius:8px;opacity:.9}
 .scramble-answer-zone.drop-empty{background:var(--neutral-tint)}
@@ -240,6 +241,7 @@ tr.only-forget-hidden{display:none!important}
     <button id="modeBtn-flash" class="mode-btn active" onclick="switchMode('flash')">🧠 플래시카드</button>
     <button id="modeBtn-table" class="mode-btn" onclick="switchMode('table')">📋 표</button>
     <button id="modeBtn-scramble" class="mode-btn" onclick="switchMode('scramble')">🔤 단어 배열</button>
+    <button id="modeBtn-molgong" class="mode-btn" onclick="switchMode('molgong')">🔥 몰공 모드</button>
     <button id="modeBtn-keywordWrite" class="mode-btn" onclick="switchMode('keywordWrite')">📝 키워드 보고 적기</button>
     <button id="modeBtn-englishOnly" class="mode-btn" onclick="switchMode('englishOnly')">📖 문장 읽기</button>
     <button class="gray" onclick="clearAll()">초기화</button>
@@ -422,9 +424,31 @@ tr.only-forget-hidden{display:none!important}
     <button class="secondary small" onclick="nextScramble()">다음 ▶</button>
   </div>
 
-  <div id="scrambleFeedback" class="scramble-feedback flash-hidden"></div>
+<div id="scrambleFeedback" class="scramble-feedback flash-hidden"></div>
   <div id="scrambleResult" class="scramble-result flash-hidden"></div>
   <div class="flash-help">단어 칩을 드래그해서 정답 영역에 놓거나, 클릭해서 순서대로 채울 수 있어. 입력창에 직접 타이핑해도 되고, "🙈 단어 숨기기"로 힌트 없이 연습할 수도 있어. "정답 확인"으로 채점하고 "다음"으로 넘어가면, 끝났을 때 틀린 문장만 표 번호와 함께 모아서 보여줘.</div>
+</div>
+</div>
+
+<div id="mode-molgong" class="card mode-panel">
+<b>🔥 몰공 모드</b>
+<div class="flash-card-box">
+  <div class="flash-options">
+    <label>순서
+      <select id="molgongOrder" onchange="resetMolgong();this.blur();">
+        <option value="seq">순서대로</option>
+        <option value="random">랜덤</option>
+      </select>
+    </label>
+    <button class="green small" onclick="startMolgong()">시작</button>
+    <button class="secondary small" onclick="prevMolgong()">◀ 이전</button>
+    <button class="secondary small" onclick="showNextMolgongWord()">다음 단어 ▶</button>
+    <span id="molgongProgress" class="flash-progress">0 / 0</span>
+  </div>
+  <div class="flash-bar"><div id="molgongBarInner" class="flash-bar-inner"></div></div>
+  <div id="molgongSource" class="q-meta"></div>
+  <div id="molgongPrompt" class="scramble-prompt">표를 불러온 뒤 시작을 눌러줘.</div>
+  <div id="molgongHintBox" class="scramble-answer-zone"><span class="scramble-answer-placeholder">→ 를 누르면 영어 단어가 앞에서부터 하나씩 보여.</span></div>
 </div>
 </div>
 
@@ -1003,6 +1027,7 @@ function renderTable(){
  applyForgetOnlyButton();
  resetFlashcard();
  resetScramble();
+ resetMolgong();
  resetKeywordWrite();
  renderEnglishOnly();
  applyStudyAreaVisibility();
@@ -1340,8 +1365,12 @@ function renderScrambleHintBox(){
 }
 function showNextScrambleHint(){
  if(!scrambleTokens.length){alert('먼저 단어 배열을 시작해줘.');return;}
- if(scrambleHintCount<scrambleTokens.length)scrambleHintCount++;
- renderScrambleHintBox();
+ if(scrambleHintCount<scrambleTokens.length){
+  scrambleHintCount++;
+  renderScrambleHintBox();
+  return;
+ }
+ nextScramble();
 }
 function renderScramblePool(){
  const poolEl=document.getElementById('scramblePool');
@@ -1648,6 +1677,119 @@ function finishScramble(){
  }
 }
 
+let molgongOrderList=[],molgongIndex=0,molgongTokens=[],molgongHintCount=0,molgongFinished=false;
+function buildMolgongOrder(){
+ const indices=getVisibleRowIndices().filter(i=>rows[i]&&((rows[i].ko||'').trim()||(rows[i].en||'').trim()));
+ molgongOrderList=document.getElementById('molgongOrder')?.value==='random'?shuffleArray(indices):indices;
+ molgongIndex=0;
+ molgongHintCount=0;
+ molgongFinished=false;
+}
+function resetMolgong(){
+ buildMolgongOrder();
+ renderMolgong(false);
+}
+function startMolgong(){
+ if(!rows.length){alert('먼저 표를 생성해줘.');return;}
+ buildMolgongOrder();
+ renderMolgong(true);
+}
+function currentMolgongRow(){
+ if(!molgongOrderList.length)return null;
+ const rowIndex=molgongOrderList[molgongIndex];
+ return {rowIndex,row:rows[rowIndex]};
+}
+function renderMolgong(focus=false){
+ const prompt=document.getElementById('molgongPrompt');
+ const box=document.getElementById('molgongHintBox');
+ const source=document.getElementById('molgongSource');
+ const prog=document.getElementById('molgongProgress');
+ const bar=document.getElementById('molgongBarInner');
+ if(!prompt||!box)return;
+ if(molgongFinished){
+  if(source)source.textContent='';
+  prompt.textContent='🎉 몰공 모드 끝!';
+  box.innerHTML='<span class="scramble-answer-placeholder">끝났어. 시작을 누르면 다시 시작해.</span>';
+  if(prog)prog.textContent=`${molgongOrderList.length} / ${molgongOrderList.length}`;
+  if(bar)bar.style.width='100%';
+  return;
+ }
+ if(!molgongOrderList.length){
+  if(source)source.textContent='';
+  prompt.textContent=rows.length?'현재 조건에 표시할 문장이 없어.':'표를 불러온 뒤 시작을 눌러줘.';
+  molgongTokens=[];
+  molgongHintCount=0;
+  box.innerHTML='<span class="scramble-answer-placeholder">→ 를 누르면 영어 단어가 앞에서부터 하나씩 보여.</span>';
+  if(prog)prog.textContent='0 / 0';
+  if(bar)bar.style.width='0%';
+  return;
+ }
+ const cur=currentMolgongRow();
+ if(!cur||!cur.row)return;
+ const sourceTitles=[...new Set(molgongOrderList.map(i=>[rows[i]?.sheetName,rows[i]?.itemLabel].filter(Boolean).join(' - ')).filter(Boolean))];
+ const currentSource=[cur.row.sheetName,cur.row.itemLabel].filter(Boolean).join(' - ');
+ if(source)source.textContent=sourceTitles.length>1&&currentSource?currentSource:'';
+ prompt.textContent=cur.row.ko||'(한글 해석 없음)';
+ molgongTokens=tokenizeSentence(cur.row.en||'');
+ renderMolgongHintBox();
+ if(prog)prog.textContent=`${molgongIndex+1} / ${molgongOrderList.length}`;
+ if(bar)bar.style.width=`${Math.round(((molgongIndex+1)/molgongOrderList.length)*100)}%`;
+}
+function renderMolgongHintBox(){
+ const box=document.getElementById('molgongHintBox');
+ if(!box)return;
+ if(!molgongTokens.length){
+  box.innerHTML='<span class="scramble-answer-placeholder">→ 를 누르면 영어 단어가 앞에서부터 하나씩 보여.</span>';
+  return;
+ }
+ box.innerHTML=molgongTokens.map((word,idx)=>
+  idx<molgongHintCount
+   ? `<span class="scramble-chip placed">${escapeHtml(word)}</span>`
+   : '<span class="molgong-empty-slot"></span>'
+ ).join('');
+}
+function showNextMolgongWord(){
+ if(!molgongOrderList.length){startMolgong();return;}
+ if(molgongFinished){molgongFinished=false;molgongIndex=0;molgongHintCount=0;renderMolgong(true);return;}
+ if(molgongHintCount<molgongTokens.length){
+  molgongHintCount++;
+  renderMolgongHintBox();
+  return;
+ }
+ nextMolgong();
+}
+function showAllMolgongWords(){
+ if(!molgongOrderList.length){startMolgong();return;}
+ if(molgongFinished)return;
+ molgongHintCount=molgongTokens.length;
+ renderMolgongHintBox();
+}
+function nextMolgong(){
+ if(!molgongOrderList.length)return;
+ molgongIndex=molgongIndex>=molgongOrderList.length-1?0:molgongIndex+1;
+ molgongHintCount=0;
+ renderMolgong(true);
+}
+function prevMolgong(){
+ if(!molgongOrderList.length){startMolgong();return;}
+ if(molgongFinished){
+  molgongFinished=false;
+  molgongIndex=Math.max(0,molgongOrderList.length-1);
+ }else if(molgongHintCount>0){
+  molgongHintCount--;
+  renderMolgongHintBox();
+  return;
+ }else if(molgongIndex>0){
+  molgongIndex--;
+ }
+ molgongHintCount=0;
+ renderMolgong(true);
+}
+function finishMolgong(){
+ molgongFinished=true;
+ renderMolgong(false);
+}
+
 let keywordWriteList=[],keywordWriteIndex=0,keywordWriteFinished=false,keywordWriteAnswers=[];
 function buildKeywordWriteList(){
  const entries=[];
@@ -1796,6 +1938,17 @@ function autoGrowScramble(el){
 document.addEventListener('keydown',function(e){
  const tag=(e.target&&e.target.tagName||'').toLowerCase();
  if(tag==='input'||tag==='textarea'||tag==='select')return;
+ if(currentMode==='scramble'){
+  if(e.key==='ArrowRight'){e.preventDefault();showNextScrambleHint();}
+  else if(e.key==='ArrowLeft'){e.preventDefault();prevScramble();}
+  return;
+ }
+ if(currentMode==='molgong'){
+  if(e.code==='Space'){e.preventDefault();showAllMolgongWords();}
+  else if(e.key==='ArrowRight'){e.preventDefault();showNextMolgongWord();}
+  else if(e.key==='ArrowLeft'){e.preventDefault();prevMolgong();}
+  return;
+ }
  if(e.code==='Space'){e.preventDefault();flipFlashcard();}
  else if(e.key==='Enter'){e.preventDefault();handleFlashCardClick();}
  else if(e.key==='ArrowRight'){nextFlashcard();}
@@ -1916,7 +2069,7 @@ function toggleActionsColumn(btn){actionsVisible=!actionsVisible;applyActionsVis
 let currentMode='flash';
 function switchMode(mode){
  currentMode=mode;
- ['table','flash','scramble','keywordWrite','englishOnly'].forEach(m=>{
+ ['table','flash','scramble','molgong','keywordWrite','englishOnly'].forEach(m=>{
    const panel=document.getElementById('mode-'+m);
    const btn=document.getElementById('modeBtn-'+m);
    if(panel)panel.classList.toggle('active', m===mode);
