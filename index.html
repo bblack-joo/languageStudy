@@ -329,8 +329,8 @@ tr.only-forget-hidden{display:none!important}
       <button class="green small" onclick="playFlashSpeak()">🔊 듣기</button>
     </div>
   </div>
-  <div class="flash-help">아래는 채점 기능 없는 자유 연습장이야. 다음 카드로 넘어가면 자동으로 지워져.</div>
-  <textarea id="flashScratchInput" placeholder="자유롭게 써보면서 연습해봐" style="height:90px"></textarea>
+  <div class="flash-help">아래에 쓴 내용은 카드별로 기억했다가 마지막에 정답과 비교해서 보여줘.</div>
+  <textarea id="flashScratchInput" placeholder="자유롭게 써보면서 연습해봐" style="height:90px" oninput="saveFlashScratch(); autoGrow(this);"></textarea>
   <div class="flash-options">
     <button class="green small" onclick="handleFlashCardClick()">확인</button>
   </div>
@@ -485,7 +485,7 @@ tr.only-forget-hidden{display:none!important}
 </div>
 <script>
 let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[];
-let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false;
+let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
 function norm(s){return String(s??'').trim().replace(/\s+/g,'').toLowerCase();}
@@ -1075,6 +1075,17 @@ function clearFlashScratch(){
  const el=document.getElementById('flashScratchInput');
  if(el) el.value='';
 }
+function saveFlashScratch(){
+ const el=document.getElementById('flashScratchInput');
+ if(!el||flashFinished||!flashOrderList.length)return;
+ flashScratchAnswers[flashIndex]=el.value;
+}
+function loadFlashScratch(){
+ const el=document.getElementById('flashScratchInput');
+ if(!el)return;
+ el.value=flashScratchAnswers[flashIndex]||'';
+ autoGrow(el);
+}
 function toggleFlashSpeakBox(){
  const box=document.getElementById('flashSpeakBox');
  const btn=document.getElementById('flashSpeakToggleBtn');
@@ -1100,6 +1111,7 @@ function buildFlashOrder(){
  flashIndex=0;
  flashRevealed=false;
  flashFinished=false;
+ flashScratchAnswers=new Array(flashOrderList.length).fill('');
  clearFlashScratch();
  hideFlashResult();
 }
@@ -1172,6 +1184,7 @@ function renderFlashcard(autoSpeak=false){
  }
  if(prog)prog.textContent=`${flashIndex+1} / ${flashOrderList.length}`;
  if(bar)bar.style.width=`${Math.round(((flashIndex+1)/flashOrderList.length)*100)}%`;
+ loadFlashScratch();
  const speakMode=document.getElementById('flashSpeakMode')?.value||'both';
  const displayedSide=flashRevealed&&!singleMode?back:front;
  if(autoSpeak && speakMode!=='off'){
@@ -1206,16 +1219,17 @@ function nextFlashcard(){
  if(!flashOrderList.length) startFlashcards();
  if(!flashOrderList.length)return;
  if(flashFinished)return;
+ saveFlashScratch();
  if(flashIndex>=flashOrderList.length-1){finishFlashcards();return;}
  flashIndex++;
  flashRevealed=false;
- clearFlashScratch();
  hideFlashResult();
  renderFlashcard(true);
 }
 function prevFlashcard(){
  if(!flashOrderList.length) startFlashcards();
  if(!flashOrderList.length)return;
+ saveFlashScratch();
  if(flashFinished){
    flashFinished=false;
    flashIndex=Math.max(0,flashOrderList.length-1);
@@ -1223,11 +1237,11 @@ function prevFlashcard(){
    flashIndex--;
  }
  flashRevealed=false;
- clearFlashScratch();
  hideFlashResult();
  renderFlashcard(true);
 }
 function finishFlashcards(){
+ saveFlashScratch();
  flashFinished=true;
  flashRevealed=false;
  clearFlashScratch();
@@ -1239,8 +1253,15 @@ function showFlashAllSentences(){
  if(!res)return;
  const items=flashOrderList.map((rowIndex,pos)=>({pos:pos+1,row:rows[rowIndex]})).filter(x=>x.row);
  if(!items.length){hideFlashResult();return;}
- let html='<div><b>전체 문장</b></div><table><thead><tr><th class="num-col">번호</th><th>한글</th><th>영어</th></tr></thead><tbody>';
- html+=items.map(item=>`<tr><td class="num-col">${item.pos}</td><td>${escapeHtml(item.row.ko||'')}</td><td>${formatStress(item.row.en||'')}</td></tr>`).join('');
+ const mode=document.getElementById('flashMode')?.value||'ko_en';
+ const answerLang=(mode==='en_ko'||mode==='ko_only')?'ko':'en';
+ let html='<div><b>플래시카드 결과</b></div><table><thead><tr><th class="num-col">번호</th><th>내가 쓴 문장</th><th>정답</th></tr></thead><tbody>';
+ html+=items.map(item=>{
+  const myAnswer=flashScratchAnswers[item.pos-1]||'';
+  const correct=answerLang==='ko'?(item.row.ko||''):(item.row.en||'');
+  const correctHtml=answerLang==='ko'?escapeHtml(correct):formatStress(correct);
+  return `<tr><td class="num-col">${item.pos}</td><td style="white-space:pre-wrap">${escapeHtml(myAnswer)}</td><td>${correctHtml}</td></tr>`;
+ }).join('');
  html+='</tbody></table>';
  res.innerHTML=html;
  res.classList.remove('flash-hidden');
