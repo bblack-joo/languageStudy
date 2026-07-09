@@ -341,6 +341,7 @@ tr.only-forget-hidden{display:none!important}
   <div id="flashSpeakBox" style="display:none">
     <div class="flash-options">
       <label>반복 <input id="flashSpeakRepeat" type="number" min="1" value="1" style="width:60px"> 회</label>
+      <label><input id="flashSpeakInfinite" type="checkbox"> 무한</label>
       <label>한글 속도 <input id="flashKoRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label>
       <label>영어 속도 <input id="flashEnRate" type="number" min="0.5" max="2" step="0.1" value="1.0" style="width:70px"></label>
       <button class="green small" onclick="playFlashSpeak()">🔊 듣기</button>
@@ -538,7 +539,7 @@ tr.only-forget-hidden{display:none!important}
 </div>
 <script>
 let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[];
-let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[];
+let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
 function norm(s){return String(s??'').trim().replace(/\s+/g,'').toLowerCase();}
@@ -1181,11 +1182,22 @@ async function playFlashSpeak(){
  if(!row){alert('먼저 플래시카드를 시작해줘.');return;}
  const side=flashSide(row,flashRevealed?'back':'front');
  if(!side.plain){alert('읽을 내용이 없어.');return;}
+ const runId=++flashSpeakRunId;
  const repeat=Math.max(1,Number(document.getElementById('flashSpeakRepeat')?.value||1));
- for(let k=0;k<repeat;k++){
+ const infinite=!!document.getElementById('flashSpeakInfinite')?.checked;
+ for(let k=0;infinite||k<repeat;k++){
+   if(runId!==flashSpeakRunId)return;
    await speakFlashText(side,getFlashSpeakRate(side.lang));
-   if(k<repeat-1) await sleep(400);
+   if(runId!==flashSpeakRunId)return;
+   if(infinite||k<repeat-1){
+    await sleep(400);
+    if(runId!==flashSpeakRunId)return;
+   }
  }
+}
+function stopFlashSpeakPlayback(){
+ flashSpeakRunId++;
+ stopSpeak();
 }
 function getFlashSpeakRate(lang){
  const id=lang==='ko'?'flashKoRate':'flashEnRate';
@@ -1303,6 +1315,7 @@ function flipFlashcard(){
  renderFlashcard(true);
 }
 function nextFlashcard(){
+ stopFlashSpeakPlayback();
  if(!flashOrderList.length) startFlashcards();
  if(!flashOrderList.length)return;
  if(flashFinished)return;
@@ -1311,9 +1324,10 @@ function nextFlashcard(){
  flashIndex++;
  flashRevealed=false;
  hideFlashResult();
- renderFlashcard(true);
+ renderFlashcard(false);
 }
 function prevFlashcard(){
+ stopFlashSpeakPlayback();
  if(!flashOrderList.length) startFlashcards();
  if(!flashOrderList.length)return;
  saveFlashScratch();
@@ -1325,9 +1339,10 @@ function prevFlashcard(){
  }
  flashRevealed=false;
  hideFlashResult();
- renderFlashcard(true);
+ renderFlashcard(false);
 }
 function finishFlashcards(){
+ stopFlashSpeakPlayback();
  saveFlashScratch();
  flashFinished=true;
  flashRevealed=false;
