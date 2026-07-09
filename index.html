@@ -401,11 +401,17 @@ tr.only-forget-hidden{display:none!important}
         ⌫ 되돌리기
     </button>
 
+    <button class="secondary small" onclick="showNextScrambleHint()">
+        힌트
+    </button>
+
     <button class="gray small" onclick="scrambleResetInput()">
         지우기
     </button>
 
 </div>
+
+  <div id="scrambleHintBox" class="scramble-answer-zone"><span class="scramble-answer-placeholder">힌트를 누르면 앞 단어부터 하나씩 보여줘.</span></div>
 
   <div class="flash-options">
     <button class="green small" onclick="checkScramble()">✅ 정답 확인</button>
@@ -1227,13 +1233,16 @@ function copyFlashText(lang){
  alert((lang==='ko'?'한글':'영어')+'을 복사했어.');
 }
 
-let scrambleOrderList=[],scrambleIndex=0,scrambleTokens=[],scrambleChipOrder=[],scrambleUsedStack=[],scrambleWrongs=[],scrambleFinished=false,scrambleChecked=false;
+let scrambleOrderList=[],scrambleIndex=0,scrambleTokens=[],scrambleChipOrder=[],scrambleUsedStack=[],scrambleHintCount=0,scrambleWrongs=[],scrambleFinished=false,scrambleChecked=false;
 let scrambleCursorPos=0;
 let scrambleRecognition=null;
 function tokenizeSentence(text){
  const clean=stripStress(text||'').trim();
  if(!clean)return[];
- return clean.split(/\s+/).filter(Boolean).map(token=>token==='I'?token:token.toLowerCase());
+ return clean.split(/\s+/).filter(Boolean).map(token=>{
+  const cleaned=token.replace(/\.$/,'');
+  return cleaned==='I'?cleaned:cleaned.toLowerCase();
+ });
 }
 function normalizeForCompare(text){
  return String(text||'').toLowerCase().replace(/[.,!?'"“”‘’]/g,'').replace(/\s+/g,' ').trim();
@@ -1286,8 +1295,10 @@ function renderScrambleQuestion(autoSpeak=false){
  if(!scrambleOrderList.length){
    promptEl.textContent=rows.length?'현재 조건에 배열할 문장이 없어.':'표를 불러온 뒤 시작을 눌러줘.';
    scrambleTokens=[];scrambleChipOrder=[];scrambleUsedStack=[];
+   scrambleHintCount=0;
    poolEl.innerHTML='';inputEl.value='';autoGrowScramble(inputEl);inputEl.disabled=true;
    renderScrambleAnswerZone();
+   renderScrambleHintBox();
    if(prog)prog.textContent='0 / 0';
    if(bar)bar.style.width='0%';
    return;
@@ -1299,9 +1310,11 @@ function renderScrambleQuestion(autoSpeak=false){
  scrambleTokens=tokenizeSentence(answerText);
  scrambleChipOrder=shuffleArray(scrambleTokens.map((t,idx)=>idx));
  scrambleUsedStack=[];
+ scrambleHintCount=0;
  scrambleCursorPos=0;
  inputEl.disabled=false;
  syncScrambleAnswer();
+ renderScrambleHintBox();
  if(prog)prog.textContent=`${scrambleIndex+1} / ${scrambleOrderList.length}`;
  if(bar)bar.style.width=`${Math.round(scrambleIndex/scrambleOrderList.length*100)}%`;
  if(autoSpeak) speakScramblePromptAuto(promptLang,promptText);
@@ -1309,6 +1322,21 @@ function renderScrambleQuestion(autoSpeak=false){
 function syncScrambleAnswer(){
  renderScramblePool();
  renderScrambleAnswerZone();
+}
+function renderScrambleHintBox(){
+ const box=document.getElementById('scrambleHintBox');
+ if(!box)return;
+ const hints=scrambleTokens.slice(0,scrambleHintCount);
+ if(!hints.length){
+  box.innerHTML='<span class="scramble-answer-placeholder">힌트를 누르면 앞 단어부터 하나씩 보여줘.</span>';
+ }else{
+  box.innerHTML=hints.map(word=>`<span class="scramble-chip placed">${escapeHtml(word)}</span>`).join('');
+ }
+}
+function showNextScrambleHint(){
+ if(!scrambleTokens.length){alert('먼저 단어 배열을 시작해줘.');return;}
+ if(scrambleHintCount<scrambleTokens.length)scrambleHintCount++;
+ renderScrambleHintBox();
 }
 function renderScramblePool(){
  const poolEl=document.getElementById('scramblePool');
@@ -1556,6 +1584,8 @@ function finishScramble(){
  if(promptEl)promptEl.textContent='🎉 이번 배열 연습 끝!';
  if(poolEl)poolEl.innerHTML='';
  if(inputEl){inputEl.value='';inputEl.disabled=true;}
+ scrambleHintCount=0;
+ renderScrambleHintBox();
  if(prog)prog.textContent=`${scrambleOrderList.length} / ${scrambleOrderList.length}`;
  if(bar)bar.style.width='100%';
  if(fb){fb.className='scramble-feedback flash-hidden';fb.innerHTML='';}
