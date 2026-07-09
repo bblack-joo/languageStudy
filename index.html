@@ -243,6 +243,7 @@ tr.only-forget-hidden{display:none!important}
     <button id="modeBtn-scramble" class="mode-btn" onclick="switchMode('scramble')">🔤 단어 배열</button>
     <button id="modeBtn-molgong" class="mode-btn" onclick="switchMode('molgong')">🔥 몰공 모드</button>
     <button id="modeBtn-keywordWrite" class="mode-btn" onclick="switchMode('keywordWrite')">📝 키워드 보고 적기</button>
+    <button id="modeBtn-cloze" class="mode-btn" onclick="switchMode('cloze')">🕳 빈칸 맞추기</button>
     <button id="modeBtn-englishOnly" class="mode-btn" onclick="switchMode('englishOnly')">📖 문장 읽기</button>
     <button class="gray" onclick="clearAll()">초기화</button>
   </div>
@@ -475,6 +476,42 @@ tr.only-forget-hidden{display:none!important}
     <textarea id="keywordWriteInput" placeholder="키워드를 보고 문장을 적어봐" style="height:110px" oninput="saveKeywordWriteAnswer(); autoGrow(this);" disabled></textarea>
   </div>
 <div id="keywordWriteResult" class="scramble-result flash-hidden"></div>
+</div>
+</div>
+
+<div id="mode-cloze" class="card mode-panel">
+<b>🕳 빈칸 맞추기</b>
+<div id="clozeQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="clozeQuestionList"></div></div>
+<div class="flash-card-box">
+  <div class="flash-options">
+    <label>레벨
+      <select id="clozeLevel" onchange="resetCloze();this.blur();">
+        <option value="1">레벨 1</option>
+        <option value="2">레벨 2</option>
+        <option value="3">레벨 3</option>
+      </select>
+    </label>
+    <label>순서
+      <select id="clozeOrder" onchange="resetCloze();this.blur();">
+        <option value="seq">순서대로</option>
+        <option value="random">랜덤</option>
+      </select>
+    </label>
+    <button class="green small" onclick="startCloze()">시작</button>
+    <button class="secondary small" onclick="prevCloze()">◀ 이전</button>
+    <button class="secondary small" onclick="checkCloze()">정답 확인</button>
+    <button class="secondary small" onclick="nextCloze()">다음 ▶</button>
+    <span id="clozeProgress" class="flash-progress">0 / 0</span>
+  </div>
+  <div class="flash-bar"><div id="clozeBarInner" class="flash-bar-inner"></div></div>
+  <div id="clozePromptKo" class="scramble-prompt">표를 불러온 뒤 시작을 눌러줘.</div>
+  <div id="clozeSentence" class="scramble-answer-zone"><span class="scramble-answer-placeholder">빈칸 문장이 여기에 표시돼.</span></div>
+  <div class="flash-scratch-box">
+    <textarea id="clozeInput" placeholder="빈칸에 들어갈 단어들을 순서대로 적어봐" style="height:90px" oninput="saveClozeAnswer(); autoGrow(this);" disabled></textarea>
+  </div>
+  <div id="clozeFeedback" class="scramble-feedback flash-hidden"></div>
+  <div id="clozeResult" class="scramble-result flash-hidden"></div>
+  <div class="flash-help">레벨이 높을수록 빈칸이 많아져. 빈칸 답은 쉼표나 띄어쓰기로 구분해서 적으면 돼.</div>
 </div>
 </div>
 
@@ -867,6 +904,7 @@ function showQuestions(items){
  renderQuestionBox('questionBox','questionList',currentQuestionItems,'table',true);
  renderQuestionBox('flashQuestionBox','flashQuestionList',currentQuestionItems,'flash');
  renderQuestionBox('scrambleQuestionBox','scrambleQuestionList',currentQuestionItems,'scramble');
+ renderQuestionBox('clozeQuestionBox','clozeQuestionList',currentQuestionItems,'cloze');
  setTimeout(refreshPracticeHeights,0);
 }
 
@@ -943,7 +981,7 @@ function copyKeyword(id){
  navigator.clipboard.writeText(box.textContent||'');
  alert('키워드 복사했어.');
 }
-function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});}
+function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox','clozeQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList','clozeQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});}
 function setRows(pairs){document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',flowText:i.flowText||'',done:false})).filter(i=>i.ko||i.en);renderTable();}
 function loadSelectedItem(){stopSpeak();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));}
 function isItemImportant(item){return item.answers.some(a=>a.important);}
@@ -1029,6 +1067,7 @@ function renderTable(){
  resetScramble();
  resetMolgong();
  resetKeywordWrite();
+ resetCloze();
  renderEnglishOnly();
  applyStudyAreaVisibility();
  setTimeout(refreshPracticeHeights,0);
@@ -1919,6 +1958,184 @@ function showKeywordWriteResult(){
  res.classList.remove('flash-hidden');
 }
 
+let clozeOrderList=[],clozeIndex=0,clozeFinished=false,clozeAnswers=[],clozeChecked=[];
+function buildClozeOrder(){
+ const indices=getVisibleRowIndices().filter(i=>rows[i]&&String(rows[i].en||'').trim());
+ clozeOrderList=document.getElementById('clozeOrder')?.value==='random'?shuffleArray(indices):indices;
+ clozeIndex=0;
+ clozeFinished=false;
+ clozeAnswers=new Array(clozeOrderList.length).fill('');
+ clozeChecked=new Array(clozeOrderList.length).fill(false);
+ hideClozeResult();
+}
+function resetCloze(){
+ buildClozeOrder();
+ renderCloze(false);
+}
+function startCloze(){
+ if(!rows.length){alert('먼저 표를 생성해줘.');return;}
+ buildClozeOrder();
+ renderCloze(true);
+}
+function hideClozeResult(){
+ const res=document.getElementById('clozeResult');
+ if(res){res.classList.add('flash-hidden');res.innerHTML='';}
+ const fb=document.getElementById('clozeFeedback');
+ if(fb){fb.className='scramble-feedback flash-hidden';fb.innerHTML='';}
+}
+function currentClozeRow(){
+ if(!clozeOrderList.length)return null;
+ const rowIndex=clozeOrderList[clozeIndex];
+ return {rowIndex,row:rows[rowIndex]};
+}
+function parseClozeTokens(text){
+ return stripStress(text||'').trim().split(/\s+/).filter(Boolean).map(token=>{
+  const match=token.match(/^([^A-Za-z0-9']*)(.*?)([^A-Za-z0-9']*)$/);
+  const prefix=match?match[1]:'';
+  const core=match?match[2]:token;
+  const suffix=match?match[3]:'';
+  return {raw:token,prefix,core,suffix};
+ });
+}
+function clozeBlankIndexes(tokens){
+ const level=Number(document.getElementById('clozeLevel')?.value||1);
+ const ratio=level===3?0.65:level===2?0.45:0.25;
+ const wordIndexes=tokens.map((t,i)=>({t,i})).filter(x=>x.t.core&&/[A-Za-z0-9]/.test(x.t.core)).map(x=>x.i);
+ if(!wordIndexes.length)return new Set();
+ const count=Math.max(1,Math.min(wordIndexes.length,Math.ceil(wordIndexes.length*ratio)));
+ const picked=new Set();
+ for(let n=0;n<count;n++){
+  const pos=Math.min(wordIndexes.length-1,Math.floor((n+0.5)*wordIndexes.length/count));
+  picked.add(wordIndexes[pos]);
+ }
+ return picked;
+}
+function clozeData(row){
+ const tokens=parseClozeTokens(row?.en||'');
+ const blanks=clozeBlankIndexes(tokens);
+ const answers=[];
+ const html=tokens.map((token,idx)=>{
+  if(blanks.has(idx)){
+   answers.push(token.core);
+   return `${escapeHtml(token.prefix)}<span class="molgong-empty-slot" title="빈칸"></span>${escapeHtml(token.suffix)}`;
+  }
+  return escapeHtml(token.raw);
+ }).join(' ');
+ return {html,answers,answerText:answers.join(' '),fullText:stripStress(row?.en||'')};
+}
+function normalizeClozeToken(text){
+ return String(text||'').toLowerCase().replace(/[.,!?;:"“”‘’()[\]{}]/g,'').trim();
+}
+function clozeInputWords(text){
+ return String(text||'').split(/[,\s]+/).map(normalizeClozeToken).filter(Boolean);
+}
+function saveClozeAnswer(){
+ const input=document.getElementById('clozeInput');
+ if(!input||clozeFinished||!clozeOrderList.length)return;
+ clozeAnswers[clozeIndex]=input.value;
+}
+function renderCloze(focusInput=false){
+ const prompt=document.getElementById('clozePromptKo');
+ const sentence=document.getElementById('clozeSentence');
+ const input=document.getElementById('clozeInput');
+ const prog=document.getElementById('clozeProgress');
+ const bar=document.getElementById('clozeBarInner');
+ if(!prompt||!sentence||!input)return;
+ if(clozeFinished){
+  prompt.textContent='🎉 빈칸 맞추기 끝!';
+  sentence.innerHTML='<span class="scramble-answer-placeholder">결과표에서 내가 쓴 답과 정답을 비교해봐.</span>';
+  input.value='';
+  input.disabled=true;
+  if(prog)prog.textContent=`${clozeOrderList.length} / ${clozeOrderList.length}`;
+  if(bar)bar.style.width='100%';
+  return;
+ }
+ if(!clozeOrderList.length){
+  prompt.textContent=rows.length?'현재 조건에 표시할 문장이 없어.':'표를 불러온 뒤 시작을 눌러줘.';
+  sentence.innerHTML='<span class="scramble-answer-placeholder">빈칸 문장이 여기에 표시돼.</span>';
+  input.value='';
+  input.disabled=true;
+  if(prog)prog.textContent='0 / 0';
+  if(bar)bar.style.width='0%';
+  return;
+ }
+ const cur=currentClozeRow();
+ const data=clozeData(cur.row);
+ prompt.textContent=cur.row.ko||'(한글 해석 없음)';
+ sentence.innerHTML=data.html||'<span class="scramble-answer-placeholder">영어 문장이 없어.</span>';
+ input.disabled=false;
+ input.value=clozeAnswers[clozeIndex]||'';
+ autoGrow(input);
+ if(prog)prog.textContent=`${clozeIndex+1} / ${clozeOrderList.length}`;
+ if(bar)bar.style.width=`${Math.round(((clozeIndex+1)/clozeOrderList.length)*100)}%`;
+ const fb=document.getElementById('clozeFeedback');
+ if(fb&&!clozeChecked[clozeIndex]){fb.className='scramble-feedback flash-hidden';fb.innerHTML='';}
+ if(focusInput)setTimeout(()=>input.focus(),0);
+}
+function checkCloze(){
+ const cur=currentClozeRow();
+ if(!cur){startCloze();return;}
+ saveClozeAnswer();
+ const data=clozeData(cur.row);
+ const expected=data.answers.map(normalizeClozeToken);
+ const actual=clozeInputWords(clozeAnswers[clozeIndex]||'');
+ const correct=expected.length===actual.length&&expected.every((word,idx)=>word===actual[idx]);
+ clozeChecked[clozeIndex]=correct;
+ const fb=document.getElementById('clozeFeedback');
+ if(fb){
+  fb.className='scramble-feedback '+(correct?'correct':'wrong');
+  fb.innerHTML=correct?'정답이야!':`다시 확인해봐. 정답: ${escapeHtml(data.answerText)}`;
+ }
+ return correct;
+}
+function nextCloze(){
+ if(!clozeOrderList.length){startCloze();return;}
+ if(clozeFinished)return;
+ saveClozeAnswer();
+ if(clozeIndex>=clozeOrderList.length-1){finishCloze();return;}
+ clozeIndex++;
+ hideClozeResult();
+ renderCloze(true);
+}
+function prevCloze(){
+ if(!clozeOrderList.length){startCloze();return;}
+ saveClozeAnswer();
+ if(clozeFinished){
+  clozeFinished=false;
+  clozeIndex=Math.max(0,clozeOrderList.length-1);
+ }else if(clozeIndex>0){
+  clozeIndex--;
+ }
+ hideClozeResult();
+ renderCloze(true);
+}
+function finishCloze(){
+ saveClozeAnswer();
+ clozeFinished=true;
+ renderCloze(false);
+ showClozeResult();
+}
+function showClozeResult(){
+ const res=document.getElementById('clozeResult');
+ if(!res)return;
+ const rowsHtml=clozeOrderList.map((rowIndex,i)=>{
+  const row=rows[rowIndex];
+  const data=clozeData(row);
+  const expected=data.answers.map(normalizeClozeToken);
+  const actual=clozeInputWords(clozeAnswers[i]||'');
+  const correct=expected.length===actual.length&&expected.every((word,idx)=>word===actual[idx]);
+  return `<tr><td class="num-col">${i+1}</td><td>${escapeHtml(data.answerText)}</td><td style="white-space:pre-wrap">${escapeHtml(clozeAnswers[i]||'')}</td><td>${formatStress(data.fullText)}</td><td>${correct?'정답':'확인 필요'}</td></tr>`;
+ }).join('');
+ const correctCount=clozeOrderList.filter((rowIndex,i)=>{
+  const data=clozeData(rows[rowIndex]);
+  const expected=data.answers.map(normalizeClozeToken);
+  const actual=clozeInputWords(clozeAnswers[i]||'');
+  return expected.length===actual.length&&expected.every((word,idx)=>word===actual[idx]);
+ }).length;
+ res.innerHTML=`<div><b>결과: ${clozeOrderList.length}문장 중 정답 ${correctCount}개</b></div><table><thead><tr><th class="num-col">번호</th><th>빈칸 정답</th><th>내가 쓴 답</th><th>전체 문장</th><th>결과</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
+ res.classList.remove('flash-hidden');
+}
+
 function renderEnglishOnly(){
  const box=document.getElementById('englishOnlyList');
  if(!box)return;
@@ -1968,6 +2185,12 @@ document.addEventListener('keydown',function(e){
   if(e.code==='Space'){e.preventDefault();showAllMolgongWords();}
   else if(e.key==='ArrowRight'){e.preventDefault();showNextMolgongWord();}
   else if(e.key==='ArrowLeft'){e.preventDefault();prevMolgong();}
+  return;
+ }
+ if(currentMode==='cloze'){
+  if(e.key==='Enter'){e.preventDefault();checkCloze();}
+  else if(e.key==='ArrowRight'){e.preventDefault();nextCloze();}
+  else if(e.key==='ArrowLeft'){e.preventDefault();prevCloze();}
   return;
  }
  if(e.code==='Space'){e.preventDefault();flipFlashcard();}
@@ -2090,7 +2313,7 @@ function toggleActionsColumn(btn){actionsVisible=!actionsVisible;applyActionsVis
 let currentMode='flash';
 function switchMode(mode){
  currentMode=mode;
- ['table','flash','scramble','molgong','keywordWrite','englishOnly'].forEach(m=>{
+ ['table','flash','scramble','molgong','keywordWrite','cloze','englishOnly'].forEach(m=>{
    const panel=document.getElementById('mode-'+m);
    const btn=document.getElementById('modeBtn-'+m);
    if(panel)panel.classList.toggle('active', m===mode);
