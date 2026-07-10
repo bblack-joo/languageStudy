@@ -255,11 +255,13 @@ tr.only-forget-hidden{display:none!important}
   <b>학습 모드 선택</b>
   <div class="toolbar mode-switch">
     <button id="modeBtn-flash" class="mode-btn active" onclick="switchMode('flash')">🧠 플래시카드</button>
-    <button id="modeBtn-table" class="mode-btn" onclick="switchMode('table')">📋 표</button>
     <button id="modeBtn-scramble" class="mode-btn" onclick="switchMode('scramble')">🔤 단어 배열</button>
     <button id="modeBtn-molgong" class="mode-btn" onclick="switchMode('molgong')">🔥 몰공 모드</button>
     <button id="modeBtn-keywordWrite" class="mode-btn" onclick="switchMode('keywordWrite')">📝 키워드 보고 적기</button>
     <button id="modeBtn-cloze" class="mode-btn" onclick="switchMode('cloze')">🕳 빈칸 맞추기</button>
+  </div>
+  <div class="toolbar mode-switch">
+    <button id="modeBtn-table" class="mode-btn" onclick="switchMode('table')">📋 표</button>
     <button id="modeBtn-englishOnly" class="mode-btn" onclick="switchMode('englishOnly')">📖 문장 읽기</button>
     <button class="gray" onclick="clearAll()">초기화</button>
   </div>
@@ -1011,6 +1013,31 @@ function copyKeyword(id){
 function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox','clozeQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList','clozeQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});}
 function setRows(pairs){document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',flowText:i.flowText||'',done:false})).filter(i=>i.ko||i.en);renderTable();}
 function loadSelectedItem(){stopSpeak();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));}
+function canLoadNextSelectedItem(){
+ const select=document.getElementById('unitSelect');
+ if(!select||!select.value||select.value==='__ALL__')return false;
+ for(let i=select.selectedIndex+1;i<select.options.length;i++){
+  const value=select.options[i].value;
+  if(value&&value!=='__ALL__')return true;
+ }
+ return false;
+}
+function nextAnswerButtonHtml(){
+ return canLoadNextSelectedItem()?'<div class="flash-options"><button class="green small" onclick="loadNextSelectedItem()">다음 답변 ▶</button></div>':'';
+}
+function loadNextSelectedItem(){
+ const select=document.getElementById('unitSelect');
+ if(!select){alert('다음 답변을 찾지 못했어.');return;}
+ for(let i=select.selectedIndex+1;i<select.options.length;i++){
+  const value=select.options[i].value;
+  if(value&&value!=='__ALL__'){
+   select.selectedIndex=i;
+   loadSelectedItem();
+   return;
+  }
+ }
+ alert('다음 답변이 없어.');
+}
 function isItemImportant(item){return item.answers.some(a=>a.important);}
 function loadImportantItems(){
  stopSpeak();
@@ -1384,7 +1411,7 @@ function showFlashAllSentences(){
   const correctHtml=answerLang==='ko'?escapeHtml(correct):formatStress(correct);
   return `<tr><td class="num-col">${item.pos}</td><td style="white-space:pre-wrap">${escapeHtml(myAnswer)}</td><td>${correctHtml}</td></tr>`;
  }).join('');
- html+='</tbody></table>';
+ html+='</tbody></table>'+nextAnswerButtonHtml();
  res.innerHTML=html;
  res.classList.remove('flash-hidden');
 }
@@ -1816,7 +1843,7 @@ function finishScramble(){
    }else{
      html+='<div style="margin-top:8px">오답 없이 전부 맞췄어! 🎉</div>';
    }
-   res.innerHTML=html;
+   res.innerHTML=html+nextAnswerButtonHtml();
  }
 }
 
@@ -1851,8 +1878,8 @@ function renderMolgong(focus=false){
  if(!prompt||!box)return;
  if(molgongFinished){
   if(source)source.textContent='';
-  prompt.textContent='🎉 몰공 모드 끝!';
-  box.innerHTML='<span class="scramble-answer-placeholder">끝났어. 시작을 누르면 다시 시작해.</span>';
+ prompt.textContent='🎉 몰공 모드 끝!';
+  box.innerHTML='<span class="scramble-answer-placeholder">끝났어. 시작을 누르면 다시 시작해.</span>'+nextAnswerButtonHtml();
   if(prog)prog.textContent=`${molgongOrderList.length} / ${molgongOrderList.length}`;
   if(bar)bar.style.width='100%';
   return;
@@ -1909,7 +1936,8 @@ function showAllMolgongWords(){
 }
 function nextMolgong(){
  if(!molgongOrderList.length)return;
- molgongIndex=molgongIndex>=molgongOrderList.length-1?0:molgongIndex+1;
+ if(molgongIndex>=molgongOrderList.length-1){finishMolgong();return;}
+ molgongIndex++;
  molgongHintCount=0;
  renderMolgong(true);
 }
@@ -2035,9 +2063,9 @@ function showKeywordWriteResult(){
  html+='</tbody></table>';
  const originals=[...new Set(keywordWriteList.map(item=>String(item.en||'').trim()).filter(Boolean))];
  if(originals.length){
-  html+=`<div style="margin-top:12px"><b>원래 문장 전체</b><div class="keyword-box" style="display:block">${formatStress(originals.join('\n\n'))}</div></div>`;
+ html+=`<div style="margin-top:12px"><b>원래 문장 전체</b><div class="keyword-box" style="display:block">${formatStress(originals.join('\n\n'))}</div></div>`;
  }
- res.innerHTML=html;
+ res.innerHTML=html+nextAnswerButtonHtml();
  res.classList.remove('flash-hidden');
 }
 
@@ -2323,7 +2351,7 @@ function showClozeResult(){
   const actual=clozeInputWords(clozeAnswers[i]||'');
   return expected.length===actual.length&&expected.every((word,idx)=>word===actual[idx]);
  }).length;
- res.innerHTML=`<div><b>결과: ${clozeOrderList.length}문장 중 정답 ${correctCount}개</b></div><table><thead><tr><th class="num-col">번호</th><th>빈칸 정답</th><th>내가 쓴 답</th><th>전체 문장</th><th>결과</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
+ res.innerHTML=`<div><b>결과: ${clozeOrderList.length}문장 중 정답 ${correctCount}개</b></div><table><thead><tr><th class="num-col">번호</th><th>빈칸 정답</th><th>내가 쓴 답</th><th>전체 문장</th><th>결과</th></tr></thead><tbody>${rowsHtml}</tbody></table>${nextAnswerButtonHtml()}`;
  res.classList.remove('flash-hidden');
 }
 
@@ -2350,7 +2378,7 @@ function renderEnglishOnly(){
    lines.push(`<div class="keyword-box" style="display:block">${escapeHtml(x.flowText)}</div>`);
   }
  });
- box.innerHTML=lines.join('');
+ box.innerHTML=lines.join('')+nextAnswerButtonHtml();
 }
 
 function saveScrambleCursor(){
