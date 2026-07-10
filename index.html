@@ -325,6 +325,9 @@ tr.only-forget-hidden{display:none!important}
     <button class="secondary small" onclick="prevFlashcard()">◀ 이전</button>
     <button class="secondary small" onclick="flipFlashcard()">뒤집기</button>
     <button class="secondary small" onclick="nextFlashcard()">다음 ▶</button>
+    <label>언어1 <input id="flashAutoFrontSec" type="number" min="1" step="0.5" value="3" style="width:70px" onchange="scheduleFlashAutoNext()"> 초</label>
+    <label>언어2 <input id="flashAutoBackSec" type="number" min="1" step="0.5" value="5" style="width:70px" onchange="scheduleFlashAutoNext()"> 초</label>
+    <button id="flashAutoNextBtn" class="secondary small" onclick="toggleFlashAutoNext()">자동 넘김 꺼짐</button>
     <span id="flashProgress" class="flash-progress">0 / 0</span>
   </div>
   <div class="flash-bar"><div id="flashBarInner" class="flash-bar-inner"></div></div>
@@ -551,7 +554,7 @@ tr.only-forget-hidden{display:none!important}
 </div>
 <script>
 let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[];
-let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0;
+let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0,flashAutoNextOn=false,flashAutoNextTimer=null;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
 function norm(s){return String(s??'').trim().replace(/\s+/g,'').toLowerCase();}
@@ -1262,6 +1265,7 @@ function buildFlashOrder(){
  hideFlashResult();
 }
 function resetFlashcard(){
+ stopFlashAutoNext();
  buildFlashOrder();
  renderFlashcard(false);
 }
@@ -1269,6 +1273,61 @@ function startFlashcards(){
  if(!rows.length){alert('먼저 표를 생성해줘.');return;}
  buildFlashOrder();
  renderFlashcard(true);
+ scheduleFlashAutoNext();
+}
+function clearFlashAutoNextTimer(){
+ if(flashAutoNextTimer){
+  clearTimeout(flashAutoNextTimer);
+  flashAutoNextTimer=null;
+ }
+}
+function updateFlashAutoNextButton(){
+ const btn=document.getElementById('flashAutoNextBtn');
+ if(!btn)return;
+ btn.textContent=flashAutoNextOn?'자동 넘김 켜짐':'자동 넘김 꺼짐';
+ btn.className=flashAutoNextOn?'orange small':'secondary small';
+}
+function stopFlashAutoNext(){
+ flashAutoNextOn=false;
+ clearFlashAutoNextTimer();
+ updateFlashAutoNextButton();
+}
+function toggleFlashAutoNext(){
+ if(flashAutoNextOn){stopFlashAutoNext();return;}
+ if(!flashOrderList.length) startFlashcards();
+ if(!flashOrderList.length)return;
+ if(flashFinished){
+  flashFinished=false;
+  flashIndex=0;
+  flashRevealed=false;
+  hideFlashResult();
+  renderFlashcard(false);
+ }
+ flashAutoNextOn=true;
+ updateFlashAutoNextButton();
+ scheduleFlashAutoNext();
+}
+function scheduleFlashAutoNext(){
+ clearFlashAutoNextTimer();
+ updateFlashAutoNextButton();
+ if(!flashAutoNextOn||flashFinished||!flashOrderList.length)return;
+ const frontSec=Math.max(0.5,Number(document.getElementById('flashAutoFrontSec')?.value||3));
+ const backSec=Math.max(0.5,Number(document.getElementById('flashAutoBackSec')?.value||5));
+ const sec=(!isFlashSingleMode()&&flashRevealed)?backSec:frontSec;
+ flashAutoNextTimer=setTimeout(()=>{
+  flashAutoNextTimer=null;
+  if(!flashAutoNextOn||flashFinished||!flashOrderList.length)return;
+  advanceFlashAutoNext();
+ },sec*1000);
+}
+function advanceFlashAutoNext(){
+ if(!isFlashSingleMode()&&!flashRevealed){
+  flashRevealed=true;
+  renderFlashcard(false);
+  scheduleFlashAutoNext();
+  return;
+ }
+ nextFlashcard();
 }
 function hideFlashResult(){
  const res=document.getElementById('flashResult');
@@ -1372,6 +1431,7 @@ function nextFlashcard(){
  flashRevealed=false;
  hideFlashResult();
  renderFlashcard(false);
+ scheduleFlashAutoNext();
 }
 function prevFlashcard(){
  stopFlashSpeakPlayback();
@@ -1387,9 +1447,11 @@ function prevFlashcard(){
  flashRevealed=false;
  hideFlashResult();
  renderFlashcard(false);
+ scheduleFlashAutoNext();
 }
 function finishFlashcards(){
  stopFlashSpeakPlayback();
+ stopFlashAutoNext();
  saveFlashScratch();
  flashFinished=true;
  flashRevealed=false;
