@@ -142,6 +142,8 @@ tr.only-forget-hidden{display:none!important}
 .scramble-chip.placed{background:var(--primary-tint);border:1px solid var(--primary);color:var(--primary-dark)}
 .scramble-chip.placed:hover{background:#fff}
 .molgong-empty-slot{display:inline-block;min-width:54px;height:34px;border:1px dashed var(--border);background:var(--neutral-tint);border-radius:8px}
+.cloze-inline-input{width:96px;min-width:64px;max-width:320px;border:1px solid var(--primary);border-radius:8px;padding:7px 8px;font-size:15px;font-weight:800;color:var(--primary-dark);background:#fffdf8;text-align:center;transition:width .12s ease}
+.cloze-inline-input:focus{outline:2px solid var(--primary-tint);border-color:var(--primary-dark)}
 .scramble-chip.drop-before{box-shadow:-8px 0 0 var(--neutral-tint);border-left:3px solid #9b948a}
 .scramble-answer-zone.drop-at-end::after{content:"";display:block;min-width:54px;height:34px;border:2px dashed #9b948a;background:var(--neutral-tint);border-radius:8px;opacity:.9}
 .scramble-answer-zone.drop-empty{background:var(--neutral-tint)}
@@ -518,6 +520,8 @@ tr.only-forget-hidden{display:none!important}
     </label>
     <button class="green small" onclick="startCloze()">시작</button>
     <button class="secondary small" onclick="prevCloze()">◀ 이전</button>
+    <button class="secondary small" id="clozeHintToggleBtn" onclick="toggleClozeHint()">힌트 보기</button>
+    <button class="secondary small" onclick="copyClozeFullAnswer()">전체 정답 문장 복사</button>
     <button class="secondary small" onclick="checkCloze()">정답 확인</button>
     <button class="secondary small" onclick="nextCloze()">다음 ▶</button>
     <span id="clozeProgress" class="flash-progress">0 / 0</span>
@@ -525,12 +529,16 @@ tr.only-forget-hidden{display:none!important}
   <div class="flash-bar"><div id="clozeBarInner" class="flash-bar-inner"></div></div>
   <div id="clozePromptKo" class="scramble-prompt">표를 불러온 뒤 시작을 눌러줘.</div>
   <div id="clozeSentence" class="scramble-answer-zone"><span class="scramble-answer-placeholder">빈칸 문장이 여기에 표시돼.</span></div>
+  <div id="clozeHintBox" class="scramble-pool flash-hidden"></div>
   <div class="flash-scratch-box">
-    <textarea id="clozeInput" placeholder="빈칸에 들어갈 단어들을 순서대로 적어봐" style="height:90px" oninput="saveClozeAnswer(); autoGrow(this);" disabled></textarea>
+    <input id="clozeInput" type="hidden">
+    <div class="flash-options">
+      <button class="gray small" onclick="resetClozeInput()">지우기</button>
+    </div>
   </div>
   <div id="clozeFeedback" class="scramble-feedback flash-hidden"></div>
   <div id="clozeResult" class="scramble-result flash-hidden"></div>
-  <div class="flash-help">레벨이 높을수록 빈칸이 많아져. 빈칸 답은 쉼표나 띄어쓰기로 구분해서 적으면 돼.</div>
+  <div class="flash-help">레벨이 높을수록 빈칸이 많아져. 문장 사이 빈칸에 바로 입력하거나, 힌트 단어를 눌러 채울 수 있어.</div>
 </div>
 </div>
 
@@ -2033,7 +2041,7 @@ function showKeywordWriteResult(){
  res.classList.remove('flash-hidden');
 }
 
-let clozeOrderList=[],clozeIndex=0,clozeFinished=false,clozeAnswers=[],clozeChecked=[];
+let clozeOrderList=[],clozeIndex=0,clozeFinished=false,clozeAnswers=[],clozeChecked=[],clozeHintVisible=false,clozeHintOrders=[];
 function buildClozeOrder(){
  const indices=getVisibleRowIndices().filter(i=>rows[i]&&String(rows[i].en||'').trim());
  clozeOrderList=document.getElementById('clozeOrder')?.value==='random'?shuffleArray(indices):indices;
@@ -2041,6 +2049,8 @@ function buildClozeOrder(){
  clozeFinished=false;
  clozeAnswers=new Array(clozeOrderList.length).fill('');
  clozeChecked=new Array(clozeOrderList.length).fill(false);
+ clozeHintVisible=false;
+ clozeHintOrders=new Array(clozeOrderList.length).fill(null);
  hideClozeResult();
 }
 function resetCloze(){
@@ -2057,6 +2067,63 @@ function hideClozeResult(){
  if(res){res.classList.add('flash-hidden');res.innerHTML='';}
  const fb=document.getElementById('clozeFeedback');
  if(fb){fb.className='scramble-feedback flash-hidden';fb.innerHTML='';}
+}
+function renderClozeHintBox(data=null){
+ const box=document.getElementById('clozeHintBox');
+ const btn=document.getElementById('clozeHintToggleBtn');
+ if(btn)btn.textContent=clozeHintVisible?'힌트 숨기기':'힌트 보기';
+ if(!box)return;
+ if(!clozeHintVisible||!data||!data.answers.length){
+  box.classList.add('flash-hidden');
+  box.innerHTML='';
+  return;
+ }
+ if(!clozeHintOrders[clozeIndex]){
+  clozeHintOrders[clozeIndex]=shuffleArray(data.answers.map((word,idx)=>({word,idx})));
+ }
+ box.innerHTML=clozeHintOrders[clozeIndex].map(item=>`<button class="scramble-chip" data-word="${escapeAttr(item.word)}" onclick="addClozeHintWordFromButton(this)">${escapeHtml(item.word)}</button>`).join('');
+ box.classList.remove('flash-hidden');
+}
+function toggleClozeHint(){
+ if(!clozeOrderList.length){startCloze();return;}
+ if(clozeFinished)return;
+ clozeHintVisible=!clozeHintVisible;
+ const cur=currentClozeRow();
+ renderClozeHintBox(cur?clozeData(cur.row):null);
+}
+function addClozeHintWord(word){
+ if(clozeFinished||!clozeOrderList.length)return;
+ const text=String(word||'').trim();
+ if(!text)return;
+ const inputs=[...document.querySelectorAll('.cloze-inline-input')];
+ const target=inputs.find(input=>!input.value.trim())||inputs[inputs.length-1];
+ if(!target)return;
+ target.value=text;
+ resizeClozeInput(target);
+ saveClozeAnswer();
+ target.focus();
+}
+function addClozeHintWordFromButton(btn){
+ addClozeHintWord(btn?.dataset?.word||'');
+}
+function clozeInlineInputKeydown(e,input){
+ if(e.key==='Enter'&&!e.shiftKey){
+  e.preventDefault();
+  checkCloze();
+ }else if(e.key==='ArrowRight'){
+  e.preventDefault();
+  nextCloze();
+ }else if(e.key==='ArrowLeft'){
+  e.preventDefault();
+  prevCloze();
+ }else if(e.key==='Backspace'&&!input.value){
+  const inputs=[...document.querySelectorAll('.cloze-inline-input')];
+  const idx=inputs.indexOf(input);
+  if(idx>0){
+   e.preventDefault();
+   inputs[idx-1].focus();
+  }
+ }
 }
 function currentClozeRow(){
  if(!clozeOrderList.length)return null;
@@ -2089,14 +2156,38 @@ function clozeData(row){
  const tokens=parseClozeTokens(row?.en||'');
  const blanks=clozeBlankIndexes(tokens);
  const answers=[];
- const html=tokens.map((token,idx)=>{
+ const parts=tokens.map((token,idx)=>{
   if(blanks.has(idx)){
+   const blankIndex=answers.length;
    answers.push(token.core);
-   return `${escapeHtml(token.prefix)}<span class="molgong-empty-slot" title="빈칸"></span>${escapeHtml(token.suffix)}`;
+   return {type:'blank',blankIndex,prefix:token.prefix,suffix:token.suffix,answer:token.core};
   }
-  return escapeHtml(token.raw);
+  return {type:'text',raw:token.raw};
+ });
+ return {parts,answers,answerText:answers.join(' '),fullText:stripStress(row?.en||'')};
+}
+function clozeSavedWords(index=clozeIndex){
+ return String(clozeAnswers[index]||'').split(/[,\s]+/).filter(Boolean);
+}
+function renderClozeSentenceInputs(data){
+ const saved=clozeSavedWords();
+ return data.parts.map(part=>{
+  if(part.type==='blank'){
+   const value=saved[part.blankIndex]||'';
+   const width=clozeInputWidth(value||part.answer);
+   return `${escapeHtml(part.prefix)}<input class="cloze-inline-input" data-blank-index="${part.blankIndex}" value="${escapeAttr(value)}" style="width:${width}px" oninput="resizeClozeInput(this); saveClozeAnswer()" onkeydown="clozeInlineInputKeydown(event,this)">${escapeHtml(part.suffix)}`;
+  }
+  return escapeHtml(part.raw);
  }).join(' ');
- return {html,answers,answerText:answers.join(' '),fullText:stripStress(row?.en||'')};
+}
+function clozeInputWidth(text){
+ const len=String(text||'').length;
+ return Math.max(64,Math.min(320,len*12+34));
+}
+function resizeClozeInput(input){
+ if(!input)return;
+ const fallback=currentClozeRow()?clozeData(currentClozeRow().row).answers[Number(input.dataset.blankIndex)||0]:'';
+ input.style.width=clozeInputWidth(input.value||fallback)+'px';
 }
 function normalizeClozeToken(text){
  return String(text||'').toLowerCase().replace(/[.,!?;:"“”‘’()[\]{}]/g,'').trim();
@@ -2105,9 +2196,25 @@ function clozeInputWords(text){
  return String(text||'').split(/[,\s]+/).map(normalizeClozeToken).filter(Boolean);
 }
 function saveClozeAnswer(){
- const input=document.getElementById('clozeInput');
- if(!input||clozeFinished||!clozeOrderList.length)return;
- clozeAnswers[clozeIndex]=input.value;
+ if(clozeFinished||!clozeOrderList.length)return;
+ const inputs=[...document.querySelectorAll('.cloze-inline-input')];
+ inputs.forEach(resizeClozeInput);
+ clozeAnswers[clozeIndex]=inputs.map(input=>input.value.trim()).join(' ');
+ const hidden=document.getElementById('clozeInput');
+ if(hidden)hidden.value=clozeAnswers[clozeIndex];
+ clozeChecked[clozeIndex]=false;
+ const fb=document.getElementById('clozeFeedback');
+ if(fb){fb.className='scramble-feedback flash-hidden';fb.innerHTML='';}
+}
+function resetClozeInput(){
+ if(clozeFinished||!clozeOrderList.length)return;
+ document.querySelectorAll('.cloze-inline-input').forEach(input=>{input.value='';resizeClozeInput(input);});
+ saveClozeAnswer();
+ clozeChecked[clozeIndex]=false;
+ const fb=document.getElementById('clozeFeedback');
+ if(fb){fb.className='scramble-feedback flash-hidden';fb.innerHTML='';}
+ const first=document.querySelector('.cloze-inline-input');
+ if(first)first.focus();
 }
 function renderCloze(focusInput=false){
  const prompt=document.getElementById('clozePromptKo');
@@ -2119,8 +2226,8 @@ function renderCloze(focusInput=false){
  if(clozeFinished){
   prompt.textContent='🎉 빈칸 맞추기 끝!';
   sentence.innerHTML='<span class="scramble-answer-placeholder">결과표에서 내가 쓴 답과 정답을 비교해봐.</span>';
+  renderClozeHintBox(null);
   input.value='';
-  input.disabled=true;
   if(prog)prog.textContent=`${clozeOrderList.length} / ${clozeOrderList.length}`;
   if(bar)bar.style.width='100%';
   return;
@@ -2128,8 +2235,8 @@ function renderCloze(focusInput=false){
  if(!clozeOrderList.length){
   prompt.textContent=rows.length?'현재 조건에 표시할 문장이 없어.':'표를 불러온 뒤 시작을 눌러줘.';
   sentence.innerHTML='<span class="scramble-answer-placeholder">빈칸 문장이 여기에 표시돼.</span>';
+  renderClozeHintBox(null);
   input.value='';
-  input.disabled=true;
   if(prog)prog.textContent='0 / 0';
   if(bar)bar.style.width='0%';
   return;
@@ -2137,15 +2244,14 @@ function renderCloze(focusInput=false){
  const cur=currentClozeRow();
  const data=clozeData(cur.row);
  prompt.textContent=cur.row.ko||'(한글 해석 없음)';
- sentence.innerHTML=data.html||'<span class="scramble-answer-placeholder">영어 문장이 없어.</span>';
- input.disabled=false;
+ sentence.innerHTML=data.parts.length?renderClozeSentenceInputs(data):'<span class="scramble-answer-placeholder">영어 문장이 없어.</span>';
+ renderClozeHintBox(data);
  input.value=clozeAnswers[clozeIndex]||'';
- autoGrow(input);
  if(prog)prog.textContent=`${clozeIndex+1} / ${clozeOrderList.length}`;
  if(bar)bar.style.width=`${Math.round(((clozeIndex+1)/clozeOrderList.length)*100)}%`;
  const fb=document.getElementById('clozeFeedback');
  if(fb&&!clozeChecked[clozeIndex]){fb.className='scramble-feedback flash-hidden';fb.innerHTML='';}
- if(focusInput)setTimeout(()=>input.focus(),0);
+ if(focusInput)setTimeout(()=>document.querySelector('.cloze-inline-input')?.focus(),0);
 }
 function checkCloze(){
  const cur=currentClozeRow();
@@ -2163,12 +2269,21 @@ function checkCloze(){
  }
  return correct;
 }
+function copyClozeFullAnswer(){
+ const cur=currentClozeRow();
+ if(!cur||!cur.row){alert('복사할 문장이 없어.');return;}
+ const text=stripStress(cur.row.en||'').trim();
+ if(!text){alert('복사할 영어 문장이 없어.');return;}
+ navigator.clipboard.writeText(text);
+ alert('전체 정답 문장을 복사했어.');
+}
 function nextCloze(){
  if(!clozeOrderList.length){startCloze();return;}
  if(clozeFinished)return;
  saveClozeAnswer();
  if(clozeIndex>=clozeOrderList.length-1){finishCloze();return;}
  clozeIndex++;
+ clozeHintVisible=false;
  hideClozeResult();
  renderCloze(true);
 }
@@ -2181,6 +2296,7 @@ function prevCloze(){
  }else if(clozeIndex>0){
   clozeIndex--;
  }
+ clozeHintVisible=false;
  hideClozeResult();
  renderCloze(true);
 }
