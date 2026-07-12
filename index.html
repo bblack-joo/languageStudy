@@ -187,6 +187,9 @@ tr.only-forget-hidden{display:none!important}
 .scramble-result .num-col{width:52px;text-align:center}
 .keyword-write-result table{table-layout:fixed}
 .keyword-write-result .keyword-col{width:24%;word-break:break-word;white-space:pre-wrap}
+.selected-answer-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.selected-answer-chip{display:inline-flex;align-items:center;gap:6px;background:var(--primary-tint);border:1px solid var(--primary);color:var(--primary-dark);border-radius:8px;padding:6px 9px;font-size:13px;font-weight:800}
+.selected-answer-chip button{padding:2px 6px;border-radius:6px;font-size:12px;background:#fff;color:var(--danger-dark);border:1px solid var(--border)}
 
 .mode-switch{gap:10px}
 .mode-btn{background:#fff;border:1px solid var(--border);color:var(--text-muted);font-weight:800;padding:10px 18px;font-size:14.5px}
@@ -217,8 +220,12 @@ tr.only-forget-hidden{display:none!important}
     <select id="unitFilter" onchange="renderItemSelect()"><option value="">전체</option></select>
     <select id="unitSelect"><option value="">엑셀 파일을 먼저 선택</option></select>
     <button onclick="loadSelectedItem()">선택 문장</button>
+    <button class="secondary" onclick="addSelectedItemToQueue()">+ 추가</button>
+    <button class="green" onclick="loadQueuedItems()">선택한 답변 불러오기</button>
+    <button class="gray" onclick="clearSelectedItemQueue()">비우기</button>
     <button class="orange" onclick="loadImportantItems()">선택 중요문장</button>
   </div>
+  <div id="selectedItemQueue" class="selected-answer-list"></div>
   <div class="toolbar">
     <input type="number" id="randomCount" class="random-count" min="1" step="1" value="10">
     <button class="orange" onclick="loadRandomItems()">랜덤 불러오기</button>
@@ -553,7 +560,7 @@ tr.only-forget-hidden{display:none!important}
 </div>
 </div>
 <script>
-let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[];
+let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[],selectedItemKeys=[];
 let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0,flashAutoNextOn=false,flashAutoNextTimer=null;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
@@ -754,6 +761,7 @@ function parseAnswerSheet(ws,sheetName){
 async function loadWorkbookFiles(fileList){
  if(!fileList||!fileList.length)return;
  stopSpeak();
+ clearSelectedItemQueue();
  try{
   const files=[...fileList];
   const multi=files.length>1;
@@ -831,9 +839,45 @@ function renderItemSelect(){
    const label=(isItemImportant(i)?'★ ':'')+i.label+(i.memo?`_[${i.memo}]`:'');
    return `<option value="${escapeAttr(i.key)}">${escapeHtml(label)}</option>`;
  }).join('');
+ renderSelectedItemQueue();
 }
 
 function itemToPairs(item){const flowText=(item.flows||[]).map(x=>String(x).trim()).filter(Boolean).join('\n');return item.answers.map(a=>({ko:a.ko,en:a.en,important:!!a.important,notMemorized:!!a.notMemorized,itemLabel:item.label||'',sheetName:item.sheetName||'',flowText}));}
+function itemOptionLabel(item){
+ return (isItemImportant(item)?'★ ':'')+item.label+(item.memo?`_[${item.memo}]`:'');
+}
+function renderSelectedItemQueue(){
+ const box=document.getElementById('selectedItemQueue');
+ if(!box)return;
+ const items=selectedItemKeys.map(key=>BOOK.items.find(item=>item.key===key)).filter(Boolean);
+ if(!items.length){box.innerHTML='';return;}
+ box.innerHTML=items.map(item=>`<span class="selected-answer-chip">${escapeHtml(itemOptionLabel(item))}<button data-key="${escapeAttr(item.key)}" onclick="removeSelectedItemFromQueue(this.dataset.key)">×</button></span>`).join('');
+}
+function addSelectedItemToQueue(){
+ const select=document.getElementById('unitSelect');
+ const key=select?.value||'';
+ if(!key||key==='__ALL__'){alert('추가할 답변 하나를 선택해줘.');return;}
+ const item=BOOK.items.find(v=>v.key===key);
+ if(!item){alert('선택한 묶음을 찾지 못했어.');return;}
+ if(selectedItemKeys.includes(key)){alert('이미 추가된 답변이야.');return;}
+ selectedItemKeys.push(key);
+ renderSelectedItemQueue();
+}
+function removeSelectedItemFromQueue(key){
+ selectedItemKeys=selectedItemKeys.filter(v=>v!==key);
+ renderSelectedItemQueue();
+}
+function clearSelectedItemQueue(){
+ selectedItemKeys=[];
+ renderSelectedItemQueue();
+}
+function loadQueuedItems(){
+ stopSpeak();
+ const items=selectedItemKeys.map(key=>BOOK.items.find(item=>item.key===key)).filter(Boolean);
+ if(!items.length){loadSelectedItem();return;}
+ showQuestions(items);
+ setRows(items.flatMap(itemToPairs));
+}
 let timerInterval=null,timerStartTime=0;
 function formatTimer(ms){
  const totalSec=Math.floor(ms/1000);
@@ -1018,6 +1062,7 @@ function setRows(pairs){document.getElementById('inputText').value=pairs.map(i=>
 function loadSelectedItem(){stopSpeak();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));}
 function canLoadNextSelectedItem(){
  const select=document.getElementById('unitSelect');
+ if((currentQuestionItems||[]).length!==1)return false;
  if(!select||!select.value||select.value==='__ALL__')return false;
  for(let i=select.selectedIndex+1;i<select.options.length;i++){
   const value=select.options[i].value;
