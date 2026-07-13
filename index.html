@@ -71,6 +71,7 @@ pre{white-space:pre-wrap;background:#111;color:#e6e6e6;padding:12px;border-radiu
 .question-box{background:#fbfcfe;border:1px solid var(--border);border-left:4px solid var(--filter);border-radius:10px;padding:12px;margin:10px 0;line-height:1.5}
 .question-group-title{margin-top:10px;color:var(--filter-dark);font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:.03em}
 .question-item{margin:8px 0;color:var(--text)}
+.english-group-gap{height:16px}
 .question-no{display:inline-block;background:var(--filter-tint);color:var(--filter-dark);border-radius:6px;padding:2px 6px;font-weight:900;margin-right:4px}
 .q-en{font-weight:800}
 .q-ko{display:none;margin-top:6px;padding:8px 10px;background:var(--primary-tint);border:1px solid var(--border);border-radius:8px;color:var(--primary-dark)}
@@ -219,16 +220,24 @@ tr.only-forget-hidden{display:none!important}
   <div class="toolbar">
     <select id="unitFilter" onchange="renderItemSelect()"><option value="">전체</option></select>
     <select id="unitSelect"><option value="">엑셀 파일을 먼저 선택</option></select>
-    <button onclick="loadSelectedItem()">선택 문장</button>
     <button class="secondary" onclick="addSelectedItemToQueue()">+ 추가</button>
-    <button class="green" onclick="loadQueuedItems()">선택한 답변 불러오기</button>
+    <button class="secondary" onclick="addImportantBundlesToQueue()">+핵심 전체 추가</button>
+    <button class="red" onclick="loadQueuedItems()">불러오기</button>
+    <button class="red" onclick="loadQueuedImportantOnly()">핵심 문장들만 불러오기</button>
+  </div>
+  <div class="toolbar">
     <button class="gray" onclick="clearSelectedItemQueue()">비우기</button>
-    <button class="orange" onclick="loadImportantItems()">선택 중요문장</button>
+    <input type="number" id="randomCount" class="random-count" min="1" step="1" value="1">
+    <button class="orange" onclick="loadRandomItems()">랜덤 추가</button>
+    <button class="orange" onclick="addRandomImportantItems()">핵심 랜덤 추가</button>
   </div>
   <div id="selectedItemQueue" class="selected-answer-list"></div>
   <div class="toolbar">
-    <input type="number" id="randomCount" class="random-count" min="1" step="1" value="10">
-    <button class="orange" onclick="loadRandomItems()">랜덤 불러오기</button>
+    <button class="orange" onclick="addSelectedImportantToQueue()">핵심 문장만 가져오기</button>
+  </div>
+  <div class="toolbar" style="display:none">
+    <button class="green" onclick="loadQueuedItems()">선택한 답변 불러오기</button>
+    <button class="orange" onclick="loadImportantItems()">선택 중요문장</button>
   </div>
   <div class="hint">파일 선택 창에서 여러 개(Ctrl/Shift로 다중 선택)를 고르면 한 번에 합쳐서 불러와. 파일이 2개 이상이면 Unit 목록에 "파일명::시트명"으로 구분해서 표시돼. 답변 탭은 헤더 아래에서 빈 줄 전까지 한 묶음으로 읽어. 같은 묶음 안의 unit/그룹/질문 번호는 전부 질문 박스에 표시해. "선택 중요문장"는 Unit/묶음에서 고른 범위 안에서만, "⭐ 전체 중요문장"는 필터와 상관없이 문장집 전체에서 중요도=1로 표시된 묶음들을 처음부터 빈 줄 직전까지 통째로 전부 불러와. "🎲 중요문장 랜덤 1개"는 문장집 전체의 중요 묶음들 중 딱 하나만 랜덤으로 불러와.</div>
 </div>
@@ -843,28 +852,81 @@ function renderItemSelect(){
 }
 
 function itemToPairs(item){const flowText=(item.flows||[]).map(x=>String(x).trim()).filter(Boolean).join('\n');return item.answers.map(a=>({ko:a.ko,en:a.en,important:!!a.important,notMemorized:!!a.notMemorized,itemLabel:item.label||'',sheetName:item.sheetName||'',flowText}));}
+function itemToImportantPairs(item){return itemToPairs(item).filter(p=>p.important);}
 function itemOptionLabel(item){
  return (isItemImportant(item)?'★ ':'')+item.label+(item.memo?`_[${item.memo}]`:'');
+}
+function normalizeQueueEntry(entry){
+ return typeof entry==='string'?{key:entry,importantOnly:false}:entry;
+}
+function queueEntryId(key,importantOnly=false){
+ return `${key}__mode__${importantOnly?'important':'all'}`;
 }
 function renderSelectedItemQueue(){
  const box=document.getElementById('selectedItemQueue');
  if(!box)return;
- const items=selectedItemKeys.map(key=>BOOK.items.find(item=>item.key===key)).filter(Boolean);
- if(!items.length){box.innerHTML='';return;}
- box.innerHTML=items.map(item=>`<span class="selected-answer-chip">${escapeHtml(itemOptionLabel(item))}<button data-key="${escapeAttr(item.key)}" onclick="removeSelectedItemFromQueue(this.dataset.key)">×</button></span>`).join('');
+ const entries=selectedItemKeys.map(normalizeQueueEntry).map(entry=>({entry,item:BOOK.items.find(item=>item.key===entry.key)})).filter(x=>x.item);
+ if(!entries.length){box.innerHTML='';return;}
+ box.innerHTML=entries.map(({entry,item})=>{
+  const label=itemOptionLabel(item)+(entry.importantOnly?' · 핵심':'');
+  const id=queueEntryId(entry.key,entry.importantOnly);
+  return `<span class="selected-answer-chip">${escapeHtml(label)}<button data-id="${escapeAttr(id)}" onclick="removeSelectedItemFromQueue(this.dataset.id)">×</button></span>`;
+ }).join('');
 }
-function addSelectedItemToQueue(){
+function getSelectedQueueItem(){
  const select=document.getElementById('unitSelect');
  const key=select?.value||'';
  if(!key||key==='__ALL__'){alert('추가할 답변 하나를 선택해줘.');return;}
  const item=BOOK.items.find(v=>v.key===key);
  if(!item){alert('선택한 묶음을 찾지 못했어.');return;}
- if(selectedItemKeys.includes(key)){alert('이미 추가된 답변이야.');return;}
- selectedItemKeys.push(key);
+ return {key,item};
+}
+function addQueueEntry(key,importantOnly=false,quiet=false){
+ const id=queueEntryId(key,importantOnly);
+ const exists=selectedItemKeys.map(normalizeQueueEntry).some(entry=>queueEntryId(entry.key,entry.importantOnly)===id);
+ if(exists){if(!quiet)alert('이미 추가된 답변이야.');return false;}
+ selectedItemKeys.push({key,importantOnly});
+ renderSelectedItemQueue();
+ return true;
+}
+function addSelectedItemToQueue(){
+ const selected=getSelectedQueueItem();
+ if(!selected)return;
+ addQueueEntry(selected.key,false);
+}
+function addSelectedImportantToQueue(){
+ const select=document.getElementById('unitSelect');
+ if(select?.value==='__ALL__'){
+  const importantItems=getFilteredItems().filter(item=>itemToImportantPairs(item).length);
+  if(!importantItems.length){alert('현재 선택 범위에 핵심 문장이 없어.');return;}
+  let added=0;
+  importantItems.forEach(item=>{if(addQueueEntry(item.key,true,true))added++;});
+  renderSelectedItemQueue();
+  return;
+ }
+ const selected=getSelectedQueueItem();
+ if(!selected)return;
+ if(!itemToImportantPairs(selected.item).length){alert('이 답변에는 핵심 문장이 없어.');return;}
+ addQueueEntry(selected.key,true);
+}
+function getCurrentImportantBundleScope(){
+ const unitVal=document.getElementById('unitFilter')?.value || '';
+ if(unitVal)return BOOK.items.filter(item=>item.sheetName===unitVal);
+ const selKey=document.getElementById('unitSelect')?.value || '';
+ const selItem=selKey&&selKey!=='__ALL__'?BOOK.items.find(v=>v.key===selKey):null;
+ if(selItem)return BOOK.items.filter(item=>item.sheetName===selItem.sheetName);
+ return getFilteredItems();
+}
+function addImportantBundlesToQueue(){
+ if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}
+ const importantItems=getCurrentImportantBundleScope().filter(isItemImportant);
+ if(!importantItems.length){alert('현재 선택 범위에 핵심 문장묶음이 없어.');return;}
+ let added=0;
+ importantItems.forEach(item=>{if(addQueueEntry(item.key,false,true))added++;});
  renderSelectedItemQueue();
 }
-function removeSelectedItemFromQueue(key){
- selectedItemKeys=selectedItemKeys.filter(v=>v!==key);
+function removeSelectedItemFromQueue(id){
+ selectedItemKeys=selectedItemKeys.map(normalizeQueueEntry).filter(entry=>queueEntryId(entry.key,entry.importantOnly)!==id);
  renderSelectedItemQueue();
 }
 function clearSelectedItemQueue(){
@@ -873,10 +935,31 @@ function clearSelectedItemQueue(){
 }
 function loadQueuedItems(){
  stopSpeak();
- const items=selectedItemKeys.map(key=>BOOK.items.find(item=>item.key===key)).filter(Boolean);
- if(!items.length){loadSelectedItem();return;}
+ const entries=selectedItemKeys.map(normalizeQueueEntry).map(entry=>({entry,item:BOOK.items.find(item=>item.key===entry.key)})).filter(x=>x.item);
+ if(!entries.length){loadSelectedItem();return;}
+ const items=entries.map(x=>x.item);
+ const pairs=entries.flatMap(({entry,item})=>entry.importantOnly?itemToImportantPairs(item):itemToPairs(item));
+ if(!pairs.length){alert('불러올 문장이 없어.');return;}
  showQuestions(items);
- setRows(items.flatMap(itemToPairs));
+ setRows(pairs);
+}
+function loadQueuedImportantOnly(){
+ stopSpeak();
+ const entries=selectedItemKeys.map(normalizeQueueEntry).map(entry=>({entry,item:BOOK.items.find(item=>item.key===entry.key)})).filter(x=>x.item);
+ if(!entries.length){
+  const selected=getSelectedQueueItem();
+  if(!selected)return;
+  const pairs=itemToImportantPairs(selected.item);
+  if(!pairs.length){alert('이 답변에는 핵심 문장이 없어.');return;}
+  showQuestions([selected.item]);
+  setRows(pairs);
+  return;
+ }
+ const items=entries.map(x=>x.item);
+ const pairs=entries.flatMap(({item})=>itemToImportantPairs(item));
+ if(!pairs.length){alert('선택한 목록에 핵심 문장이 없어.');return;}
+ showQuestions(items);
+ setRows(pairs);
 }
 let timerInterval=null,timerStartTime=0;
 function formatTimer(ms){
@@ -1133,15 +1216,22 @@ function loadRandomItems(){
  stopSpeak();
  if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}
  const list=getFilteredItems();
- if(!list.length){alert('선택한 범위에 불러올 문장이 없어.');return;}
- const allPairs=list.flatMap(item=>itemToPairs(item).map(p=>({...p,__itemKey:item.key,itemLabel:item.label||'',sheetName:item.sheetName||''})));
- if(!allPairs.length){alert('선택한 범위에 불러올 문장이 없어.');return;}
- const count=Math.max(1,Number(document.getElementById('randomCount').value||10));
- const picked=shuffleArray(allPairs).slice(0,Math.min(count,allPairs.length));
- const usedKeys=new Set(picked.map(p=>p.__itemKey));
- const usedItems=list.filter(item=>usedKeys.has(item.key));
- showQuestions(usedItems);
- setRows(picked.map(({__itemKey,...rest})=>rest));
+ if(!list.length){alert('선택한 범위에 추가할 답변이 없어.');return;}
+ const count=Math.max(1,Number(document.getElementById('randomCount').value||1));
+ const picked=shuffleArray(list).slice(0,Math.min(count,list.length));
+ let added=0;
+ picked.forEach(item=>{if(addQueueEntry(item.key,false,true))added++;});
+ renderSelectedItemQueue();
+}
+function addRandomImportantItems(){
+ stopSpeak();
+ if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}
+ const list=getFilteredItems().filter(item=>itemToImportantPairs(item).length);
+ if(!list.length){alert('선택한 범위에 핵심 문장이 없어.');return;}
+ const count=Math.max(1,Number(document.getElementById('randomCount').value||1));
+ const picked=shuffleArray(list).slice(0,Math.min(count,list.length));
+ picked.forEach(item=>addQueueEntry(item.key,true,true));
+ renderSelectedItemQueue();
 }
 function isHeader(ko,en){return norm(ko)==='한글'&&norm(en)==='영어';}
 function loadSample(){document.getElementById('inputText').value=`한글\t영어\n집에 있는 가구에 대해 말해 주세요.\tTell me about the furniture you have in your home.\n가장 좋아하는 가구가 있나요?\tIs there a piece that is your favorite?`;parseText();}
@@ -2483,6 +2573,9 @@ function renderEnglishOnly(){
   const isGroupEnd=!next || next.title!==x.title;
   if(isGroupEnd && x.flowText){
    lines.push(`<div class="keyword-box" style="display:block">${escapeHtml(x.flowText)}</div>`);
+  }
+  if(isGroupEnd && next){
+   lines.push('<div class="english-group-gap"></div>');
   }
  });
  box.innerHTML=lines.join('')+nextAnswerButtonHtml();
