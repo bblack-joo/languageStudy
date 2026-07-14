@@ -21,10 +21,13 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-seri
 .wrap{width:98vw;max-width:1900px;margin:0 auto;padding:18px}
 h1{font-size:23px;font-weight:800;margin:6px 0 16px;letter-spacing:-.2px}
 .brand{margin:4px 0 20px}
+.brand-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .brand-title{font-size:36px;font-weight:900;letter-spacing:-.8px;margin:0;line-height:1;display:inline-flex}
 .brand-repeat-1{color:var(--primary)}
 .brand-repeat-2{color:var(--filter)}
 .brand-tagline{font-size:13px;color:var(--text-muted);font-weight:700;margin-top:7px;letter-spacing:.03em}
+.brand-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;background:transparent;color:var(--primary-dark);border:0;border-radius:0;padding:4px 0 2px;font-size:13.5px;font-weight:800}
+.brand-link:hover{filter:brightness(.96)}
 .card{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(15,23,42,.05)}
 .card>b{display:block;font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px}
 textarea{width:100%;height:150px;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:15px;line-height:1.45;background:#fff}
@@ -204,7 +207,10 @@ tr.only-forget-hidden{display:none!important}
 <body>
 <div class="wrap">
 <div class="brand">
-  <h1 class="brand-title" onclick="location.reload()" style="cursor:pointer" title="새로고침"><span class="brand-repeat-1">Repeat</span><span class="brand-repeat-2">Repeat</span></h1>
+  <div class="brand-head">
+    <h1 class="brand-title" onclick="location.reload()" style="cursor:pointer" title="새로고침"><span class="brand-repeat-1">Repeat</span><span class="brand-repeat-2">Repeat</span></h1>
+    <a class="brand-link" href="https://bblack-joo.github.io/opicSetPractice/" target="_blank" rel="noopener">시험모드↗</a>
+  </div>
   <div class="brand-tagline">A language learning tool for studying any two languages.</div>
 </div>
 
@@ -234,6 +240,7 @@ tr.only-forget-hidden{display:none!important}
   <div id="selectedItemQueue" class="selected-answer-list"></div>
   <div class="toolbar">
     <button class="orange" onclick="addSelectedImportantToQueue()">핵심 문장만 가져오기</button>
+    <button class="orange" onclick="addSelectedNotMemorizedToQueue()">안외워짐 문장만 가져오기</button>
   </div>
   <div class="toolbar" style="display:none">
     <button class="green" onclick="loadQueuedItems()">선택한 답변 불러오기</button>
@@ -311,6 +318,7 @@ tr.only-forget-hidden{display:none!important}
 
 <div id="mode-flash" class="card mode-panel active">
 <b>🧠 플래시카드로 암기하기</b>
+<div class="toolbar"><button class="secondary small" id="flashQuestionToggleBtn" onclick="toggleStudyQuestionBox('flashQuestionBox', this)" style="display:none">질문 보기</button></div>
 <div id="flashQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="flashQuestionList"></div></div>
 <div class="flash-card-box">
   <div class="flash-options">
@@ -382,6 +390,7 @@ tr.only-forget-hidden{display:none!important}
 
 <div id="mode-scramble" class="card mode-panel">
 <b>🔤 단어 배열 연습</b>
+<div class="toolbar"><button class="secondary small" id="scrambleQuestionToggleBtn" onclick="toggleStudyQuestionBox('scrambleQuestionBox', this)" style="display:none">질문 보기</button></div>
 <div id="scrambleQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="scrambleQuestionList"></div></div>
 <div class="scramble-box">
   <div class="flash-options">
@@ -475,6 +484,8 @@ tr.only-forget-hidden{display:none!important}
 
 <div id="mode-molgong" class="card mode-panel">
 <b>🔥 몰공 모드</b>
+<div class="toolbar"><button class="secondary small" id="molgongQuestionToggleBtn" onclick="toggleStudyQuestionBox('molgongQuestionBox', this)" style="display:none">질문 보기</button></div>
+<div id="molgongQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="molgongQuestionList"></div></div>
 <div class="flash-card-box">
   <div class="flash-options">
     <label>순서
@@ -497,6 +508,8 @@ tr.only-forget-hidden{display:none!important}
 
 <div id="mode-keywordWrite" class="card mode-panel">
 <b>📝 키워드 보고 적기</b>
+<div class="toolbar"><button class="secondary small" id="keywordWriteQuestionToggleBtn" onclick="toggleStudyQuestionBox('keywordWriteQuestionBox', this)" style="display:none">질문 보기</button></div>
+<div id="keywordWriteQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="keywordWriteQuestionList"></div></div>
 <div class="flash-card-box">
   <div class="flash-options">
     <label>순서
@@ -523,6 +536,7 @@ tr.only-forget-hidden{display:none!important}
 
 <div id="mode-cloze" class="card mode-panel">
 <b>🕳 빈칸 맞추기</b>
+<div class="toolbar"><button class="secondary small" id="clozeQuestionToggleBtn" onclick="toggleStudyQuestionBox('clozeQuestionBox', this)" style="display:none">질문 보기</button></div>
 <div id="clozeQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="clozeQuestionList"></div></div>
 <div class="flash-card-box">
   <div class="flash-options">
@@ -853,14 +867,20 @@ function renderItemSelect(){
 
 function itemToPairs(item){const flowText=(item.flows||[]).map(x=>String(x).trim()).filter(Boolean).join('\n');return item.answers.map(a=>({ko:a.ko,en:a.en,important:!!a.important,notMemorized:!!a.notMemorized,itemLabel:item.label||'',sheetName:item.sheetName||'',flowText}));}
 function itemToImportantPairs(item){return itemToPairs(item).filter(p=>p.important);}
+function itemToNotMemorizedPairs(item){return itemToPairs(item).filter(p=>p.notMemorized);}
 function itemOptionLabel(item){
  return (isItemImportant(item)?'★ ':'')+item.label+(item.memo?`_[${item.memo}]`:'');
 }
 function normalizeQueueEntry(entry){
- return typeof entry==='string'?{key:entry,importantOnly:false}:entry;
+ return typeof entry==='string'?{key:entry,importantOnly:false,notMemorizedOnly:false}:{key:entry.key,importantOnly:!!entry.importantOnly,notMemorizedOnly:!!entry.notMemorizedOnly};
 }
-function queueEntryId(key,importantOnly=false){
- return `${key}__mode__${importantOnly?'important':'all'}`;
+function queueEntryId(key,importantOnly=false,notMemorizedOnly=false){
+ return `${key}__mode__${notMemorizedOnly?'forget':importantOnly?'important':'all'}`;
+}
+function queueEntryPairs(entry,item){
+ if(entry.notMemorizedOnly)return itemToNotMemorizedPairs(item);
+ if(entry.importantOnly)return itemToImportantPairs(item);
+ return itemToPairs(item);
 }
 function renderSelectedItemQueue(){
  const box=document.getElementById('selectedItemQueue');
@@ -868,8 +888,8 @@ function renderSelectedItemQueue(){
  const entries=selectedItemKeys.map(normalizeQueueEntry).map(entry=>({entry,item:BOOK.items.find(item=>item.key===entry.key)})).filter(x=>x.item);
  if(!entries.length){box.innerHTML='';return;}
  box.innerHTML=entries.map(({entry,item})=>{
-  const label=itemOptionLabel(item)+(entry.importantOnly?' · 핵심':'');
-  const id=queueEntryId(entry.key,entry.importantOnly);
+  const label=itemOptionLabel(item)+(entry.notMemorizedOnly?' · 안외워짐':entry.importantOnly?' · 핵심':'');
+  const id=queueEntryId(entry.key,entry.importantOnly,entry.notMemorizedOnly);
   return `<span class="selected-answer-chip">${escapeHtml(label)}<button data-id="${escapeAttr(id)}" onclick="removeSelectedItemFromQueue(this.dataset.id)">×</button></span>`;
  }).join('');
 }
@@ -881,11 +901,11 @@ function getSelectedQueueItem(){
  if(!item){alert('선택한 묶음을 찾지 못했어.');return;}
  return {key,item};
 }
-function addQueueEntry(key,importantOnly=false,quiet=false){
- const id=queueEntryId(key,importantOnly);
- const exists=selectedItemKeys.map(normalizeQueueEntry).some(entry=>queueEntryId(entry.key,entry.importantOnly)===id);
+function addQueueEntry(key,importantOnly=false,quiet=false,notMemorizedOnly=false){
+ const id=queueEntryId(key,importantOnly,notMemorizedOnly);
+ const exists=selectedItemKeys.map(normalizeQueueEntry).some(entry=>queueEntryId(entry.key,entry.importantOnly,entry.notMemorizedOnly)===id);
  if(exists){if(!quiet)alert('이미 추가된 답변이야.');return false;}
- selectedItemKeys.push({key,importantOnly});
+ selectedItemKeys.push({key,importantOnly,notMemorizedOnly});
  renderSelectedItemQueue();
  return true;
 }
@@ -909,6 +929,21 @@ function addSelectedImportantToQueue(){
  if(!itemToImportantPairs(selected.item).length){alert('이 답변에는 핵심 문장이 없어.');return;}
  addQueueEntry(selected.key,true);
 }
+function addSelectedNotMemorizedToQueue(){
+ const select=document.getElementById('unitSelect');
+ if(select?.value==='__ALL__'){
+  const forgetItems=getFilteredItems().filter(item=>itemToNotMemorizedPairs(item).length);
+  if(!forgetItems.length){alert('현재 선택 범위에 안외워짐 문장이 없어.');return;}
+  let added=0;
+  forgetItems.forEach(item=>{if(addQueueEntry(item.key,false,true,true))added++;});
+  renderSelectedItemQueue();
+  return;
+ }
+ const selected=getSelectedQueueItem();
+ if(!selected)return;
+ if(!itemToNotMemorizedPairs(selected.item).length){alert('이 답변에는 안외워짐 문장이 없어.');return;}
+ addQueueEntry(selected.key,false,false,true);
+}
 function getCurrentImportantBundleScope(){
  const unitVal=document.getElementById('unitFilter')?.value || '';
  if(unitVal)return BOOK.items.filter(item=>item.sheetName===unitVal);
@@ -926,7 +961,7 @@ function addImportantBundlesToQueue(){
  renderSelectedItemQueue();
 }
 function removeSelectedItemFromQueue(id){
- selectedItemKeys=selectedItemKeys.map(normalizeQueueEntry).filter(entry=>queueEntryId(entry.key,entry.importantOnly)!==id);
+ selectedItemKeys=selectedItemKeys.map(normalizeQueueEntry).filter(entry=>queueEntryId(entry.key,entry.importantOnly,entry.notMemorizedOnly)!==id);
  renderSelectedItemQueue();
 }
 function clearSelectedItemQueue(){
@@ -938,7 +973,7 @@ function loadQueuedItems(){
  const entries=selectedItemKeys.map(normalizeQueueEntry).map(entry=>({entry,item:BOOK.items.find(item=>item.key===entry.key)})).filter(x=>x.item);
  if(!entries.length){loadSelectedItem();return;}
  const items=entries.map(x=>x.item);
- const pairs=entries.flatMap(({entry,item})=>entry.importantOnly?itemToImportantPairs(item):itemToPairs(item));
+ const pairs=entries.flatMap(({entry,item})=>queueEntryPairs(entry,item));
  if(!pairs.length){alert('불러올 문장이 없어.');return;}
  showQuestions(items);
  setRows(pairs);
@@ -1043,15 +1078,33 @@ function buildQuestionHtml(items,prefix){
  return {html,questionTexts,questionAudio,keywordAudio};
 }
 
-function renderQuestionBox(boxId,listId,items,prefix,collect=false){
+function toggleStudyQuestionBox(boxId,btn){
+ const box=document.getElementById(boxId);
+ if(!box)return;
+ const show=box.style.display!=='block';
+ box.style.display=show?'block':'none';
+ if(btn)btn.textContent=show?'질문 숨기기':'질문 보기';
+}
+function setStudyQuestionToggle(mode,hasQuestions,collapsed=true){
+ const box=document.getElementById(`${mode}QuestionBox`);
+ const btn=document.getElementById(`${mode}QuestionToggleBtn`);
+ if(btn){
+   btn.style.display=hasQuestions?'inline-block':'none';
+   btn.textContent='질문 보기';
+ }
+ if(box)box.style.display=hasQuestions && !collapsed?'block':'none';
+}
+function renderQuestionBox(boxId,listId,items,prefix,collect=false,collapsed=false){
  const box=document.getElementById(boxId), list=document.getElementById(listId);
- if(!box||!list)return;
+ if(!box||!list)return false;
  const built=buildQuestionHtml(items,prefix);
  list.innerHTML=built.html.join('');
- box.style.display=built.html.length?'block':'none';
+ const hasQuestions=!!built.html.length;
+ box.style.display=hasQuestions && !collapsed?'block':'none';
  Object.assign(QUESTION_AUDIO,built.questionAudio);
  Object.assign(KEYWORD_AUDIO,built.keywordAudio);
  if(collect) currentQuestionTexts=built.questionTexts;
+ return hasQuestions;
 }
 
 function showQuestions(items){
@@ -1061,9 +1114,11 @@ function showQuestions(items){
  QUESTION_AUDIO={};
  KEYWORD_AUDIO={};
  renderQuestionBox('questionBox','questionList',currentQuestionItems,'table',true);
- renderQuestionBox('flashQuestionBox','flashQuestionList',currentQuestionItems,'flash');
- renderQuestionBox('scrambleQuestionBox','scrambleQuestionList',currentQuestionItems,'scramble');
- renderQuestionBox('clozeQuestionBox','clozeQuestionList',currentQuestionItems,'cloze');
+ setStudyQuestionToggle('flash',renderQuestionBox('flashQuestionBox','flashQuestionList',currentQuestionItems,'flash',false,true),true);
+ setStudyQuestionToggle('scramble',renderQuestionBox('scrambleQuestionBox','scrambleQuestionList',currentQuestionItems,'scramble',false,true),true);
+ setStudyQuestionToggle('molgong',renderQuestionBox('molgongQuestionBox','molgongQuestionList',currentQuestionItems,'molgong',false,true),true);
+ setStudyQuestionToggle('keywordWrite',renderQuestionBox('keywordWriteQuestionBox','keywordWriteQuestionList',currentQuestionItems,'keywordWrite',false,true),true);
+ setStudyQuestionToggle('cloze',renderQuestionBox('clozeQuestionBox','clozeQuestionList',currentQuestionItems,'cloze',false,true),true);
  setTimeout(refreshPracticeHeights,0);
 }
 
@@ -1140,7 +1195,7 @@ function copyKeyword(id){
  navigator.clipboard.writeText(box.textContent||'');
  alert('키워드 복사했어.');
 }
-function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox','clozeQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList','clozeQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});}
+function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox','molgongQuestionBox','keywordWriteQuestionBox','clozeQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList','molgongQuestionList','keywordWriteQuestionList','clozeQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});['flash','scramble','molgong','keywordWrite','cloze'].forEach(mode=>setStudyQuestionToggle(mode,false));}
 function setRows(pairs){document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',flowText:i.flowText||'',done:false})).filter(i=>i.ko||i.en);renderTable();}
 function loadSelectedItem(){stopSpeak();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));}
 function canLoadNextSelectedItem(){
@@ -2562,6 +2617,7 @@ function renderEnglishOnly(){
  }
  const titles=[...new Set(list.map(x=>x.title).filter(Boolean))];
  let lastTitle=null;
+ let keywordNo=0;
  const lines=[];
  list.forEach((x,idx)=>{
   if(titles.length>1 && x.title && x.title!==lastTitle){
@@ -2572,7 +2628,8 @@ function renderEnglishOnly(){
   const next=list[idx+1];
   const isGroupEnd=!next || next.title!==x.title;
   if(isGroupEnd && x.flowText){
-   lines.push(`<div class="keyword-box" style="display:block">${escapeHtml(x.flowText)}</div>`);
+   const keywordId=`englishOnlyKeyword_${keywordNo++}`;
+   lines.push(`<div><button class="keyword-toggle" onclick="toggleKeyword('${keywordId}', this)">키워드 보기</button><div id="${keywordId}" class="keyword-box">${escapeHtml(x.flowText)}</div></div>`);
   }
   if(isGroupEnd && next){
    lines.push('<div class="english-group-gap"></div>');
@@ -2752,3 +2809,4 @@ function downloadPython(){let code=document.getElementById('pythonCode').textCon
 </script>
 </body>
 </html>
+
