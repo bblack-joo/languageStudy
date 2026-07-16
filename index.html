@@ -597,6 +597,7 @@ tr.only-forget-hidden{display:none!important}
 </div>
 <script>
 let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[],selectedItemKeys=[];
+let studyGroups=[],studyGroupIndex=0;
 let ENGLISH_ONLY_COPY={};
 let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0,flashAutoNextOn=false,flashAutoNextTimer=null;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -982,15 +983,36 @@ function clearSelectedItemQueue(){
  selectedItemKeys=[];
  renderSelectedItemQueue();
 }
+function clearStudyGroups(){
+ studyGroups=[];
+ studyGroupIndex=0;
+}
+function makeStudyGroups(entries,pairGetter){
+ return entries.map(({entry,item})=>{
+  const pairs=pairGetter?pairGetter(item,entry):queueEntryPairs(entry,item);
+  return {item,pairs};
+ }).filter(group=>group.item&&group.pairs&&group.pairs.length);
+}
+function loadStudyGroup(index=0){
+ if(!studyGroups.length)return false;
+ studyGroupIndex=Math.max(0,Math.min(index,studyGroups.length-1));
+ const group=studyGroups[studyGroupIndex];
+ showQuestions([group.item]);
+ setRows(group.pairs,true);
+ return true;
+}
+function loadStudyGroups(groups){
+ studyGroups=groups||[];
+ studyGroupIndex=0;
+ return loadStudyGroup(0);
+}
 function loadQueuedItems(){
  stopSpeak();
  const entries=selectedItemKeys.map(normalizeQueueEntry).map(entry=>({entry,item:BOOK.items.find(item=>item.key===entry.key)})).filter(x=>x.item);
  if(!entries.length){loadSelectedItem();return;}
- const items=entries.map(x=>x.item);
- const pairs=entries.flatMap(({entry,item})=>queueEntryPairs(entry,item));
- if(!pairs.length){alert('불러올 문장이 없어.');return;}
- showQuestions(items);
- setRows(pairs);
+ const groups=makeStudyGroups(entries);
+ if(!groups.length){alert('불러올 문장이 없어.');return;}
+ loadStudyGroups(groups);
 }
 function loadQueuedImportantOnly(){
  stopSpeak();
@@ -1000,15 +1022,14 @@ function loadQueuedImportantOnly(){
   if(!selected)return;
   const pairs=itemToImportantPairs(selected.item);
   if(!pairs.length){alert('이 답변에는 핵심 문장이 없어.');return;}
+  clearStudyGroups();
   showQuestions([selected.item]);
   setRows(pairs);
   return;
  }
- const items=entries.map(x=>x.item);
- const pairs=entries.flatMap(({item})=>itemToImportantPairs(item));
- if(!pairs.length){alert('선택한 목록에 핵심 문장이 없어.');return;}
- showQuestions(items);
- setRows(pairs);
+ const groups=makeStudyGroups(entries,(item)=>itemToImportantPairs(item));
+ if(!groups.length){alert('선택한 목록에 핵심 문장이 없어.');return;}
+ loadStudyGroups(groups);
 }
 let timerInterval=null,timerStartTime=0;
 function formatTimer(ms){
@@ -1041,6 +1062,10 @@ function updateCurrentItemInfo(){
  if(!el)return;
  const items=currentQuestionItems||[];
  if(!items.length){el.textContent='';return;}
+ if(studyGroups.length>1 && items.length===1){
+   el.textContent=`현재 답변 ${studyGroupIndex+1}/${studyGroups.length}: ${items[0].sheetName} - ${items[0].label}`;
+   return;
+ }
  if(items.length===1){
    el.textContent=`현재 문제: ${items[0].sheetName} - ${items[0].label}`;
  }else{
@@ -1207,11 +1232,10 @@ function copyKeyword(id){
  const box=document.getElementById(id);
  if(!box)return;
  navigator.clipboard.writeText(box.textContent||'');
- alert('키워드 복사했어.');
 }
 function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox','molgongQuestionBox','keywordWriteQuestionBox','clozeQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList','molgongQuestionList','keywordWriteQuestionList','clozeQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});['flash','scramble','molgong','keywordWrite','cloze'].forEach(mode=>setStudyQuestionToggle(mode,false));}
-function setRows(pairs){document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',flowText:i.flowText||'',done:false})).filter(i=>i.ko||i.en);renderTable();}
-function loadSelectedItem(){stopSpeak();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));}
+function setRows(pairs,preserveGroups=false){if(!preserveGroups)clearStudyGroups();document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',flowText:i.flowText||'',done:false})).filter(i=>i.ko||i.en);renderTable();}
+function loadSelectedItem(){stopSpeak();clearStudyGroups();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));}
 function canLoadNextSelectedItem(){
  const select=document.getElementById('unitSelect');
  if((currentQuestionItems||[]).length!==1)return false;
@@ -1222,8 +1246,19 @@ function canLoadNextSelectedItem(){
  }
  return false;
 }
+function canLoadNextStudyGroup(){
+ return studyGroups.length>1 && studyGroupIndex<studyGroups.length-1;
+}
 function nextAnswerButtonHtml(){
- return canLoadNextSelectedItem()?'<div class="flash-options"><button class="green small" onclick="loadNextSelectedItem()">다음 답변 ▶</button></div>':'';
+ return (canLoadNextStudyGroup()||canLoadNextSelectedItem())?'<div class="flash-options"><button class="green small" onclick="loadNextAnswer()">다음 답변 ▶</button></div>':'';
+}
+function loadNextAnswer(){
+ if(canLoadNextStudyGroup()){
+  stopSpeak();
+  loadStudyGroup(studyGroupIndex+1);
+  return;
+ }
+ loadNextSelectedItem();
 }
 function loadNextSelectedItem(){
  const select=document.getElementById('unitSelect');
@@ -1304,8 +1339,8 @@ function addRandomImportantItems(){
 }
 function isHeader(ko,en){return norm(ko)==='한글'&&norm(en)==='영어';}
 function loadSample(){document.getElementById('inputText').value=`한글\t영어\n집에 있는 가구에 대해 말해 주세요.\tTell me about the furniture you have in your home.\n가장 좋아하는 가구가 있나요?\tIs there a piece that is your favorite?`;parseText();}
-function clearAll(){rows=[];document.getElementById('inputText').value='';renderTable();document.getElementById('pythonCard').style.display='none';hideQuestions();}
-function parseText(){const text=document.getElementById('inputText').value.trim();if(!text){alert('데이터를 먼저 넣어줘.');return;}const lines=text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);rows=[];for(const line of lines){let parts=line.split('\t'); if(parts.length<2)parts=line.split(/ {2,}|,/); if(parts.length>=2){const ko=parts[0].trim(),en=parts.slice(1).join(' ').trim(); if(ko&&en&&!isHeader(ko,en))rows.push({ko,en,important:false,notMemorized:false,done:false});}}
+function clearAll(){clearStudyGroups();rows=[];document.getElementById('inputText').value='';renderTable();document.getElementById('pythonCard').style.display='none';hideQuestions();}
+function parseText(){clearStudyGroups();const text=document.getElementById('inputText').value.trim();if(!text){alert('데이터를 먼저 넣어줘.');return;}const lines=text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);rows=[];for(const line of lines){let parts=line.split('\t'); if(parts.length<2)parts=line.split(/ {2,}|,/); if(parts.length>=2){const ko=parts[0].trim(),en=parts.slice(1).join(' ').trim(); if(ko&&en&&!isHeader(ko,en))rows.push({ko,en,important:false,notMemorized:false,done:false});}}
  if(!rows.length){const parts=text.replace(/\r\n/g,'\n').replace(/\t/g,'\n').split(/\n+/).map(x=>x.trim()).filter(Boolean);for(let i=0;i<parts.length;i+=2){const ko=parts[i]||'',en=parts[i+1]||'';if(ko&&en&&!isHeader(ko,en))rows.push({ko,en,important:false,notMemorized:false,done:false});}}
  renderTable();}
 function renderTable(){
@@ -1694,7 +1729,6 @@ function copyFlashText(lang){
  const text=lang==='ko'?(row.ko||''):stripStress(row.en||'');
  if(!text.trim()){alert('복사할 내용이 없어.');return;}
  navigator.clipboard.writeText(text);
- alert((lang==='ko'?'한글':'영어')+'을 복사했어.');
 }
 
 let scrambleOrderList=[],scrambleIndex=0,scrambleTokens=[],scrambleChipOrder=[],scrambleUsedStack=[],scrambleHintCount=0,scrambleDropPreviewPos=null,scrambleWrongs=[],scrambleFinished=false,scrambleChecked=false;
@@ -2569,7 +2603,6 @@ function copyClozeFullAnswer(){
  const text=stripStress(cur.row.en||'').trim();
  if(!text){alert('복사할 영어 문장이 없어.');return;}
  navigator.clipboard.writeText(text);
- alert('전체 정답 문장을 복사했어.');
 }
 function nextCloze(){
  if(!clozeOrderList.length){startCloze();return;}
@@ -2710,7 +2743,6 @@ function copyEnglishOnlyText(id,label){
  }else{
   navigator.clipboard.writeText(text);
  }
- alert(`${label}을 복사했어.`);
 }
 
 function saveScrambleCursor(){
@@ -2758,7 +2790,7 @@ function savePracticeInput(el){if(!el||!el.dataset.key)return;localStorage.setIt
 function autoGrow(el){if(!el)return;el.style.height='auto';el.style.height=Math.max(42,el.scrollHeight)+'px';}
 function practiceKeydown(e,el){if(el&&el.classList.contains('question-practice-input'))return;if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const inputs=[...document.querySelectorAll('.practice-input')];const idx=inputs.indexOf(el);if(idx>=0&&idx<inputs.length-1)inputs[idx+1].focus();}}
 function refreshPracticeHeights(){document.querySelectorAll('.practice-input,.question-practice-input').forEach(autoGrow);}
-function copyPracticeColumn(){const text=getVisibleRowIndices().map(i=>getSavedPractice(getPracticeKey(rows[i]))).join('\n');navigator.clipboard.writeText(text);alert('연습 열을 복사했어.');}
+function copyPracticeColumn(){const text=getVisibleRowIndices().map(i=>getSavedPractice(getPracticeKey(rows[i]))).join('\n');navigator.clipboard.writeText(text);}
 function currentQuestionPracticeKeys(){const keys=[];(currentQuestionItems||[]).forEach(item=>(item.questions||[]).forEach(q=>keys.push(getQuestionPracticeKey(q))));return keys;}
 function clearCurrentPractice(){if(!confirm('현재 표와 질문의 연습 내용을 삭제할까요?'))return;rows.forEach(r=>localStorage.removeItem(getPracticeKey(r)));currentQuestionPracticeKeys().forEach(k=>localStorage.removeItem(k));renderTable();showQuestions(currentQuestionItems);alert('현재 연습 내용을 삭제했어.');}
 function clearAllPractice(){if(!confirm('저장된 연습 내용을 전부 삭제할까요?'))return;Object.keys(localStorage).forEach(k=>{if(k.startsWith('ls_practice_')||k.startsWith('ls_qpractice_'))localStorage.removeItem(k);});renderTable();showQuestions(currentQuestionItems);alert('전체 연습 내용을 삭제했어.');}
@@ -2851,11 +2883,10 @@ function copyColumn(lang){
    .map(tr=>{
      const cell=tr.children[colIndex];
      return cell ? cell.textContent.trim() : '';
-   })
-   .filter(Boolean)
-   .join('\n');
+ })
+ .filter(Boolean)
+ .join('\n');
  navigator.clipboard.writeText(text);
- alert((lang==='ko'?'한글':'영어')+' 문장을 복사했어.');
 }
 function applyPracticeVisibility(){document.querySelectorAll('.practice-cell').forEach(cell=>{cell.classList.toggle('practice-hidden',!practiceVisible);});const btn=document.getElementById('practiceToggleBtn');if(btn)btn.textContent=practiceVisible?'✍ 연습칸 숨기기':'✍ 연습칸 보이기';}
 function togglePracticeColumn(btn){practiceVisible=!practiceVisible;applyPracticeVisibility();if(practiceVisible)setTimeout(refreshPracticeHeights,0);}
@@ -2877,7 +2908,7 @@ function getPythonDataBlock(){return rows.map(r=>`    (${pyStr(r.ko)}, ${pyStr(s
 function setPythonCode(code,mode){currentPythonMode=mode;document.getElementById('pythonCode').textContent=code;document.getElementById('pythonCard').style.display='block';return code;}
 function baseSettings(){return{base:document.getElementById('baseName').value||'opic_practice',repeat:Number(document.getElementById('repeatCount').value||1),random:document.getElementById('pythonRandom').checked,koRate:rateToEdge(document.getElementById('koRate').value),enRate:rateToEdge(document.getElementById('enRate').value),data:getPythonDataBlock()};}
 function generatePython(mode='both'){if(!rows.length){alert('먼저 표를 생성해줘.');return '';}const s=baseSettings();let code='';if(mode==='both')code=["# pip install edge-tts","import asyncio","import random","from pathlib import Path","import edge_tts","",`BASE_NAME = ${pyStr(s.base)}`,`REPEAT_COUNT = ${s.repeat}`,`RANDOM_ORDER = ${s.random?'True':'False'}`,`KO_VOICE = "ko-KR-SunHiNeural"`,`EN_VOICE = "en-US-JennyNeural"`,`KO_RATE = ${pyStr(s.koRate)}`,`EN_RATE = ${pyStr(s.enRate)}`,"DATA = [",s.data,"]","out_dir = Path(BASE_NAME)","out_dir.mkdir(exist_ok=True)","async def make_mp3(text, voice, rate, path):","    communicate = edge_tts.Communicate(text, voice=voice, rate=rate)","    await communicate.save(str(path))","async def main():","    sequence = list(DATA)","    clip_no = 1","    for _ in range(REPEAT_COUNT):","        if RANDOM_ORDER:","            random.shuffle(sequence)","        for ko, en in sequence:","            no = f'{clip_no:03d}'","            await make_mp3(ko, KO_VOICE, KO_RATE, out_dir / f'{no}_ko.mp3')","            await make_mp3(en, EN_VOICE, EN_RATE, out_dir / f'{no}_en.mp3')","            print(f'saved {no}')","            clip_no += 1","    print('완료!')","if __name__ == '__main__':","    asyncio.run(main())"].join('\n');else{const isKo=mode==='ko';code=["# pip install edge-tts","import asyncio","from pathlib import Path","import edge_tts","",`BASE_NAME = ${pyStr(s.base)}`,`SELECT_TXT = ${pyStr(mode)}`,`VOICE = ${pyStr(isKo?'ko-KR-SunHiNeural':'en-US-JennyNeural')}`,`RATE = ${pyStr(isKo?s.koRate:s.enRate)}`,"DATA = [",s.data,"]","out_dir = Path(BASE_NAME)","out_dir.mkdir(exist_ok=True)","async def make_mp3(text, voice, rate, path):","    communicate = edge_tts.Communicate(text, voice=voice, rate=rate)","    await communicate.save(str(path))","    print(f'생성 완료: {path}')","async def main():",isKo?"    final_text = ' '.join([ko for ko, en in DATA])":"    final_text = ' '.join([en for ko, en in DATA])",`    await make_mp3(final_text, VOICE, RATE, out_dir / ${pyStr(isKo?'ko.mp3':'en.mp3')})`,"if __name__ == '__main__':","    asyncio.run(main())"].join('\n');}return setPythonCode(code,mode);}
-function copyPython(){let code=document.getElementById('pythonCode').textContent||generatePython(currentPythonMode);if(!code)return;navigator.clipboard.writeText(code);alert('코드 복사했어.');}
+function copyPython(){let code=document.getElementById('pythonCode').textContent||generatePython(currentPythonMode);if(!code)return;navigator.clipboard.writeText(code);}
 function downloadPython(){let code=document.getElementById('pythonCode').textContent||generatePython(currentPythonMode);if(!code)return;const suffix=currentPythonMode==='ko'?'_ko_onefile':currentPythonMode==='en'?'_en_onefile':'_sentence_files';const blob=new Blob([code],{type:'text/x-python'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(document.getElementById('baseName').value||'opic_practice')+suffix+'.py';a.click();URL.revokeObjectURL(a.href);}
 
 
