@@ -234,7 +234,7 @@ tr.only-forget-hidden{display:none!important}
 </div>
 
 <div class="card">
-  <b>학습자 선택</b>
+  <b>학습 기록</b>
   <div class="toolbar">
     <label>사용자/탭
       <select id="cloudUserName" onchange="saveCloudSettings()">
@@ -244,8 +244,16 @@ tr.only-forget-hidden{display:none!important}
       </select>
     </label>
     <button class="green small" onclick="sendCloudTest()">저장 테스트</button>
+    <button class="secondary small" id="studyLogToggleBtn" onclick="toggleStudyLogBox()">기록 보기</button>
   </div>
   <div class="hint">선택한 이름과 같은 구글시트 탭에 학습 기록이 저장돼.</div>
+  <div id="studyLogBox" style="display:none;margin-top:10px">
+    <div class="toolbar">
+      <button class="secondary small" onclick="renderLogView()">새로고침</button>
+      <button class="gray small" onclick="clearLocalLog()">로컬 기록 비우기</button>
+    </div>
+    <div id="logView" class="scramble-result"></div>
+  </div>
 </div>
 
 <div id="loadArea">
@@ -321,7 +329,6 @@ tr.only-forget-hidden{display:none!important}
   <div class="toolbar mode-switch">
     <button id="modeBtn-table" class="mode-btn" onclick="switchMode('table')">📋 표</button>
     <button id="modeBtn-englishOnly" class="mode-btn" onclick="switchMode('englishOnly')">📖 문장 읽기</button>
-    <button id="modeBtn-log" class="mode-btn" onclick="switchMode('log')">📊 기록 보기</button>
     <button class="gray" onclick="clearAll()">초기화</button>
   </div>
   <div id="currentItemInfo" class="hint"></div>
@@ -393,6 +400,14 @@ tr.only-forget-hidden{display:none!important}
     <button id="flashAutoNextBtn" class="secondary small" onclick="toggleFlashAutoNext()">자동 넘김 꺼짐</button>
     <span id="flashProgress" class="flash-progress">0 / 0</span>
   </div>
+  <div class="flash-options">
+    <label><input id="flashRepeatModeEnabled" type="checkbox"> 반복모드 쓰기</label>
+    <label>반복 <input id="flashSpeakRepeat" type="number" min="1" value="3" style="width:60px"> 회</label>
+    <input id="flashSpeakInfinite" type="checkbox" style="display:none">
+    <button id="flashSpeakInfiniteBtn" class="secondary small" onclick="toggleFlashInfinite()">∞ 무한 꺼짐</button>
+    <label>한글 속도 <input id="flashKoRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label>
+    <label>영어 속도 <input id="flashEnRate" type="number" min="0.5" max="2" step="0.1" value="0.9" style="width:70px"></label>
+  </div>
   <div class="flash-bar"><div id="flashBarInner" class="flash-bar-inner"></div></div>
   <div id="flashCard" class="flash-card" onclick="handleFlashCardClick()">
     <div id="flashFront" class="flash-front">표를 불러온 뒤 시작을 눌러줘.</div>
@@ -407,17 +422,6 @@ tr.only-forget-hidden{display:none!important}
 </div>
 
 <div class="flash-scratch-box">
-  <div class="toolbar"><button class="secondary small" id="flashSpeakToggleBtn" onclick="toggleFlashSpeakBox()">🔊 음성 재생 보이기</button></div>
-  <div id="flashSpeakBox" style="display:none">
-    <div class="flash-options">
-      <label>반복 <input id="flashSpeakRepeat" type="number" min="1" value="1" style="width:60px"> 회</label>
-      <input id="flashSpeakInfinite" type="checkbox" style="display:none">
-      <button id="flashSpeakInfiniteBtn" class="secondary small" onclick="toggleFlashInfinite()">∞ 무한 꺼짐</button>
-      <label>한글 속도 <input id="flashKoRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label>
-      <label>영어 속도 <input id="flashEnRate" type="number" min="0.5" max="2" step="0.1" value="1.0" style="width:70px"></label>
-      <button class="green small" onclick="playFlashSpeak()">🔊 듣기</button>
-    </div>
-  </div>
   <div class="flash-help">아래에 쓴 내용은 카드별로 기억했다가 마지막에 정답과 비교해서 보여줘.</div>
   <textarea id="flashScratchInput" placeholder="자유롭게 써보면서 연습해봐" style="height:90px" oninput="saveFlashScratch(); autoGrow(this);"></textarea>
   <div class="flash-options">
@@ -621,14 +625,6 @@ tr.only-forget-hidden{display:none!important}
 <div id="englishOnlyList" class="english-only-list"></div>
 </div>
 
-<div id="mode-log" class="card mode-panel">
-<b>📊 기록 보기</b>
-<div class="toolbar">
-  <button class="secondary small" onclick="renderLogView()">새로고침</button>
-  <button class="gray small" onclick="clearLocalLog()">로컬 기록 비우기</button>
-</div>
-<div id="logView" class="scramble-result"></div>
-</div>
 </div>
 <script>
 let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[],selectedItemKeys=[];
@@ -693,6 +689,30 @@ function todayStats(){
 function localLogEntries(){
  try{return JSON.parse(localStorage.getItem(LOCAL_LOG_KEY)||'[]')||[];}catch(e){return[];}
 }
+function cleanLegacyLogData(){
+ const allowed=new Set(['answer_load','study_result']);
+ const cleaned=localLogEntries()
+  .filter(e=>allowed.has(e.type))
+  .map(e=>{
+   const copy={...e};
+   delete copy.correct;
+   delete copy.wrong;
+   delete copy.reason;
+   delete copy.ko;
+   delete copy.en;
+   return copy;
+  });
+ saveLocalLogEntries(cleaned);
+ Object.keys(localStorage).filter(k=>k.startsWith('rr_today_')).forEach(k=>{
+  try{
+   const stats=JSON.parse(localStorage.getItem(k)||'{}')||{};
+   if('wrong' in stats){
+    delete stats.wrong;
+    localStorage.setItem(k,JSON.stringify(stats));
+   }
+  }catch(e){}
+ });
+}
 function saveLocalLogEntries(entries){
  localStorage.setItem(LOCAL_LOG_KEY,JSON.stringify((entries||[]).slice(-500)));
 }
@@ -719,7 +739,7 @@ function renderLogView(){
  }
  const rowsHtml=entries.slice(0,200).map(e=>{
   const time=e.createdAt?new Date(e.createdAt).toLocaleString():'';
-  const detail=[e.source,e.total?`총 ${escapeHtml(e.total)}`:'',e.groupIndex?`${escapeHtml(e.groupIndex)}/${escapeHtml(e.groupTotal||'')}`:''].filter(Boolean).join(' · ');
+  const detail=[e.source,e.memo?`메모: ${escapeHtml(e.memo)}`:'',e.total?`총 ${escapeHtml(e.total)}`:'',e.groupIndex?`${escapeHtml(e.groupIndex)}/${escapeHtml(e.groupTotal||'')}`:''].filter(Boolean).join(' · ');
   return `<tr><td>${escapeHtml(time)}</td><td>${escapeHtml(e.user||'')}</td><td>${escapeHtml(logTypeLabel(e.type))}</td><td>${escapeHtml(e.mode||'')}</td><td>${escapeHtml(e.title||e.sheetName||'')}</td><td>${detail||'-'}</td></tr>`;
  }).join('');
  box.innerHTML=`<div class="log-summary"><span class="log-pill">현재 사용자: ${escapeHtml(user)}</span><span class="log-pill">오늘 기록: ${todayEntries.length}개</span><span class="log-pill">전체 기록: ${entries.length}개</span><span class="log-pill">오늘 학습: ${study.sentences||0}문장</span><span class="log-pill">완료: ${study.sessions||0}회</span></div><table class="log-table"><thead><tr><th>시간</th><th>사용자</th><th>종류</th><th>모드</th><th>답변/제목</th><th>내용</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
@@ -729,9 +749,34 @@ function clearLocalLog(){
  localStorage.removeItem(LOCAL_LOG_KEY);
  renderLogView();
 }
+function toggleStudyLogBox(){
+ const box=document.getElementById('studyLogBox');
+ const btn=document.getElementById('studyLogToggleBtn');
+ if(!box)return;
+ const showing=box.style.display!=='none';
+ box.style.display=showing?'none':'block';
+ if(btn)btn.textContent=showing?'기록 보기':'기록 숨기기';
+ if(!showing)renderLogView();
+}
 function saveTodayStats(stats){
  localStorage.setItem('rr_today_'+todayKey(),JSON.stringify(stats));
  updateTodayStudyInfo();
+}
+function itemMemoText(item){
+ return String(item?.memo||'').trim();
+}
+function itemsMemoText(items){
+ return [...new Set((items||[]).map(itemMemoText).filter(Boolean))].join(' / ');
+}
+function itemLogTitle(item){
+ const memo=itemMemoText(item);
+ return (item?.label||'')+(memo?`_[${memo}]`:'');
+}
+function currentQuestionTitle(){
+ return (currentQuestionItems||[]).map(itemLogTitle).join(', ');
+}
+function currentQuestionMemo(){
+ return itemsMemoText(currentQuestionItems||[]);
 }
 function updateTodayStudyInfo(){
  const el=document.getElementById('todayStudyInfo');
@@ -754,12 +799,12 @@ function recordStudyResult(mode,total,wrong,source='끝까지 진행'){
  stats.sentences=(stats.sentences||0)+(total||0);
  stats.sessions=(stats.sessions||0)+1;
  saveTodayStats(stats);
- postCloudEvent('study_result',{mode,total,source,title:(currentQuestionItems||[]).map(item=>item.label).join(', ')});
+ postCloudEvent('study_result',{mode,total,source,title:currentQuestionTitle(),memo:currentQuestionMemo()});
  return true;
 }
 function recordAnswerLoad(item,source='답변 불러오기'){
  if(!item)return;
- postCloudEvent('answer_load',{mode:MODE_LABELS[currentMode]||currentMode,title:item.label||'',sheetName:item.sheetName||'',source,groupIndex:studyGroups.length?studyGroupIndex+1:'',groupTotal:studyGroups.length||''});
+ postCloudEvent('answer_load',{mode:MODE_LABELS[currentMode]||currentMode,title:itemLogTitle(item),sheetName:item.sheetName||'',source,memo:itemMemoText(item),groupIndex:studyGroups.length?studyGroupIndex+1:'',groupTotal:studyGroups.length||''});
 }
 function recordQueuedAnswers(entries,source='선택 목록'){
 }
@@ -1617,22 +1662,25 @@ function loadFlashScratch(){
  el.value=flashScratchAnswers[flashIndex]||'';
  autoGrow(el);
 }
-function toggleFlashSpeakBox(){
- const box=document.getElementById('flashSpeakBox');
- const btn=document.getElementById('flashSpeakToggleBtn');
- if(!box)return;
- const showing=box.style.display!=='none';
- box.style.display=showing?'none':'block';
- if(btn)btn.textContent=showing?'🔊 음성 재생 보이기':'🔊 숨기기';
-}
-async function playFlashSpeak(){
+function getFlashDisplayedSpeakSide(){
  const row=getFlashCurrent();
- if(!row){alert('먼저 플래시카드를 시작해줘.');return;}
+ if(!row)return null;
  const side=flashSide(row,flashRevealed?'back':'front');
- if(!side.plain){alert('읽을 내용이 없어.');return;}
+ const speakMode=document.getElementById('flashSpeakMode')?.value||'both';
+ if(speakMode==='off')return null;
+ if(speakMode!=='both'&&speakMode!==side.lang)return null;
+ return side;
+}
+async function playFlashSpeak(options={}){
+ const row=getFlashCurrent();
+ if(!row){if(!options.silent)alert('먼저 플래시카드를 시작해줘.');return;}
+ const side=getFlashDisplayedSpeakSide();
+ if(!side){if(!options.silent)alert('현재 보이는 카드와 선택한 음성 모드가 맞지 않아.');return;}
+ if(!side.plain){if(!options.silent)alert('읽을 내용이 없어.');return;}
  const runId=++flashSpeakRunId;
- const repeat=Math.max(1,Number(document.getElementById('flashSpeakRepeat')?.value||1));
- const infinite=!!document.getElementById('flashSpeakInfinite')?.checked;
+ const repeatMode=!!document.getElementById('flashRepeatModeEnabled')?.checked;
+ const repeat=repeatMode?Math.max(1,Number(document.getElementById('flashSpeakRepeat')?.value||3)):1;
+ const infinite=repeatMode&&!!document.getElementById('flashSpeakInfinite')?.checked;
  for(let k=0;infinite||k<repeat;k++){
    if(runId!==flashSpeakRunId)return;
    await speakFlashText(side,getFlashSpeakRate(side.lang));
@@ -1798,15 +1846,13 @@ function renderFlashcard(autoSpeak=false){
  if(prog)prog.textContent=`${flashIndex+1} / ${flashOrderList.length}`;
  if(bar)bar.style.width=`${Math.round(((flashIndex+1)/flashOrderList.length)*100)}%`;
  loadFlashScratch();
- const speakMode=document.getElementById('flashSpeakMode')?.value||'both';
- const displayedSide=flashRevealed&&!singleMode?back:front;
- if(autoSpeak && speakMode!=='off'){
-   if(speakMode==='both'){
-     speakFlashText(displayedSide,getFlashSpeakRate(displayedSide.lang));
-   }else if(speakMode===displayedSide.lang){
-     speakFlashText(displayedSide,getFlashSpeakRate(displayedSide.lang));
+ if(autoSpeak){
+   if(document.getElementById('flashRepeatModeEnabled')?.checked){
+     playFlashSpeak({silent:true});
+   }else{
+     const side=getFlashDisplayedSpeakSide();
+     if(side)speakFlashText(side,getFlashSpeakRate(side.lang));
    }
-   // 선택한 언어와 지금 보이는 면의 언어가 다르면 재생하지 않음
  }
 }
 async function speakFlashText(side,rateOverride=null){
@@ -3083,14 +3129,13 @@ function switchMode(mode){
  const changed=currentMode!==mode;
  currentMode=mode;
  if(changed)startStudyEntry();
- ['table','flash','scramble','molgong','keywordWrite','cloze','englishOnly','log'].forEach(m=>{
+ ['table','flash','scramble','molgong','keywordWrite','cloze','englishOnly'].forEach(m=>{
    const panel=document.getElementById('mode-'+m);
    const btn=document.getElementById('modeBtn-'+m);
    if(panel)panel.classList.toggle('active', m===mode);
    if(btn)btn.classList.toggle('active', m===mode);
  });
- if(mode==='log')renderLogView();
- if(changed&&mode!=='log')recordModeChange(mode);
+ if(changed)recordModeChange(mode);
 }
 document.getElementById('fileInput').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;const name=file.name.toLowerCase();if(name.endsWith('.txt')||name.endsWith('.csv')){document.getElementById('inputText').value=await file.text();parseText();return;}const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];const arr=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false});rows=[];arr.forEach(line=>{const ko=val(line,0),en=val(line,1);if(ko&&en&&!isHeader(ko,en))rows.push({ko,en,important:false,notMemorized:false,done:false});});document.getElementById('inputText').value=rows.map(r=>`${r.ko}\t${r.en}`).join('\n');renderTable();});
 function rateToEdge(v){const n=Number(v||1),pct=Math.round((n-1)*100);return pct===0?'+0%':pct>0?`+${pct}%`:`${pct}%`;}
@@ -3101,6 +3146,7 @@ function generatePython(mode='both'){if(!rows.length){alert('먼저 표를 생�
 function copyPython(){let code=document.getElementById('pythonCode').textContent||generatePython(currentPythonMode);if(!code)return;navigator.clipboard.writeText(code);}
 function downloadPython(){let code=document.getElementById('pythonCode').textContent||generatePython(currentPythonMode);if(!code)return;const suffix=currentPythonMode==='ko'?'_ko_onefile':currentPythonMode==='en'?'_en_onefile':'_sentence_files';const blob=new Blob([code],{type:'text/x-python'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(document.getElementById('baseName').value||'opic_practice')+suffix+'.py';a.click();URL.revokeObjectURL(a.href);}
 
+cleanLegacyLogData();
 loadCloudSettings();
 renderLogView();
 
