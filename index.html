@@ -653,6 +653,7 @@ function stripStress(text){return String(text??'').replace(/\[\[([\s\S]*?)\]\]/g
 const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycbxlrjhnLmeUKN3k6tA8rTKrODeO39ZYNwGTw4cIykD1ZNHikYlZHDKBLD2FZdslwgdo/exec';
 const MODE_LABELS={table:'표',flash:'플래시카드',scramble:'단어 배열',molgong:'몰공 모드',keywordWrite:'키워드 보고 적기',cloze:'빈칸 맞추기',englishOnly:'문장 읽기',log:'기록 보기'};
 const LOCAL_LOG_KEY='rr_local_log';
+const CLOUD_ALLOWED_TYPES=new Set(['answer_load','study_result']);
 function todayKey(){return new Date().toLocaleDateString('sv-SE');}
 function rowTitle(row){return [row?.sheetName,row?.itemLabel].filter(Boolean).join(' - ');}
 function cloudSettings(){return{user:localStorage.getItem('rr_cloud_user')||'hoonyB',url:CLOUD_SCRIPT_URL};}
@@ -668,6 +669,7 @@ function saveCloudSettings(){
  updateTodayStudyInfo();
 }
 function postCloudEvent(type,data={}){
+ if(!CLOUD_ALLOWED_TYPES.has(type))return;
  const s=cloudSettings();
  if(!s.user||!s.url)return;
  const payload={app:'RepeatRepeat',type,user:s.user,date:todayKey(),createdAt:new Date().toISOString(),...data};
@@ -682,8 +684,7 @@ function sendCloudTest(){
  saveCloudSettings();
  const s=cloudSettings();
  if(!s.user){alert('사용자/탭을 먼저 선택해줘.');return;}
- postCloudEvent('test',{mode:'설정 테스트',title:'연동 테스트'});
- alert('테스트 기록을 보냈어. 구글시트에서 확인해줘.');
+ alert('저장 대상은 '+s.user+' 탭이야. 실제 기록은 답변 불러오기/학습 완료 때만 남겨.');
 }
 function todayStats(){
  const key='rr_today_'+todayKey();
@@ -702,12 +703,12 @@ function addLocalLogEntry(entry){
  if(currentMode==='log')renderLogView();
 }
 function logTypeLabel(type){
- return {test:'저장 테스트',study_result:'학습 완료',cloud_error:'전송 오류'}[type]||type||'기록';
+ return {answer_load:'답변 불러오기',study_result:'학습 완료'}[type]||type||'기록';
 }
 function renderLogView(){
  const box=document.getElementById('logView');
  if(!box)return;
- const entries=localLogEntries().filter(e=>['study_result','test','cloud_error'].includes(e.type)).slice().reverse();
+ const entries=localLogEntries().filter(e=>['answer_load','study_result'].includes(e.type)).slice().reverse();
  const user=cloudSettings().user||'선택 안 됨';
  const today=todayKey();
  const todayEntries=entries.filter(e=>e.date===today);
@@ -757,6 +758,8 @@ function recordStudyResult(mode,total,wrong,source='끝까지 진행'){
  return true;
 }
 function recordAnswerLoad(item,source='답변 불러오기'){
+ if(!item)return;
+ postCloudEvent('answer_load',{mode:MODE_LABELS[currentMode]||currentMode,title:item.label||'',sheetName:item.sheetName||'',source,groupIndex:studyGroups.length?studyGroupIndex+1:'',groupTotal:studyGroups.length||''});
 }
 function recordQueuedAnswers(entries,source='선택 목록'){
 }
