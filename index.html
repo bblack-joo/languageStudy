@@ -227,6 +227,21 @@ tr.only-forget-hidden{display:none!important}
   <div class="brand-tagline">A language learning tool for studying any two languages.</div>
 </div>
 
+<div class="card">
+  <b>학습자 선택</b>
+  <div class="toolbar">
+    <label>사용자/탭
+      <select id="cloudUserName" onchange="saveCloudSettings()">
+        <option value="">선택</option>
+        <option value="mintB">mintB</option>
+        <option value="hoonyB">hoonyB</option>
+      </select>
+    </label>
+    <button class="green small" onclick="sendCloudTest()">저장 테스트</button>
+  </div>
+  <div class="hint">선택한 이름과 같은 구글시트 탭에 학습 기록이 저장돼.</div>
+</div>
+
 <div id="loadArea">
 <div class="card">
   <b>엑셀 파일 불러오기</b>
@@ -303,14 +318,6 @@ tr.only-forget-hidden{display:none!important}
   </div>
   <div id="currentItemInfo" class="hint"></div>
   <div id="todayStudyInfo" class="hint"></div>
-  <div class="toolbar"><button class="secondary small" id="cloudSettingsToggleBtn" onclick="toggleCloudSettings()">☁ 기록 저장 설정</button></div>
-  <div id="cloudSettingsBox" style="display:none">
-    <div class="toolbar">
-      <label>사용자/탭 <input id="cloudUserName" placeholder="구글시트 탭 이름" style="width:150px" onchange="saveCloudSettings()"></label>
-      <button class="green small" onclick="sendCloudTest()">테스트</button>
-    </div>
-    <div class="hint">저장 API는 앱에 고정돼 있어. 사용자 이름은 구글시트 탭 이름과 같아야 하고, 해당 탭이 이미 있을 때만 저장해.</div>
-  </div>
   <div class="toolbar">
     <span id="timerDisplay" class="flash-progress">00:00</span>
     <button class="green small" onclick="startTimer()">⏱ 시작</button>
@@ -625,28 +632,21 @@ function compactNo(u,g,q){return `${String(u).trim()}${String(g).trim()}${String
 function escapeHtml(s){return String(s??'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 function stripStress(text){return String(text??'').replace(/\[\[([\s\S]*?)\]\]/g,'$1');}
 const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycbxlrjhnLmeUKN3k6tA8rTKrODeO39ZYNwGTw4cIykD1ZNHikYlZHDKBLD2FZdslwgdo/exec';
+const MODE_LABELS={table:'표',flash:'플래시카드',scramble:'단어 배열',molgong:'몰공 모드',keywordWrite:'키워드 보고 적기',cloze:'빈칸 맞추기',englishOnly:'문장 읽기'};
 function todayKey(){return new Date().toLocaleDateString('sv-SE');}
 function rowTitle(row){return [row?.sheetName,row?.itemLabel].filter(Boolean).join(' - ');}
 function cloudSettings(){return{user:localStorage.getItem('rr_cloud_user')||'',url:CLOUD_SCRIPT_URL};}
 function loadCloudSettings(){
  const s=cloudSettings();
  const user=document.getElementById('cloudUserName');
- if(user)user.value=s.user;
+ if(user&&[...user.options].some(opt=>opt.value===s.user))user.value=s.user;
  updateTodayStudyInfo();
 }
 function saveCloudSettings(){
  const user=(document.getElementById('cloudUserName')?.value||'').trim();
  localStorage.setItem('rr_cloud_user',user);
  updateTodayStudyInfo();
-}
-function toggleCloudSettings(){
- const box=document.getElementById('cloudSettingsBox');
- const btn=document.getElementById('cloudSettingsToggleBtn');
- if(!box)return;
- const showing=box.style.display!=='none';
- box.style.display=showing?'none':'block';
- if(btn)btn.textContent=showing?'☁ 기록 저장 설정':'☁ 설정 숨기기';
- if(!showing)loadCloudSettings();
+ postCloudEvent('user_select',{mode:'사용자 선택',title:user});
 }
 function postCloudEvent(type,data={}){
  const s=cloudSettings();
@@ -659,7 +659,7 @@ function postCloudEvent(type,data={}){
 function sendCloudTest(){
  saveCloudSettings();
  const s=cloudSettings();
- if(!s.user){alert('사용자/탭 이름을 먼저 넣어줘.');return;}
+ if(!s.user){alert('사용자/탭을 먼저 선택해줘.');return;}
  postCloudEvent('test',{mode:'설정 테스트',title:'연동 테스트'});
  alert('테스트 기록을 보냈어. 구글시트에서 확인해줘.');
 }
@@ -676,7 +676,7 @@ function updateTodayStudyInfo(){
  if(!el)return;
  const s=todayStats();
  const cloud=cloudSettings();
- const cloudText=cloud.user&&cloud.url?` · 구글 저장: ${cloud.user}`:'';
+ const cloudText=cloud.user&&cloud.url?` · 구글 저장: ${cloud.user}`:' · 구글 저장: 사용자 선택 필요';
  el.textContent=`오늘 학습: ${s.sentences||0}문장 · 오답 ${s.wrong||0}개 · 완료 ${s.sessions||0}회${cloudText}`;
 }
 function recordStudyResult(mode,total,wrong){
@@ -686,6 +686,17 @@ function recordStudyResult(mode,total,wrong){
  stats.sessions=(stats.sessions||0)+1;
  saveTodayStats(stats);
  postCloudEvent('study_result',{mode,total,wrong,correct:Math.max(0,(total||0)-(wrong||0)),title:(currentQuestionItems||[]).map(item=>item.label).join(', ')});
+}
+function recordAnswerLoad(item,source='답변 불러오기'){
+ if(!item)return;
+ postCloudEvent('answer_load',{mode:MODE_LABELS[currentMode]||currentMode,title:item.label||'',sheetName:item.sheetName||'',source,groupIndex:studyGroups.length?studyGroupIndex+1:'',groupTotal:studyGroups.length||''});
+}
+function recordQueuedAnswers(entries,source='선택 목록'){
+ const labels=(entries||[]).map(x=>x.item?.label).filter(Boolean).join(', ');
+ if(labels)postCloudEvent('answer_queue',{mode:source,title:labels,total:(entries||[]).length});
+}
+function recordModeChange(mode){
+ postCloudEvent('mode_change',{mode:MODE_LABELS[mode]||mode,title:(currentQuestionItems||[]).map(item=>item.label).join(', ')});
 }
 function markAutoNotMemorized(row,mode,reason='오답'){
  if(!row||!(row.ko||row.en))return;
@@ -1085,6 +1096,7 @@ function loadStudyGroup(index=0){
  const group=studyGroups[studyGroupIndex];
  showQuestions([group.item]);
  setRows(group.pairs,true);
+ recordAnswerLoad(group.item,index===0?'선택 답변 시작':'다음 답변');
  return true;
 }
 function loadStudyGroups(groups){
@@ -1096,6 +1108,7 @@ function loadQueuedItems(){
  stopSpeak();
  const entries=selectedItemKeys.map(normalizeQueueEntry).map(entry=>({entry,item:BOOK.items.find(item=>item.key===entry.key)})).filter(x=>x.item);
  if(!entries.length){loadSelectedItem();return;}
+ recordQueuedAnswers(entries,'선택 답변 불러오기');
  const groups=makeStudyGroups(entries);
  if(!groups.length){alert('불러올 문장이 없어.');return;}
  loadStudyGroups(groups);
@@ -1111,8 +1124,10 @@ function loadQueuedImportantOnly(){
   clearStudyGroups();
   showQuestions([selected.item]);
   setRows(pairs);
+  recordAnswerLoad(selected.item,'핵심 문장 불러오기');
   return;
  }
+ recordQueuedAnswers(entries,'핵심 문장들만 불러오기');
  const groups=makeStudyGroups(entries,(item)=>itemToImportantPairs(item));
  if(!groups.length){alert('선택한 목록에 핵심 문장이 없어.');return;}
  loadStudyGroups(groups);
@@ -1321,7 +1336,7 @@ function copyKeyword(id){
 }
 function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox','molgongQuestionBox','keywordWriteQuestionBox','clozeQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList','molgongQuestionList','keywordWriteQuestionList','clozeQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});['flash','scramble','molgong','keywordWrite','cloze'].forEach(mode=>setStudyQuestionToggle(mode,false));}
 function setRows(pairs,preserveGroups=false){if(!preserveGroups)clearStudyGroups();document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',flowText:i.flowText||'',done:false})).filter(i=>i.ko||i.en);renderTable();}
-function loadSelectedItem(){stopSpeak();clearStudyGroups();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));}
+function loadSelectedItem(){stopSpeak();clearStudyGroups();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));recordAnswerLoad(item,'선택 답변 불러오기');}
 function canLoadNextSelectedItem(){
  const select=document.getElementById('unitSelect');
  if((currentQuestionItems||[]).length!==1)return false;
@@ -1382,6 +1397,7 @@ function loadImportantItems(){
  if(!list.length){alert('선택한 범위에 중요도 1인 묶음이 없어.');return;}
  showQuestions(list);
  setRows(list.flatMap(itemToPairs));
+ postCloudEvent('answer_load',{mode:MODE_LABELS[currentMode]||currentMode,title:list.map(item=>item.label).join(', '),source:'선택 중요문장',total:list.length});
 }
 function loadAllImportantItems(){
  stopSpeak();
@@ -1390,6 +1406,7 @@ function loadAllImportantItems(){
  if(!list.length){alert('문장집 전체에 중요도 1인 묶음이 없어.');return;}
  showQuestions(list);
  setRows(list.flatMap(itemToPairs));
+ postCloudEvent('answer_load',{mode:MODE_LABELS[currentMode]||currentMode,title:list.map(item=>item.label).join(', '),source:'전체 중요문장',total:list.length});
 }
 function loadRandomImportantItem(){
  stopSpeak();
@@ -1399,8 +1416,9 @@ function loadRandomImportantItem(){
  const picked=list[Math.floor(Math.random()*list.length)];
  showQuestions([picked]);
  setRows(itemToPairs(picked));
+ recordAnswerLoad(picked,'중요문장 랜덤 1개');
 }
-function loadAllItems(){stopSpeak();if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}const list=getFilteredItems();if(!list.length){alert('선택한 Unit에 불러올 문장이 없어.');return;}showQuestions(list);setRows(list.flatMap(itemToPairs));}
+function loadAllItems(){stopSpeak();clearStudyGroups();if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}const list=getFilteredItems();if(!list.length){alert('선택한 Unit에 불러올 문장이 없어.');return;}showQuestions(list);setRows(list.flatMap(itemToPairs));postCloudEvent('answer_load',{mode:MODE_LABELS[currentMode]||currentMode,title:list.map(item=>item.label).join(', '),source:'전체 문장',total:list.length});}
 function shuffleArray(a){return a.map(v=>({v,s:Math.random()})).sort((x,y)=>x.s-y.s).map(x=>x.v)}
 function loadRandomItems(){
  stopSpeak();
@@ -2987,6 +3005,7 @@ function applyActionsVisibility(){document.querySelectorAll('.actions-col,.actio
 function toggleActionsColumn(btn){actionsVisible=!actionsVisible;applyActionsVisibility();}
 let currentMode='flash';
 function switchMode(mode){
+ const changed=currentMode!==mode;
  currentMode=mode;
  ['table','flash','scramble','molgong','keywordWrite','cloze','englishOnly'].forEach(m=>{
    const panel=document.getElementById('mode-'+m);
@@ -2994,6 +3013,7 @@ function switchMode(mode){
    if(panel)panel.classList.toggle('active', m===mode);
    if(btn)btn.classList.toggle('active', m===mode);
  });
+ if(changed)recordModeChange(mode);
 }
 document.getElementById('fileInput').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;const name=file.name.toLowerCase();if(name.endsWith('.txt')||name.endsWith('.csv')){document.getElementById('inputText').value=await file.text();parseText();return;}const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];const arr=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false});rows=[];arr.forEach(line=>{const ko=val(line,0),en=val(line,1);if(ko&&en&&!isHeader(ko,en))rows.push({ko,en,important:false,notMemorized:false,done:false});});document.getElementById('inputText').value=rows.map(r=>`${r.ko}\t${r.en}`).join('\n');renderTable();});
 function rateToEdge(v){const n=Number(v||1),pct=Math.round((n-1)*100);return pct===0?'+0%':pct>0?`+${pct}%`:`${pct}%`;}
