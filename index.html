@@ -198,7 +198,7 @@ tr.only-forget-hidden{display:none!important}
 .keyword-write-result table{table-layout:fixed}
 .keyword-write-result .keyword-col{width:24%;word-break:break-word;white-space:pre-wrap}
 .english-only-list{margin-top:12px;padding:12px;background:var(--filter-tint);border:1px solid var(--border);border-radius:12px}
-.english-only-topbar{display:flex;justify-content:flex-end;align-items:center;margin-bottom:10px}
+.english-only-topbar{display:flex;justify-content:flex-end;align-items:center;gap:7px;margin-bottom:10px}
 .english-answer-card{background:#fff;border:1px solid #D8CCBC;border-radius:10px;padding:14px 16px;margin:0 0 14px;box-shadow:0 1px 2px rgba(42,36,32,.04)}
 .english-answer-card:last-child{margin-bottom:0}
 .english-answer-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
@@ -299,6 +299,7 @@ tr.only-forget-hidden{display:none!important}
 <div class="hint">단어, 표현, 문장을 적고 원하는 질문을 누르면 ChatGPT 새 탭이 열려. 질문문은 클립보드에도 같이 복사돼.</div>
 <textarea id="chatGptInput" placeholder="예: get used to / I usually spend time at home." style="height:70px" oninput="autoGrow(this)"></textarea>
 <div class="toolbar">
+  <button class="secondary small" onclick="askChatGpt('simple')">간단히</button>
   <button class="green small" onclick="askChatGpt('meaning')">뜻 물어보기</button>
   <button class="green small" onclick="askChatGpt('examples')">예문 물어보기</button>
   <button class="orange small" onclick="askChatGpt('opic')">오픽식으로 바꾸기</button>
@@ -349,6 +350,8 @@ tr.only-forget-hidden{display:none!important}
 <div class="toolbar"><button id="koToggleBtn" class="green small" onclick="displayRow('ko')">한글 숨기기</button><button id="enToggleBtn" class="green small" onclick="displayRow('en')">영어 숨기기</button><button id="practiceToggleBtn" class="green small" onclick="togglePracticeColumn(this)">✍ 연습칸 숨기기</button><button id="actionsToggleBtn" class="green small" onclick="toggleActionsColumn(this)">기능 숨기기</button><button id="forgetOnlyBtn" class="orange small" onclick="toggleForgetOnly(this)">☑ 안 외워진 것만 보기</button></div>
 <div class="toolbar-label">연습 관리</div>
 <div class="toolbar"><span class="hint" style="margin:0 4px 0 0">연습칸에 적어보며 외우기</span><button class="green small" onclick="copyPracticeColumn()">✍ 연습 복사</button><button class="gray small" onclick="clearCurrentPractice()">현재 표 연습 삭제</button><button class="red small" onclick="clearAllPractice()">전체 연습 삭제</button></div>
+<div class="toolbar-label">학습 완료</div>
+<div class="toolbar"><button class="green small" onclick="completeTableStudy('읽기 완료')">읽기 완료</button><button class="green small" onclick="completeTableStudy('타이핑 완료')">타이핑 완료</button></div>
 <div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">✓</th><th class="num">번호</th><th class="kr">한글 <button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="practice-cell">✍ 연습</th><th class="actions actions-header">기능</th></tr></thead><tbody></tbody></table></div>
 </div>
 
@@ -663,7 +666,6 @@ function saveCloudSettings(){
  const user=(document.getElementById('cloudUserName')?.value||'').trim();
  localStorage.setItem('rr_cloud_user',user);
  updateTodayStudyInfo();
- postCloudEvent('user_select',{mode:'사용자 선택',title:user});
 }
 function postCloudEvent(type,data={}){
  const s=cloudSettings();
@@ -700,12 +702,12 @@ function addLocalLogEntry(entry){
  if(currentMode==='log')renderLogView();
 }
 function logTypeLabel(type){
- return {user_select:'사용자 선택',test:'저장 테스트',answer_load:'답변 불러오기',answer_queue:'선택 목록',mode_change:'모드 변경',study_result:'학습 완료',not_memorized:'안외워짐',cloud_error:'전송 오류'}[type]||type||'기록';
+ return {test:'저장 테스트',study_result:'학습 완료',cloud_error:'전송 오류'}[type]||type||'기록';
 }
 function renderLogView(){
  const box=document.getElementById('logView');
  if(!box)return;
- const entries=localLogEntries().slice().reverse();
+ const entries=localLogEntries().filter(e=>['study_result','test','cloud_error'].includes(e.type)).slice().reverse();
  const user=cloudSettings().user||'선택 안 됨';
  const today=todayKey();
  const todayEntries=entries.filter(e=>e.date===today);
@@ -716,10 +718,10 @@ function renderLogView(){
  }
  const rowsHtml=entries.slice(0,200).map(e=>{
   const time=e.createdAt?new Date(e.createdAt).toLocaleString():'';
-  const detail=[e.source,e.total?`총 ${escapeHtml(e.total)}`:'',e.correct!==undefined?`정답 ${escapeHtml(e.correct)}`:'',e.wrong!==undefined?`오답 ${escapeHtml(e.wrong)}`:'',e.groupIndex?`${escapeHtml(e.groupIndex)}/${escapeHtml(e.groupTotal||'')}`:'',e.reason].filter(Boolean).join(' · ');
+  const detail=[e.source,e.total?`총 ${escapeHtml(e.total)}`:'',e.groupIndex?`${escapeHtml(e.groupIndex)}/${escapeHtml(e.groupTotal||'')}`:''].filter(Boolean).join(' · ');
   return `<tr><td>${escapeHtml(time)}</td><td>${escapeHtml(e.user||'')}</td><td>${escapeHtml(logTypeLabel(e.type))}</td><td>${escapeHtml(e.mode||'')}</td><td>${escapeHtml(e.title||e.sheetName||'')}</td><td>${detail||'-'}</td></tr>`;
  }).join('');
- box.innerHTML=`<div class="log-summary"><span class="log-pill">현재 사용자: ${escapeHtml(user)}</span><span class="log-pill">오늘 기록: ${todayEntries.length}개</span><span class="log-pill">전체 기록: ${entries.length}개</span><span class="log-pill">오늘 학습: ${study.sentences||0}문장</span><span class="log-pill">오늘 오답: ${study.wrong||0}개</span></div><table class="log-table"><thead><tr><th>시간</th><th>사용자</th><th>종류</th><th>모드</th><th>답변/제목</th><th>내용</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
+ box.innerHTML=`<div class="log-summary"><span class="log-pill">현재 사용자: ${escapeHtml(user)}</span><span class="log-pill">오늘 기록: ${todayEntries.length}개</span><span class="log-pill">전체 기록: ${entries.length}개</span><span class="log-pill">오늘 학습: ${study.sentences||0}문장</span><span class="log-pill">완료: ${study.sessions||0}회</span></div><table class="log-table"><thead><tr><th>시간</th><th>사용자</th><th>종류</th><th>모드</th><th>답변/제목</th><th>내용</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
 }
 function clearLocalLog(){
  if(!confirm('앱 안에 저장된 로컬 기록을 비울까요? 구글시트 기록은 삭제되지 않아.'))return;
@@ -736,26 +738,29 @@ function updateTodayStudyInfo(){
  const s=todayStats();
  const cloud=cloudSettings();
  const cloudText=cloud.user&&cloud.url?` · 구글 저장: ${cloud.user}`:' · 구글 저장: 사용자 선택 필요';
- el.textContent=`오늘 학습: ${s.sentences||0}문장 · 오답 ${s.wrong||0}개 · 완료 ${s.sessions||0}회${cloudText}`;
+ el.textContent=`오늘 학습: ${s.sentences||0}문장 · 완료 ${s.sessions||0}회${cloudText}`;
 }
-function recordStudyResult(mode,total,wrong){
+let studyEntryToken=Date.now(),completedStudyKeys=new Set();
+function startStudyEntry(){
+ studyEntryToken=Date.now()+'_'+Math.random().toString(36).slice(2);
+ completedStudyKeys=new Set();
+}
+function recordStudyResult(mode,total,wrong,source='끝까지 진행'){
+ const key=`${studyEntryToken}|${mode}|${source}`;
+ if(completedStudyKeys.has(key))return false;
+ completedStudyKeys.add(key);
  const stats=todayStats();
  stats.sentences=(stats.sentences||0)+(total||0);
- stats.wrong=(stats.wrong||0)+(wrong||0);
  stats.sessions=(stats.sessions||0)+1;
  saveTodayStats(stats);
- postCloudEvent('study_result',{mode,total,wrong,correct:Math.max(0,(total||0)-(wrong||0)),title:(currentQuestionItems||[]).map(item=>item.label).join(', ')});
+ postCloudEvent('study_result',{mode,total,source,title:(currentQuestionItems||[]).map(item=>item.label).join(', ')});
+ return true;
 }
 function recordAnswerLoad(item,source='답변 불러오기'){
- if(!item)return;
- postCloudEvent('answer_load',{mode:MODE_LABELS[currentMode]||currentMode,title:item.label||'',sheetName:item.sheetName||'',source,groupIndex:studyGroups.length?studyGroupIndex+1:'',groupTotal:studyGroups.length||''});
 }
 function recordQueuedAnswers(entries,source='선택 목록'){
- const labels=(entries||[]).map(x=>x.item?.label).filter(Boolean).join(', ');
- if(labels)postCloudEvent('answer_queue',{mode:source,title:labels,total:(entries||[]).length});
 }
 function recordModeChange(mode){
- postCloudEvent('mode_change',{mode:MODE_LABELS[mode]||mode,title:(currentQuestionItems||[]).map(item=>item.label).join(', ')});
 }
 function markAutoNotMemorized(row,mode,reason='오답'){
  if(!row||!(row.ko||row.en))return;
@@ -767,7 +772,6 @@ function markAutoNotMemorized(row,mode,reason='오답'){
  if(check)check.checked=true;
  if(tr&&showOnlyNotMemorized)tr.classList.remove('only-forget-hidden');
  updateCountInfo();
- postCloudEvent('not_memorized',{mode,reason,title:rowTitle(row),ko:row.ko||'',en:stripStress(row.en||'')});
 }
 
 function formatStress(text){
@@ -1394,7 +1398,7 @@ function copyKeyword(id){
  navigator.clipboard.writeText(box.textContent||'');
 }
 function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox','molgongQuestionBox','keywordWriteQuestionBox','clozeQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList','molgongQuestionList','keywordWriteQuestionList','clozeQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});['flash','scramble','molgong','keywordWrite','cloze'].forEach(mode=>setStudyQuestionToggle(mode,false));}
-function setRows(pairs,preserveGroups=false){if(!preserveGroups)clearStudyGroups();document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',flowText:i.flowText||'',done:false})).filter(i=>i.ko||i.en);renderTable();}
+function setRows(pairs,preserveGroups=false){if(!preserveGroups)clearStudyGroups();startStudyEntry();document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',flowText:i.flowText||'',done:false})).filter(i=>i.ko||i.en);renderTable();}
 function loadSelectedItem(){stopSpeak();clearStudyGroups();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));recordAnswerLoad(item,'선택 답변 불러오기');}
 function canLoadNextSelectedItem(){
  const select=document.getElementById('unitSelect');
@@ -1456,7 +1460,6 @@ function loadImportantItems(){
  if(!list.length){alert('선택한 범위에 중요도 1인 묶음이 없어.');return;}
  showQuestions(list);
  setRows(list.flatMap(itemToPairs));
- postCloudEvent('answer_load',{mode:MODE_LABELS[currentMode]||currentMode,title:list.map(item=>item.label).join(', '),source:'선택 중요문장',total:list.length});
 }
 function loadAllImportantItems(){
  stopSpeak();
@@ -1465,7 +1468,6 @@ function loadAllImportantItems(){
  if(!list.length){alert('문장집 전체에 중요도 1인 묶음이 없어.');return;}
  showQuestions(list);
  setRows(list.flatMap(itemToPairs));
- postCloudEvent('answer_load',{mode:MODE_LABELS[currentMode]||currentMode,title:list.map(item=>item.label).join(', '),source:'전체 중요문장',total:list.length});
 }
 function loadRandomImportantItem(){
  stopSpeak();
@@ -1477,7 +1479,7 @@ function loadRandomImportantItem(){
  setRows(itemToPairs(picked));
  recordAnswerLoad(picked,'중요문장 랜덤 1개');
 }
-function loadAllItems(){stopSpeak();clearStudyGroups();if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}const list=getFilteredItems();if(!list.length){alert('선택한 Unit에 불러올 문장이 없어.');return;}showQuestions(list);setRows(list.flatMap(itemToPairs));postCloudEvent('answer_load',{mode:MODE_LABELS[currentMode]||currentMode,title:list.map(item=>item.label).join(', '),source:'전체 문장',total:list.length});}
+function loadAllItems(){stopSpeak();clearStudyGroups();if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}const list=getFilteredItems();if(!list.length){alert('선택한 Unit에 불러올 문장이 없어.');return;}showQuestions(list);setRows(list.flatMap(itemToPairs));}
 function shuffleArray(a){return a.map(v=>({v,s:Math.random()})).sort((x,y)=>x.s-y.s).map(x=>x.v)}
 function loadRandomItems(){
  stopSpeak();
@@ -1557,6 +1559,7 @@ function toggleChatGptBox(){
 }
 function buildChatGptPrompt(kind,text){
  const value=String(text||'').trim();
+ if(kind==='simple')return `${value} 설명해줘`;
  if(kind==='meaning')return `영어 표현 "${value}"의 뜻을 한국어로 쉽게 설명하고, 자연스러운 영어 예문 5개와 오픽 답변에서 쓸 수 있는 짧은 문장 3개를 알려줘.`;
  if(kind==='examples')return `영어 표현 "${value}"을 실제 회화와 오픽 답변에서 자연스럽게 쓰는 예문을 알려줘. 쉬운 문장부터 조금 긴 문장까지 단계별로 보여줘.`;
  if(kind==='opic')return `다음 표현이나 문장을 오픽 답변에서 자연스럽게 쓸 수 있게 바꿔줘. 쉬운 버전, 자연스러운 버전, 조금 더 길게 말하는 버전으로 보여줘: "${value}"`;
@@ -2876,7 +2879,7 @@ function renderEnglishOnly(){
  let groupStartIndex=0;
  const lines=[];
  ENGLISH_ONLY_COPY={all:formatEnglishOnlyCopyItems(list)};
- lines.push('<div class="english-only-topbar"><button class="secondary small" onclick="copyEnglishOnlyText(\'all\', \'전체 문장\')">전체 복사</button></div>');
+ lines.push('<div class="english-only-topbar"><button class="green small" onclick="completeEnglishOnlyStudy()">읽기 완료</button><button class="secondary small" onclick="copyEnglishOnlyText(\'all\', \'전체 문장\')">전체 복사</button></div>');
  list.forEach((x,idx)=>{
   if(idx===0 || x.title!==lastTitle){
    lastTitle=x.title;
@@ -2900,6 +2903,16 @@ function renderEnglishOnly(){
   }
  });
  box.innerHTML=lines.join('')+nextAnswerButtonHtml();
+}
+
+function completeTableStudy(source){
+ if(!rows.length){alert('먼저 문장을 불러와줘.');return;}
+ recordStudyResult('표',rows.length,0,source);
+}
+
+function completeEnglishOnlyStudy(){
+ if(!rows.length){alert('먼저 문장을 불러와줘.');return;}
+ recordStudyResult('문장 읽기',rows.filter(r=>String(r.en||'').trim()).length,0,'읽기 완료');
 }
 
 function copyEnglishOnlyText(id,label){
@@ -3066,6 +3079,7 @@ let currentMode='flash';
 function switchMode(mode){
  const changed=currentMode!==mode;
  currentMode=mode;
+ if(changed)startStudyEntry();
  ['table','flash','scramble','molgong','keywordWrite','cloze','englishOnly','log'].forEach(m=>{
    const panel=document.getElementById('mode-'+m);
    const btn=document.getElementById('modeBtn-'+m);
