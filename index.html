@@ -302,6 +302,15 @@ tr.only-forget-hidden{display:none!important}
     <button class="gray" onclick="clearAll()">초기화</button>
   </div>
   <div id="currentItemInfo" class="hint"></div>
+  <div id="todayStudyInfo" class="hint"></div>
+  <div class="toolbar"><button class="secondary small" id="cloudSettingsToggleBtn" onclick="toggleCloudSettings()">☁ 기록 저장 설정</button></div>
+  <div id="cloudSettingsBox" style="display:none">
+    <div class="toolbar">
+      <label>사용자/탭 <input id="cloudUserName" placeholder="구글시트 탭 이름" style="width:150px" onchange="saveCloudSettings()"></label>
+      <button class="green small" onclick="sendCloudTest()">테스트</button>
+    </div>
+    <div class="hint">저장 API는 앱에 고정돼 있어. 사용자 이름은 구글시트 탭 이름과 같아야 하고, 해당 탭이 이미 있을 때만 저장해.</div>
+  </div>
   <div class="toolbar">
     <span id="timerDisplay" class="flash-progress">00:00</span>
     <button class="green small" onclick="startTimer()">⏱ 시작</button>
@@ -615,6 +624,81 @@ function keyOf(u,g,q){return `${String(u).trim()}|${String(g).trim()}|${String(q
 function compactNo(u,g,q){return `${String(u).trim()}${String(g).trim()}${String(q).trim()}`;}
 function escapeHtml(s){return String(s??'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 function stripStress(text){return String(text??'').replace(/\[\[([\s\S]*?)\]\]/g,'$1');}
+const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycbxlrjhnLmeUKN3k6tA8rTKrODeO39ZYNwGTw4cIykD1ZNHikYlZHDKBLD2FZdslwgdo/exec';
+function todayKey(){return new Date().toLocaleDateString('sv-SE');}
+function rowTitle(row){return [row?.sheetName,row?.itemLabel].filter(Boolean).join(' - ');}
+function cloudSettings(){return{user:localStorage.getItem('rr_cloud_user')||'',url:CLOUD_SCRIPT_URL};}
+function loadCloudSettings(){
+ const s=cloudSettings();
+ const user=document.getElementById('cloudUserName');
+ if(user)user.value=s.user;
+ updateTodayStudyInfo();
+}
+function saveCloudSettings(){
+ const user=(document.getElementById('cloudUserName')?.value||'').trim();
+ localStorage.setItem('rr_cloud_user',user);
+ updateTodayStudyInfo();
+}
+function toggleCloudSettings(){
+ const box=document.getElementById('cloudSettingsBox');
+ const btn=document.getElementById('cloudSettingsToggleBtn');
+ if(!box)return;
+ const showing=box.style.display!=='none';
+ box.style.display=showing?'none':'block';
+ if(btn)btn.textContent=showing?'☁ 기록 저장 설정':'☁ 설정 숨기기';
+ if(!showing)loadCloudSettings();
+}
+function postCloudEvent(type,data={}){
+ const s=cloudSettings();
+ if(!s.user||!s.url)return;
+ const payload={app:'RepeatRepeat',type,user:s.user,date:todayKey(),createdAt:new Date().toISOString(),...data};
+ try{
+  fetch(s.url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+ }catch(e){}
+}
+function sendCloudTest(){
+ saveCloudSettings();
+ const s=cloudSettings();
+ if(!s.user){alert('사용자/탭 이름을 먼저 넣어줘.');return;}
+ postCloudEvent('test',{mode:'설정 테스트',title:'연동 테스트'});
+ alert('테스트 기록을 보냈어. 구글시트에서 확인해줘.');
+}
+function todayStats(){
+ const key='rr_today_'+todayKey();
+ try{return JSON.parse(localStorage.getItem(key)||'{}')||{};}catch(e){return{};}
+}
+function saveTodayStats(stats){
+ localStorage.setItem('rr_today_'+todayKey(),JSON.stringify(stats));
+ updateTodayStudyInfo();
+}
+function updateTodayStudyInfo(){
+ const el=document.getElementById('todayStudyInfo');
+ if(!el)return;
+ const s=todayStats();
+ const cloud=cloudSettings();
+ const cloudText=cloud.user&&cloud.url?` · 구글 저장: ${cloud.user}`:'';
+ el.textContent=`오늘 학습: ${s.sentences||0}문장 · 오답 ${s.wrong||0}개 · 완료 ${s.sessions||0}회${cloudText}`;
+}
+function recordStudyResult(mode,total,wrong){
+ const stats=todayStats();
+ stats.sentences=(stats.sentences||0)+(total||0);
+ stats.wrong=(stats.wrong||0)+(wrong||0);
+ stats.sessions=(stats.sessions||0)+1;
+ saveTodayStats(stats);
+ postCloudEvent('study_result',{mode,total,wrong,correct:Math.max(0,(total||0)-(wrong||0)),title:(currentQuestionItems||[]).map(item=>item.label).join(', ')});
+}
+function markAutoNotMemorized(row,mode,reason='오답'){
+ if(!row||!(row.ko||row.en))return;
+ try{localStorage.setItem(sentenceMemoryKey(row),'1');}catch(e){}
+ row.notMemorized=true;
+ const rowIndex=rows.indexOf(row);
+ const tr=rowIndex>=0?document.getElementById('row'+rowIndex):null;
+ const check=tr?.querySelector('.forget-check');
+ if(check)check.checked=true;
+ if(tr&&showOnlyNotMemorized)tr.classList.remove('only-forget-hidden');
+ updateCountInfo();
+ postCloudEvent('not_memorized',{mode,reason,title:rowTitle(row),ko:row.ko||'',en:stripStress(row.en||'')});
+}
 
 function formatStress(text){
     return escapeHtml(String(text || ''))
@@ -880,7 +964,9 @@ function renderItemSelect(){
  renderSelectedItemQueue();
 }
 
-function itemToPairs(item){const flowText=(item.flows||[]).map(x=>String(x).trim()).filter(Boolean).join('\n');return item.answers.map(a=>({ko:a.ko,en:a.en,important:!!a.important,notMemorized:!!a.notMemorized,itemLabel:item.label||'',sheetName:item.sheetName||'',flowText}));}
+function sentenceMemoryKey(row){return 'ls_auto_forget_'+storageSafe((row?.en||'')+'|'+(row?.ko||''));}
+function isAutoNotMemorized(row){try{return localStorage.getItem(sentenceMemoryKey(row))==='1';}catch(e){return false;}}
+function itemToPairs(item){const flowText=(item.flows||[]).map(x=>String(x).trim()).filter(Boolean).join('\n');return item.answers.map(a=>({ko:a.ko,en:a.en,important:!!a.important,notMemorized:!!a.notMemorized||isAutoNotMemorized(a),itemLabel:item.label||'',sheetName:item.sheetName||'',flowText}));}
 function itemToImportantPairs(item){return itemToPairs(item).filter(p=>p.important);}
 function itemToNotMemorizedPairs(item){return itemToPairs(item).filter(p=>p.notMemorized);}
 function itemOptionLabel(item){
@@ -1705,13 +1791,17 @@ function showFlashAllSentences(){
  if(!items.length){hideFlashResult();return;}
  const mode=document.getElementById('flashMode')?.value||'ko_en';
  const answerLang=(mode==='en_ko'||mode==='ko_only')?'ko':'en';
+ let wrongCount=0;
  let html='<div><b>플래시카드 결과</b></div><table><thead><tr><th class="num-col">번호</th><th>내가 쓴 문장</th><th>정답</th></tr></thead><tbody>';
  html+=items.map(item=>{
   const myAnswer=flashScratchAnswers[item.pos-1]||'';
   const correct=answerLang==='ko'?(item.row.ko||''):(item.row.en||'');
+  const isWrong=normalizeForCompare(myAnswer)!==normalizeForCompare(stripStress(correct));
+  if(isWrong){wrongCount++;markAutoNotMemorized(item.row,'플래시카드','직접 쓴 답 비교');}
   const correctHtml=answerLang==='ko'?escapeHtml(correct):formatStress(correct);
   return `<tr><td class="num-col">${item.pos}</td><td style="white-space:pre-wrap">${escapeHtml(myAnswer)}</td><td>${correctHtml}</td></tr>`;
  }).join('');
+ recordStudyResult('플래시카드',items.length,wrongCount);
  html+='</tbody></table>'+nextAnswerButtonHtml();
  res.innerHTML=html;
  res.classList.remove('flash-hidden');
@@ -2133,12 +2223,15 @@ function finishScramble(){
  if(res){
    res.classList.remove('flash-hidden');
    const total=scrambleOrderList.length;
-   const wrongCount=scrambleWrongs.length;
+   const uniqueWrongRows=[...new Map(scrambleWrongs.map(w=>[w.rowIndex,w])).values()];
+   uniqueWrongRows.forEach(w=>markAutoNotMemorized(rows[w.rowIndex],'단어배열','오답'));
+   const wrongCount=uniqueWrongRows.length;
    const correctCount=total-wrongCount;
+   recordStudyResult('단어배열',total,wrongCount);
    let html=`<div><b>결과: ${total}문장 중 정답 ${correctCount}개 / 오답 ${wrongCount}개</b></div>`;
    if(wrongCount){
      html+='<table><thead><tr><th class="num-col">번호</th><th>한글</th><th>영어</th></tr></thead><tbody>';
-     html+=scrambleWrongs.map(w=>`<tr><td class="num-col">${w.rowIndex+1}</td><td>${escapeHtml(w.ko)}</td><td>${formatStress(w.en)}</td></tr>`).join('');
+     html+=uniqueWrongRows.map(w=>`<tr><td class="num-col">${w.rowIndex+1}</td><td>${escapeHtml(w.ko)}</td><td>${formatStress(w.en)}</td></tr>`).join('');
      html+='</tbody></table>';
    }else{
      html+='<div style="margin-top:8px">오답 없이 전부 맞췄어! 🎉</div>';
@@ -2258,6 +2351,7 @@ function prevMolgong(){
 }
 function finishMolgong(){
  molgongFinished=true;
+ recordStudyResult('몰공 모드',molgongOrderList.length,0);
  renderMolgong(false);
 }
 
@@ -2350,6 +2444,7 @@ function prevKeywordWrite(){
 function finishKeywordWrite(){
  saveKeywordWriteAnswer();
  keywordWriteFinished=true;
+ recordStudyResult('키워드 보고 적기',keywordWriteList.length,0);
  renderKeywordWrite(false);
  showKeywordWriteResult();
 }
@@ -2636,20 +2731,18 @@ function finishCloze(){
 function showClozeResult(){
  const res=document.getElementById('clozeResult');
  if(!res)return;
+ let wrongCount=0;
  const rowsHtml=clozeOrderList.map((rowIndex,i)=>{
   const row=rows[rowIndex];
   const data=clozeData(row);
   const expected=data.answers.map(normalizeClozeToken);
   const actual=clozeInputWords(clozeAnswers[i]||'');
   const correct=expected.length===actual.length&&expected.every((word,idx)=>word===actual[idx]);
+  if(!correct){wrongCount++;markAutoNotMemorized(row,'빈칸 맞추기','오답');}
   return `<tr><td class="num-col">${i+1}</td><td>${escapeHtml(data.answerText)}</td><td style="white-space:pre-wrap">${escapeHtml(clozeAnswers[i]||'')}</td><td>${formatStress(data.fullText)}</td><td>${correct?'정답':'확인 필요'}</td></tr>`;
  }).join('');
- const correctCount=clozeOrderList.filter((rowIndex,i)=>{
-  const data=clozeData(rows[rowIndex]);
-  const expected=data.answers.map(normalizeClozeToken);
-  const actual=clozeInputWords(clozeAnswers[i]||'');
-  return expected.length===actual.length&&expected.every((word,idx)=>word===actual[idx]);
- }).length;
+ const correctCount=clozeOrderList.length-wrongCount;
+ recordStudyResult('빈칸 맞추기',clozeOrderList.length,wrongCount);
  res.innerHTML=`<div><b>결과: ${clozeOrderList.length}문장 중 정답 ${correctCount}개</b></div><table><thead><tr><th class="num-col">번호</th><th>빈칸 정답</th><th>내가 쓴 답</th><th>전체 문장</th><th>결과</th></tr></thead><tbody>${rowsHtml}</tbody></table>${nextAnswerButtonHtml()}`;
  res.classList.remove('flash-hidden');
 }
@@ -2911,6 +3004,7 @@ function generatePython(mode='both'){if(!rows.length){alert('먼저 표를 생�
 function copyPython(){let code=document.getElementById('pythonCode').textContent||generatePython(currentPythonMode);if(!code)return;navigator.clipboard.writeText(code);}
 function downloadPython(){let code=document.getElementById('pythonCode').textContent||generatePython(currentPythonMode);if(!code)return;const suffix=currentPythonMode==='ko'?'_ko_onefile':currentPythonMode==='en'?'_en_onefile':'_sentence_files';const blob=new Blob([code],{type:'text/x-python'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(document.getElementById('baseName').value||'opic_practice')+suffix+'.py';a.click();URL.revokeObjectURL(a.href);}
 
+loadCloudSettings();
 
 </script>
 </body>
