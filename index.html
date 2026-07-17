@@ -630,7 +630,7 @@ tr.only-forget-hidden{display:none!important}
 let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[],selectedItemKeys=[];
 let studyGroups=[],studyGroupIndex=0;
 let ENGLISH_ONLY_COPY={};
-let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0,flashAutoNextOn=false,flashAutoNextTimer=null;
+let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0,flashAutoNextOn=false,flashAutoNextTimer=null,flashAutoScheduleRunId=0;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
 function norm(s){return String(s??'').trim().replace(/\s+/g,'').toLowerCase();}
@@ -1673,23 +1673,24 @@ function getFlashDisplayedSpeakSide(){
 }
 async function playFlashSpeak(options={}){
  const row=getFlashCurrent();
- if(!row){if(!options.silent)alert('먼저 플래시카드를 시작해줘.');return;}
+ if(!row){if(!options.silent)alert('먼저 플래시카드를 시작해줘.');return false;}
  const side=getFlashDisplayedSpeakSide();
- if(!side){if(!options.silent)alert('현재 보이는 카드와 선택한 음성 모드가 맞지 않아.');return;}
- if(!side.plain){if(!options.silent)alert('읽을 내용이 없어.');return;}
+ if(!side){if(!options.silent)alert('현재 보이는 카드와 선택한 음성 모드가 맞지 않아.');return false;}
+ if(!side.plain){if(!options.silent)alert('읽을 내용이 없어.');return false;}
  const runId=++flashSpeakRunId;
  const repeatMode=!!document.getElementById('flashRepeatModeEnabled')?.checked;
  const repeat=repeatMode?Math.max(1,Number(document.getElementById('flashSpeakRepeat')?.value||3)):1;
  const infinite=repeatMode&&!!document.getElementById('flashSpeakInfinite')?.checked;
  for(let k=0;infinite||k<repeat;k++){
-   if(runId!==flashSpeakRunId)return;
+   if(runId!==flashSpeakRunId)return false;
    await speakFlashText(side,getFlashSpeakRate(side.lang));
-   if(runId!==flashSpeakRunId)return;
+   if(runId!==flashSpeakRunId)return false;
    if(infinite||k<repeat-1){
     await sleep(400);
-    if(runId!==flashSpeakRunId)return;
+    if(runId!==flashSpeakRunId)return false;
    }
  }
+ return true;
 }
 function stopFlashSpeakPlayback(){
  flashSpeakRunId++;
@@ -1745,12 +1746,17 @@ function updateFlashAutoNextButton(){
 }
 function stopFlashAutoNext(){
  flashAutoNextOn=false;
+ flashAutoScheduleRunId++;
  clearFlashAutoNextTimer();
  updateFlashAutoNextButton();
 }
 function toggleFlashAutoNext(){
  if(flashAutoNextOn){stopFlashAutoNext();return;}
- if(!flashOrderList.length) startFlashcards();
+ if(!flashOrderList.length){
+  if(!rows.length){alert('먼저 표를 생성해줘.');return;}
+  buildFlashOrder();
+  renderFlashcard(false);
+ }
  if(!flashOrderList.length)return;
  if(flashFinished){
   flashFinished=false;
@@ -1763,18 +1769,30 @@ function toggleFlashAutoNext(){
  updateFlashAutoNextButton();
  scheduleFlashAutoNext();
 }
-function scheduleFlashAutoNext(){
- clearFlashAutoNextTimer();
- updateFlashAutoNextButton();
- if(!flashAutoNextOn||flashFinished||!flashOrderList.length)return;
+function flashAutoDelaySec(){
  const frontSec=Math.max(0.5,Number(document.getElementById('flashAutoFrontSec')?.value||3));
  const backSec=Math.max(0.5,Number(document.getElementById('flashAutoBackSec')?.value||10));
- const sec=(!isFlashSingleMode()&&flashRevealed)?backSec:frontSec;
+ return (!isFlashSingleMode()&&flashRevealed)?backSec:frontSec;
+}
+function setFlashAutoAdvanceTimer(runId,sec){
+ if(runId!==flashAutoScheduleRunId||!flashAutoNextOn||flashFinished||!flashOrderList.length)return;
  flashAutoNextTimer=setTimeout(()=>{
   flashAutoNextTimer=null;
-  if(!flashAutoNextOn||flashFinished||!flashOrderList.length)return;
+  if(runId!==flashAutoScheduleRunId||!flashAutoNextOn||flashFinished||!flashOrderList.length)return;
   advanceFlashAutoNext();
  },sec*1000);
+}
+function scheduleFlashAutoNext(){
+ clearFlashAutoNextTimer();
+ const runId=++flashAutoScheduleRunId;
+ updateFlashAutoNextButton();
+ if(!flashAutoNextOn||flashFinished||!flashOrderList.length)return;
+ const sec=flashAutoDelaySec();
+ if(getFlashDisplayedSpeakSide()){
+  playFlashSpeak({silent:true}).then(()=>setFlashAutoAdvanceTimer(runId,sec));
+  return;
+ }
+ setFlashAutoAdvanceTimer(runId,sec);
 }
 function advanceFlashAutoNext(){
  if(!isFlashSingleMode()&&!flashRevealed){
@@ -1846,7 +1864,7 @@ function renderFlashcard(autoSpeak=false){
  if(prog)prog.textContent=`${flashIndex+1} / ${flashOrderList.length}`;
  if(bar)bar.style.width=`${Math.round(((flashIndex+1)/flashOrderList.length)*100)}%`;
  loadFlashScratch();
- if(autoSpeak){
+ if(autoSpeak&&!flashAutoNextOn){
    if(document.getElementById('flashRepeatModeEnabled')?.checked){
      playFlashSpeak({silent:true});
    }else{
