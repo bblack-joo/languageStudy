@@ -240,7 +240,7 @@ tr.only-forget-hidden{display:none!important}
       <select id="cloudUserName" onchange="saveCloudSettings()">
         <option value="">선택</option>
         <option value="mintB">mintB</option>
-        <option value="hoonyB">hoonyB</option>
+        <option value="hoonyB" selected>hoonyB</option>
       </select>
     </label>
     <button class="green small" onclick="sendCloudTest()">저장 테스트</button>
@@ -652,7 +652,7 @@ const MODE_LABELS={table:'표',flash:'플래시카드',scramble:'단어 배열',
 const LOCAL_LOG_KEY='rr_local_log';
 function todayKey(){return new Date().toLocaleDateString('sv-SE');}
 function rowTitle(row){return [row?.sheetName,row?.itemLabel].filter(Boolean).join(' - ');}
-function cloudSettings(){return{user:localStorage.getItem('rr_cloud_user')||'',url:CLOUD_SCRIPT_URL};}
+function cloudSettings(){return{user:localStorage.getItem('rr_cloud_user')||'hoonyB',url:CLOUD_SCRIPT_URL};}
 function loadCloudSettings(){
  const s=cloudSettings();
  const user=document.getElementById('cloudUserName');
