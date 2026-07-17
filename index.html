@@ -189,6 +189,12 @@ tr.only-forget-hidden{display:none!important}
 .scramble-result table{width:100%;border-collapse:collapse;margin-top:8px;background:#fff}
 .scramble-result td,.scramble-result th{border:1px solid var(--border);padding:6px 8px;font-size:13.5px;text-align:left}
 .scramble-result .num-col{width:52px;text-align:center}
+.log-summary{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.log-pill{background:#fff;border:1px solid var(--border);border-radius:999px;padding:5px 10px;font-size:12.5px;font-weight:800;color:var(--filter-dark)}
+.log-table{width:100%;border-collapse:collapse;background:#fff}
+.log-table th,.log-table td{border:1px solid var(--border);padding:6px 8px;font-size:13px;text-align:left;vertical-align:top}
+.log-table th{background:var(--filter-tint);color:var(--filter-dark)}
+.log-empty{padding:12px;background:#fff;border:1px solid var(--border);border-radius:10px;color:var(--text-muted);font-size:14px}
 .keyword-write-result table{table-layout:fixed}
 .keyword-write-result .keyword-col{width:24%;word-break:break-word;white-space:pre-wrap}
 .english-only-list{margin-top:12px;padding:12px;background:var(--filter-tint);border:1px solid var(--border);border-radius:12px}
@@ -314,6 +320,7 @@ tr.only-forget-hidden{display:none!important}
   <div class="toolbar mode-switch">
     <button id="modeBtn-table" class="mode-btn" onclick="switchMode('table')">📋 표</button>
     <button id="modeBtn-englishOnly" class="mode-btn" onclick="switchMode('englishOnly')">📖 문장 읽기</button>
+    <button id="modeBtn-log" class="mode-btn" onclick="switchMode('log')">📊 기록 보기</button>
     <button class="gray" onclick="clearAll()">초기화</button>
   </div>
   <div id="currentItemInfo" class="hint"></div>
@@ -610,6 +617,15 @@ tr.only-forget-hidden{display:none!important}
 <b>📖 문장 읽기</b>
 <div id="englishOnlyList" class="english-only-list"></div>
 </div>
+
+<div id="mode-log" class="card mode-panel">
+<b>📊 기록 보기</b>
+<div class="toolbar">
+  <button class="secondary small" onclick="renderLogView()">새로고침</button>
+  <button class="gray small" onclick="clearLocalLog()">로컬 기록 비우기</button>
+</div>
+<div id="logView" class="scramble-result"></div>
+</div>
 </div>
 <script>
 let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[],selectedItemKeys=[];
@@ -632,7 +648,8 @@ function compactNo(u,g,q){return `${String(u).trim()}${String(g).trim()}${String
 function escapeHtml(s){return String(s??'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 function stripStress(text){return String(text??'').replace(/\[\[([\s\S]*?)\]\]/g,'$1');}
 const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycbxlrjhnLmeUKN3k6tA8rTKrODeO39ZYNwGTw4cIykD1ZNHikYlZHDKBLD2FZdslwgdo/exec';
-const MODE_LABELS={table:'표',flash:'플래시카드',scramble:'단어 배열',molgong:'몰공 모드',keywordWrite:'키워드 보고 적기',cloze:'빈칸 맞추기',englishOnly:'문장 읽기'};
+const MODE_LABELS={table:'표',flash:'플래시카드',scramble:'단어 배열',molgong:'몰공 모드',keywordWrite:'키워드 보고 적기',cloze:'빈칸 맞추기',englishOnly:'문장 읽기',log:'기록 보기'};
+const LOCAL_LOG_KEY='rr_local_log';
 function todayKey(){return new Date().toLocaleDateString('sv-SE');}
 function rowTitle(row){return [row?.sheetName,row?.itemLabel].filter(Boolean).join(' - ');}
 function cloudSettings(){return{user:localStorage.getItem('rr_cloud_user')||'',url:CLOUD_SCRIPT_URL};}
@@ -652,9 +669,12 @@ function postCloudEvent(type,data={}){
  const s=cloudSettings();
  if(!s.user||!s.url)return;
  const payload={app:'RepeatRepeat',type,user:s.user,date:todayKey(),createdAt:new Date().toISOString(),...data};
+ addLocalLogEntry(payload);
  try{
   fetch(s.url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
- }catch(e){}
+ }catch(e){
+  addLocalLogEntry({...payload,type:'cloud_error',title:e?.message||'전송 오류'});
+ }
 }
 function sendCloudTest(){
  saveCloudSettings();
@@ -666,6 +686,45 @@ function sendCloudTest(){
 function todayStats(){
  const key='rr_today_'+todayKey();
  try{return JSON.parse(localStorage.getItem(key)||'{}')||{};}catch(e){return{};}
+}
+function localLogEntries(){
+ try{return JSON.parse(localStorage.getItem(LOCAL_LOG_KEY)||'[]')||[];}catch(e){return[];}
+}
+function saveLocalLogEntries(entries){
+ localStorage.setItem(LOCAL_LOG_KEY,JSON.stringify((entries||[]).slice(-500)));
+}
+function addLocalLogEntry(entry){
+ const entries=localLogEntries();
+ entries.push(entry);
+ saveLocalLogEntries(entries);
+ if(currentMode==='log')renderLogView();
+}
+function logTypeLabel(type){
+ return {user_select:'사용자 선택',test:'저장 테스트',answer_load:'답변 불러오기',answer_queue:'선택 목록',mode_change:'모드 변경',study_result:'학습 완료',not_memorized:'안외워짐',cloud_error:'전송 오류'}[type]||type||'기록';
+}
+function renderLogView(){
+ const box=document.getElementById('logView');
+ if(!box)return;
+ const entries=localLogEntries().slice().reverse();
+ const user=cloudSettings().user||'선택 안 됨';
+ const today=todayKey();
+ const todayEntries=entries.filter(e=>e.date===today);
+ const study=todayStats();
+ if(!entries.length){
+  box.innerHTML='<div class="log-empty">아직 기록이 없어. 학습자를 선택한 뒤 답변을 불러오거나 학습을 끝내면 여기에 보여.</div>';
+  return;
+ }
+ const rowsHtml=entries.slice(0,200).map(e=>{
+  const time=e.createdAt?new Date(e.createdAt).toLocaleString():'';
+  const detail=[e.source,e.total?`총 ${escapeHtml(e.total)}`:'',e.correct!==undefined?`정답 ${escapeHtml(e.correct)}`:'',e.wrong!==undefined?`오답 ${escapeHtml(e.wrong)}`:'',e.groupIndex?`${escapeHtml(e.groupIndex)}/${escapeHtml(e.groupTotal||'')}`:'',e.reason].filter(Boolean).join(' · ');
+  return `<tr><td>${escapeHtml(time)}</td><td>${escapeHtml(e.user||'')}</td><td>${escapeHtml(logTypeLabel(e.type))}</td><td>${escapeHtml(e.mode||'')}</td><td>${escapeHtml(e.title||e.sheetName||'')}</td><td>${detail||'-'}</td></tr>`;
+ }).join('');
+ box.innerHTML=`<div class="log-summary"><span class="log-pill">현재 사용자: ${escapeHtml(user)}</span><span class="log-pill">오늘 기록: ${todayEntries.length}개</span><span class="log-pill">전체 기록: ${entries.length}개</span><span class="log-pill">오늘 학습: ${study.sentences||0}문장</span><span class="log-pill">오늘 오답: ${study.wrong||0}개</span></div><table class="log-table"><thead><tr><th>시간</th><th>사용자</th><th>종류</th><th>모드</th><th>답변/제목</th><th>내용</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
+}
+function clearLocalLog(){
+ if(!confirm('앱 안에 저장된 로컬 기록을 비울까요? 구글시트 기록은 삭제되지 않아.'))return;
+ localStorage.removeItem(LOCAL_LOG_KEY);
+ renderLogView();
 }
 function saveTodayStats(stats){
  localStorage.setItem('rr_today_'+todayKey(),JSON.stringify(stats));
@@ -3007,13 +3066,14 @@ let currentMode='flash';
 function switchMode(mode){
  const changed=currentMode!==mode;
  currentMode=mode;
- ['table','flash','scramble','molgong','keywordWrite','cloze','englishOnly'].forEach(m=>{
+ ['table','flash','scramble','molgong','keywordWrite','cloze','englishOnly','log'].forEach(m=>{
    const panel=document.getElementById('mode-'+m);
    const btn=document.getElementById('modeBtn-'+m);
    if(panel)panel.classList.toggle('active', m===mode);
    if(btn)btn.classList.toggle('active', m===mode);
  });
- if(changed)recordModeChange(mode);
+ if(mode==='log')renderLogView();
+ if(changed&&mode!=='log')recordModeChange(mode);
 }
 document.getElementById('fileInput').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;const name=file.name.toLowerCase();if(name.endsWith('.txt')||name.endsWith('.csv')){document.getElementById('inputText').value=await file.text();parseText();return;}const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];const arr=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false});rows=[];arr.forEach(line=>{const ko=val(line,0),en=val(line,1);if(ko&&en&&!isHeader(ko,en))rows.push({ko,en,important:false,notMemorized:false,done:false});});document.getElementById('inputText').value=rows.map(r=>`${r.ko}\t${r.en}`).join('\n');renderTable();});
 function rateToEdge(v){const n=Number(v||1),pct=Math.round((n-1)*100);return pct===0?'+0%':pct>0?`+${pct}%`:`${pct}%`;}
@@ -3025,6 +3085,7 @@ function copyPython(){let code=document.getElementById('pythonCode').textContent
 function downloadPython(){let code=document.getElementById('pythonCode').textContent||generatePython(currentPythonMode);if(!code)return;const suffix=currentPythonMode==='ko'?'_ko_onefile':currentPythonMode==='en'?'_en_onefile':'_sentence_files';const blob=new Blob([code],{type:'text/x-python'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(document.getElementById('baseName').value||'opic_practice')+suffix+'.py';a.click();URL.revokeObjectURL(a.href);}
 
 loadCloudSettings();
+renderLogView();
 
 </script>
 </body>
