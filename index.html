@@ -236,6 +236,16 @@ tr.only-forget-hidden{display:none!important}
 <div class="card">
   <b>학습 기록</b>
   <div class="toolbar">
+    <label>아이디 <input id="onlineUserId" placeholder="mintB" style="width:110px"></label>
+    <label>비밀번호 <input id="onlinePassword" type="password" placeholder="비밀번호" style="width:130px"></label>
+    <button class="green small" onclick="loginOnlineLibrary()">로그인</button>
+    <button class="secondary small" onclick="testOnlineServer()">연결 테스트</button>
+    <button class="secondary small" onclick="loadOnlineFileList()">온라인 파일 목록</button>
+    <select id="onlineFileSelect" style="min-width:220px"><option value="">온라인 파일 없음</option></select>
+    <button class="red small" onclick="loadSelectedOnlineFile()">온라인 자료 불러오기</button>
+  </div>
+  <div id="onlineLoginStatus" class="hint">로그인하면 비공개 Google Drive/Sheet 자료를 불러올 수 있어.</div>
+  <div class="toolbar">
     <label>사용자/탭
       <select id="cloudUserName" onchange="saveCloudSettings()">
         <option value="">선택</option>
@@ -261,6 +271,7 @@ tr.only-forget-hidden{display:none!important}
   <b>엑셀 파일 불러오기</b>
   <div class="toolbar">
     <input type="file" id="bookExcelInput" accept=".xlsx,.xls" multiple onchange="loadWorkbookFiles(this.files)">
+    <button class="green" onclick="uploadCurrentWorkbookToDrive()">선택 파일 드라이브 업로드</button>
     <button class="secondary" onclick="loadAllItems()">전체 문장</button>
     <button class="orange" onclick="loadAllImportantItems()">⭐ 전체 중요문장</button>
     <button class="orange" onclick="loadRandomImportantItem()">🎲 중요문장 랜덤 1개</button>
@@ -646,17 +657,150 @@ function keyOf(u,g,q){return `${String(u).trim()}|${String(g).trim()}|${String(q
 function compactNo(u,g,q){return `${String(u).trim()}${String(g).trim()}${String(q).trim()}`;}
 function escapeHtml(s){return String(s??'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 function stripStress(text){return String(text??'').replace(/\[\[([\s\S]*?)\]\]/g,'$1');}
-const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycbxlrjhnLmeUKN3k6tA8rTKrODeO39ZYNwGTw4cIykD1ZNHikYlZHDKBLD2FZdslwgdo/exec';
+const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycby5fJ4a-FuiOcwXbgYH0zJqdC1EPjoU-1iUi5ivLi8Q4goQe7eBpPh7-Apiuk3TpOo0/exec';
 const MODE_LABELS={table:'표',flash:'플래시카드',scramble:'단어 배열',molgong:'몰공 모드',keywordWrite:'키워드 보고 적기',cloze:'빈칸 맞추기',englishOnly:'문장 읽기',log:'기록 보기'};
 const LOCAL_LOG_KEY='rr_local_log';
 const CLOUD_ALLOWED_TYPES=new Set(['answer_load','study_result']);
+let lastBookFiles=[];
 function todayKey(){return new Date().toLocaleDateString('sv-SE');}
 function rowTitle(row){return [row?.sheetName,row?.itemLabel].filter(Boolean).join(' - ');}
 function cloudSettings(){return{user:localStorage.getItem('rr_cloud_user')||'hoonyB',url:CLOUD_SCRIPT_URL};}
+function onlineCredentials(){
+ return {
+  user:(document.getElementById('onlineUserId')?.value||localStorage.getItem('rr_online_user')||'').trim(),
+  password:(document.getElementById('onlinePassword')?.value||localStorage.getItem('rr_online_password')||'').trim()
+ };
+}
+function setOnlineStatus(text){
+ const el=document.getElementById('onlineLoginStatus');
+ if(el)el.textContent=text;
+}
+function setCloudUserOption(name){
+ const user=document.getElementById('cloudUserName');
+ if(!user||!name)return;
+ if(![...user.options].some(opt=>opt.value===name)){
+  user.insertAdjacentHTML('beforeend',`<option value="${escapeAttr(name)}">${escapeHtml(name)}</option>`);
+ }
+ user.value=name;
+ localStorage.setItem('rr_cloud_user',name);
+ updateTodayStudyInfo();
+}
+function onlineUrl(action,params={}){
+ const query=new URLSearchParams({action,...params});
+ return CLOUD_SCRIPT_URL+'?'+query.toString();
+}
+function onlineJsonp(action,params={}){
+ return new Promise((resolve,reject)=>{
+  const callback='rr_jsonp_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+  const query=new URLSearchParams({action,callback,...params});
+  const script=document.createElement('script');
+  let called=false;
+  const timer=setTimeout(()=>{cleanup();reject(new Error('응답은 없었어. Apps Script를 v2 코드로 저장하고 새 버전으로 배포했는지 확인해줘.'));},30000);
+  function cleanup(){
+   clearTimeout(timer);
+   delete window[callback];
+   script.remove();
+  }
+  window[callback]=(data)=>{called=true;cleanup();resolve(data||{});};
+  script.onload=()=>{setTimeout(()=>{if(!called){cleanup();reject(new Error('서버 응답은 왔지만 v2 형식이 아니야. Apps Script를 v2 코드로 덮어쓰고 새 버전 배포를 해줘.'));}},0);};
+  script.onerror=()=>{cleanup();reject(new Error('온라인 자료 서버에 연결하지 못했어. 웹앱 배포 권한을 "모든 사용자"로 설정했는지 확인해줘.'));};
+  script.src=CLOUD_SCRIPT_URL+'?'+query.toString();
+  document.body.appendChild(script);
+ });
+}
+async function testOnlineServer(){
+ setOnlineStatus('연결 테스트 중...');
+ try{
+  const res=await onlineJsonp('ping');
+  setOnlineStatus(res.ok?`연결 성공: ${res.message||'v2 endpoint ready'}`:'연결은 됐지만 응답이 이상해.');
+ }catch(e){
+  setOnlineStatus((e.message||'연결 테스트 실패')+' 테스트 URL: '+onlineUrl('ping'));
+ }
+}
+async function loginOnlineLibrary(){
+ const cred=onlineCredentials();
+ if(!cred.user||!cred.password){alert('아이디와 비밀번호를 입력해줘.');return;}
+ setOnlineStatus('로그인 확인 중...');
+ try{
+  const res=await onlineJsonp('login',cred);
+  if(!res.ok){setOnlineStatus(res.message||'로그인에 실패했어.');return;}
+  localStorage.setItem('rr_online_user',cred.user);
+  localStorage.setItem('rr_online_password',cred.password);
+  setCloudUserOption(res.sheetName||cred.user);
+  setOnlineStatus(`${res.displayName||cred.user} 로그인됨 · 자료는 온라인에서 불러와.`);
+  await loadOnlineFileList();
+ }catch(e){
+  setOnlineStatus(e.message||'로그인 확인 중 오류가 났어.');
+ }
+}
+async function loadOnlineFileList(){
+ const cred=onlineCredentials();
+ if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
+ const select=document.getElementById('onlineFileSelect');
+ if(select)select.innerHTML='<option value="">불러오는 중...</option>';
+ try{
+  const res=await onlineJsonp('listFiles',cred);
+  if(!res.ok){if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';setOnlineStatus(res.message||'파일 목록을 불러오지 못했어.');return;}
+  const files=res.files||[];
+  if(select){
+   select.innerHTML=files.length?files.map(f=>`<option value="${escapeAttr(f.id)}">${escapeHtml(f.label||f.name)}</option>`).join(''):'<option value="">온라인 파일 없음</option>';
+  }
+  setOnlineStatus(files.length?`온라인 파일 ${files.length}개를 찾았어.`:'온라인 폴더에 파일이 없어.');
+ }catch(e){
+  if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';
+  setOnlineStatus(e.message||'파일 목록 오류');
+ }
+}
+function base64ToFile(base64,fileName,mimeType){
+ const bin=atob(base64);
+ const bytes=new Uint8Array(bin.length);
+ for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+ return new File([bytes],fileName||'online.xlsx',{type:mimeType||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+async function loadSelectedOnlineFile(){
+ const cred=onlineCredentials();
+ const fileId=document.getElementById('onlineFileSelect')?.value||'';
+ if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
+ if(!fileId){alert('불러올 온라인 파일을 선택해줘.');return;}
+ setOnlineStatus('온라인 파일을 불러오는 중...');
+ try{
+  const res=await onlineJsonp('getFile',{...cred,fileId});
+  if(!res.ok){setOnlineStatus(res.message||'온라인 파일을 불러오지 못했어.');return;}
+  const file=base64ToFile(res.base64,res.fileName,res.mimeType);
+  await loadWorkbookFiles([file]);
+  setOnlineStatus(`${res.fileName||'온라인 파일'} 불러오기 완료`);
+ }catch(e){
+  setOnlineStatus(e.message||'온라인 파일 불러오기 오류');
+ }
+}
+function fileToBase64(file){
+ return new Promise((resolve,reject)=>{
+  const reader=new FileReader();
+  reader.onload=()=>resolve(String(reader.result||'').split(',')[1]||'');
+  reader.onerror=()=>reject(new Error('파일을 읽지 못했어.'));
+  reader.readAsDataURL(file);
+ });
+}
+async function uploadCurrentWorkbookToDrive(){
+ const cred=onlineCredentials();
+ const files=[...(document.getElementById('bookExcelInput')?.files||lastBookFiles||[])];
+ if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
+ if(!files.length){alert('먼저 업로드할 엑셀 파일을 선택해줘.');return;}
+ setOnlineStatus('드라이브로 업로드 중...');
+ for(const file of files){
+  const base64=await fileToBase64(file);
+  fetch(CLOUD_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'uploadWorkbook',user:cred.user,password:cred.password,fileName:file.name,mimeType:file.type,base64})});
+ }
+ setOnlineStatus(`${files.length}개 파일을 드라이브로 보냈어. 잠시 뒤 파일 목록을 새로고침해줘.`);
+}
 function loadCloudSettings(){
  const s=cloudSettings();
  const user=document.getElementById('cloudUserName');
  if(user&&[...user.options].some(opt=>opt.value===s.user))user.value=s.user;
+ const onlineUser=document.getElementById('onlineUserId');
+ const onlinePassword=document.getElementById('onlinePassword');
+ if(onlineUser)onlineUser.value=localStorage.getItem('rr_online_user')||'';
+ if(onlinePassword)onlinePassword.value=localStorage.getItem('rr_online_password')||'';
  updateTodayStudyInfo();
 }
 function saveCloudSettings(){
@@ -1004,6 +1148,7 @@ function parseAnswerSheet(ws,sheetName){
 }
 async function loadWorkbookFiles(fileList){
  if(!fileList||!fileList.length)return;
+ lastBookFiles=[...fileList];
  stopSpeak();
  clearSelectedItemQueue();
  try{
@@ -1275,13 +1420,13 @@ function updateCurrentItemInfo(){
  const items=currentQuestionItems||[];
  if(!items.length){el.textContent='';return;}
  if(studyGroups.length>1 && items.length===1){
-   el.textContent=`현재 답변 ${studyGroupIndex+1}/${studyGroups.length}: ${items[0].sheetName} - ${items[0].label}`;
+   el.textContent=`현재 답변 ${studyGroupIndex+1}/${studyGroups.length}: ${items[0].sheetName} - ${itemLogTitle(items[0])}`;
    return;
  }
  if(items.length===1){
-   el.textContent=`현재 문제: ${items[0].sheetName} - ${items[0].label}`;
+   el.textContent=`현재 문제: ${items[0].sheetName} - ${itemLogTitle(items[0])}`;
  }else{
-   const names=items.map(i=>`${i.sheetName} - ${i.label}`);
+   const names=items.map(i=>`${i.sheetName} - ${itemLogTitle(i)}`);
    el.textContent=`현재 문제 (${items.length}개): ${names.join(', ')}`;
  }
 }
