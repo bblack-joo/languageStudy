@@ -429,12 +429,12 @@ tr.only-forget-hidden{display:none!important}
     <button class="secondary small" onclick="copyFlashText('en')">영어 복사</button>
   </div>
   <div id="flashResult" class="scramble-result flash-hidden"></div>
-  <div class="flash-help">카드 클릭: 정답 보기 → 다음 카드 / Space·Enter: 뒤집기·다음 / ← →: 이전·다음</div>
+  <div class="flash-help">카드 클릭: 정답 보기 → 다음 카드 / Space·Enter: 뒤집기·다음 / 타이핑 중 Ctrl+Enter: 뒤집기·다음 / ← →: 이전·다음</div>
 </div>
 
 <div class="flash-scratch-box">
   <div class="flash-help">아래에 쓴 내용은 카드별로 기억했다가 마지막에 정답과 비교해서 보여줘.</div>
-  <textarea id="flashScratchInput" placeholder="자유롭게 써보면서 연습해봐" style="height:90px" oninput="saveFlashScratch(); autoGrow(this);"></textarea>
+  <textarea id="flashScratchInput" placeholder="자유롭게 써보면서 연습해봐" style="height:90px" oninput="saveFlashScratch(); autoGrow(this);" onkeydown="flashScratchKeydown(event)"></textarea>
   <div class="flash-options">
     <button class="secondary small" onclick="flipFlashcard()">뒤집기</button>
     <button class="green small" onclick="handleFlashCardClick()">확인</button>
@@ -3183,6 +3183,7 @@ function getQuestionPracticeKey(q){return 'ls_qpractice_'+storageSafe(keyOf(q.un
 function getSavedPractice(key){return localStorage.getItem(key)||'';}
 function savePracticeInput(el){if(!el||!el.dataset.key)return;localStorage.setItem(el.dataset.key,el.value);autoGrow(el);}
 function autoGrow(el){if(!el)return;el.style.height='auto';el.style.height=Math.max(42,el.scrollHeight)+'px';}
+function flashScratchKeydown(e){if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();saveFlashScratch();handleFlashCardClick();}}
 function practiceKeydown(e,el){if(el&&el.classList.contains('question-practice-input'))return;if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const inputs=[...document.querySelectorAll('.practice-input')];const idx=inputs.indexOf(el);if(idx>=0&&idx<inputs.length-1)inputs[idx+1].focus();}}
 function refreshPracticeHeights(){document.querySelectorAll('.practice-input,.question-practice-input').forEach(autoGrow);}
 function copyPracticeColumn(){const text=getVisibleRowIndices().map(i=>getSavedPractice(getPracticeKey(rows[i]))).join('\n');navigator.clipboard.writeText(text);}
