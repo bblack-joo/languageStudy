@@ -337,6 +337,7 @@ tr.only-forget-hidden{display:none!important}
     <button id="modeBtn-scramble" class="mode-btn" onclick="switchMode('scramble')">🔤 단어 배열</button>
     <button id="modeBtn-molgong" class="mode-btn" onclick="switchMode('molgong')">🔥 몰공 모드</button>
     <button id="modeBtn-keywordWrite" class="mode-btn" onclick="switchMode('keywordWrite')">📝 키워드 보고 적기</button>
+    <button id="modeBtn-chunkCard" class="mode-btn" onclick="switchMode('chunkCard')">🧩 Chunk 카드</button>
     <button id="modeBtn-cloze" class="mode-btn" onclick="switchMode('cloze')">🕳 빈칸 맞추기</button>
   </div>
   <div class="toolbar mode-switch">
@@ -592,6 +593,42 @@ tr.only-forget-hidden{display:none!important}
 </div>
 </div>
 
+<div id="mode-chunkCard" class="card mode-panel">
+<b>🧩 Chunk · 단어 플래시카드</b>
+<div class="toolbar"><button class="secondary small" id="chunkCardQuestionToggleBtn" onclick="toggleStudyQuestionBox('chunkCardQuestionBox', this)" style="display:none">질문 보기</button></div>
+<div id="chunkCardQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="chunkCardQuestionList"></div></div>
+<div class="flash-card-box">
+  <div class="flash-options">
+    <label>뽑기
+      <select id="chunkCardSource" onchange="resetChunkCard();this.blur();">
+        <option value="chunks">Chunk만</option>
+        <option value="words">단어만</option>
+        <option value="both" selected>Chunk + 단어</option>
+      </select>
+    </label>
+    <label>순서
+      <select id="chunkCardOrder" onchange="resetChunkCard();this.blur();">
+        <option value="seq">순서대로</option>
+        <option value="random">랜덤</option>
+      </select>
+    </label>
+    <button class="green small" onclick="startChunkCard()">시작</button>
+    <button class="secondary small" onclick="speakChunkCard()">🔊 듣기</button>
+    <button class="secondary small" onclick="prevChunkCard()">◀ 이전</button>
+    <button class="secondary small" onclick="flipChunkCard()">뒤집기</button>
+    <button class="secondary small" onclick="nextChunkCard()">다음 ▶</button>
+    <span id="chunkCardProgress" class="flash-progress">0 / 0</span>
+  </div>
+  <div class="flash-bar"><div id="chunkCardBarInner" class="flash-bar-inner"></div></div>
+  <div id="chunkCard" class="flash-card" onclick="handleChunkCardClick()">
+    <div id="chunkCardFront" class="flash-front">표를 불러온 뒤 시작을 눌러줘.</div>
+    <div id="chunkCardBack" class="flash-back flash-hidden"></div>
+  </div>
+  <div id="chunkCardResult" class="scramble-result flash-hidden"></div>
+  <div class="flash-help">키워드/흐름 칸에 적힌 표현을 chunk와 단어로 뽑아 카드처럼 넘겨. 카드 클릭: 원래 문장 보기 → 다음 / Space·Enter: 뒤집기·다음 / ← →: 이전·다음</div>
+</div>
+</div>
+
 <div id="mode-cloze" class="card mode-panel">
 <b>🕳 빈칸 맞추기</b>
 <div class="toolbar"><button class="secondary small" id="clozeQuestionToggleBtn" onclick="toggleStudyQuestionBox('clozeQuestionBox', this)" style="display:none">질문 보기</button></div>
@@ -645,7 +682,7 @@ tr.only-forget-hidden{display:none!important}
 let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[],selectedItemKeys=[];
 let studyGroups=[],studyGroupIndex=0;
 let ENGLISH_ONLY_COPY={};
-let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0,flashAutoNextOn=false,flashAutoNextTimer=null,flashAutoScheduleRunId=0,flashResultCopyText='';
+let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0,flashAutoNextOn=false,flashAutoNextTimer=null,flashAutoScheduleRunId=0,flashResultCopyText='',flashResultExcelText='';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
 function norm(s){return String(s??'').trim().replace(/\s+/g,'').toLowerCase();}
@@ -662,7 +699,7 @@ function compactNo(u,g,q){return `${String(u).trim()}${String(g).trim()}${String
 function escapeHtml(s){return String(s??'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 function stripStress(text){return String(text??'').replace(/\[\[([\s\S]*?)\]\]/g,'$1');}
 const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycby5fJ4a-FuiOcwXbgYH0zJqdC1EPjoU-1iUi5ivLi8Q4goQe7eBpPh7-Apiuk3TpOo0/exec';
-const MODE_LABELS={table:'표',flash:'플래시카드',scramble:'단어 배열',molgong:'몰공 모드',keywordWrite:'키워드 보고 적기',cloze:'빈칸 맞추기',englishOnly:'문장 읽기',log:'기록 보기'};
+const MODE_LABELS={table:'표',flash:'플래시카드',scramble:'단어 배열',molgong:'몰공 모드',keywordWrite:'키워드 보고 적기',chunkCard:'Chunk 카드',cloze:'빈칸 맞추기',englishOnly:'문장 읽기',log:'기록 보기'};
 const LOCAL_LOG_KEY='rr_local_log';
 const CLOUD_ALLOWED_TYPES=new Set(['answer_load','study_result']);
 let lastBookFiles=[];
@@ -1518,6 +1555,7 @@ function showQuestions(items){
  setStudyQuestionToggle('scramble',renderQuestionBox('scrambleQuestionBox','scrambleQuestionList',currentQuestionItems,'scramble',false,true),true);
  setStudyQuestionToggle('molgong',renderQuestionBox('molgongQuestionBox','molgongQuestionList',currentQuestionItems,'molgong',false,true),true);
  setStudyQuestionToggle('keywordWrite',renderQuestionBox('keywordWriteQuestionBox','keywordWriteQuestionList',currentQuestionItems,'keywordWrite',false,true),true);
+ setStudyQuestionToggle('chunkCard',renderQuestionBox('chunkCardQuestionBox','chunkCardQuestionList',currentQuestionItems,'chunkCard',false,true),true);
  setStudyQuestionToggle('cloze',renderQuestionBox('clozeQuestionBox','clozeQuestionList',currentQuestionItems,'cloze',false,true),true);
  setTimeout(refreshPracticeHeights,0);
 }
@@ -1594,7 +1632,7 @@ function copyKeyword(id){
  if(!box)return;
  navigator.clipboard.writeText(box.textContent||'');
 }
-function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox','molgongQuestionBox','keywordWriteQuestionBox','clozeQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList','molgongQuestionList','keywordWriteQuestionList','clozeQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});['flash','scramble','molgong','keywordWrite','cloze'].forEach(mode=>setStudyQuestionToggle(mode,false));}
+function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox','molgongQuestionBox','keywordWriteQuestionBox','chunkCardQuestionBox','clozeQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList','molgongQuestionList','keywordWriteQuestionList','chunkCardQuestionList','clozeQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});['flash','scramble','molgong','keywordWrite','chunkCard','cloze'].forEach(mode=>setStudyQuestionToggle(mode,false));}
 function setRows(pairs,preserveGroups=false){if(!preserveGroups)clearStudyGroups();startStudyEntry();document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',flowText:i.flowText||'',done:false})).filter(i=>i.ko||i.en);renderTable();}
 function loadSelectedItem(){stopSpeak();clearStudyGroups();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));recordAnswerLoad(item,'선택 답변 불러오기');}
 function canLoadNextSelectedItem(){
@@ -1969,6 +2007,7 @@ function hideFlashResult(){
  const res=document.getElementById('flashResult');
  if(res){res.classList.add('flash-hidden');res.innerHTML='';}
  flashResultCopyText='';
+ flashResultExcelText='';
 }
 function getFlashCurrent(){
  if(!flashOrderList.length) buildFlashOrder();
@@ -2103,7 +2142,8 @@ function showFlashAllSentences(){
  const answerLang=(mode==='en_ko'||mode==='ko_only')?'ko':'en';
  let wrongCount=0;
  flashResultCopyText=buildFlashResultCopyText(items,answerLang);
- let html='<div class="toolbar" style="justify-content:space-between;margin-bottom:8px"><b>플래시카드 결과</b><button class="secondary small" onclick="copyFlashResultForFeedback()">첨삭용 복사</button></div><table><thead><tr><th class="num-col">번호</th><th>내가 쓴 문장</th><th>정답</th></tr></thead><tbody>';
+ flashResultExcelText=buildFlashResultExcelText(items);
+ let html='<div class="toolbar" style="justify-content:space-between;margin-bottom:8px"><b>플래시카드 결과</b><span><button class="secondary small" onclick="copyFlashResultForFeedback()">첨삭용 복사</button> <button class="secondary small" onclick="copyFlashResultForExcel()">엑셀용 복사</button></span></div><table><thead><tr><th class="num-col">번호</th><th>내가 쓴 문장</th><th>정답</th></tr></thead><tbody>';
  html+=items.map(item=>{
   const myAnswer=flashScratchAnswers[item.pos-1]||'';
   const correct=answerLang==='ko'?(item.row.ko||''):(item.row.en||'');
@@ -2139,6 +2179,19 @@ function buildFlashResultCopyText(items,answerLang){
 function copyFlashResultForFeedback(){
  if(!flashResultCopyText){alert('복사할 플래시카드 결과가 없어.');return;}
  navigator.clipboard.writeText(flashResultCopyText);
+}
+function buildFlashResultExcelText(items){
+ const lines=[];
+ items.forEach(item=>{
+  const ko=String(item.row.ko||'').replace(/\r?\n/g,' ').trim();
+  const en=stripStress(item.row.en||'').replace(/\r?\n/g,' ').trim();
+  if(ko||en)lines.push(`${ko}\t${en}`);
+ });
+ return lines.join('\n');
+}
+function copyFlashResultForExcel(){
+ if(!flashResultExcelText){alert('복사할 전체 내용이 없어.');return;}
+ navigator.clipboard.writeText(flashResultExcelText);
 }
 function handleFlashCardClick(){
  if(!flashOrderList.length){startFlashcards();return;}
@@ -2798,6 +2851,144 @@ function showKeywordWriteResult(){
  res.classList.remove('flash-hidden');
 }
 
+let chunkCardList=[],chunkCardIndex=0,chunkCardRevealed=false,chunkCardFinished=false;
+function splitChunkParts(text){
+ return String(text||'')
+  .split(/\r?\n|→|>|,|ㆍ|•|\/|;|；/)
+  .map(x=>x.trim().replace(/^[-–—]+/,'').trim())
+  .filter(Boolean);
+}
+function splitChunkWords(text){
+ return String(text||'')
+  .split(/\s+/)
+  .map(x=>x.replace(/^[^\w가-힣]+|[^\w가-힣]+$/g,'').trim())
+  .filter(x=>x&&x.length>1);
+}
+function buildChunkCardList(){
+ const source=document.getElementById('chunkCardSource')?.value||'both';
+ const entries=[],seen=new Set();
+ (currentQuestionItems||[]).forEach(item=>{
+  const original=(item.answers||[]).map(a=>stripStress(a.en||'').trim()).filter(Boolean).join('\n');
+  const label=item.label||'';
+  (item.flows||[]).forEach(flow=>{
+   splitChunkParts(flow).forEach(chunk=>{
+    if(source==='chunks'||source==='both'){
+     const key=`chunk|${label}|${chunk}`;
+     if(!seen.has(key)){seen.add(key);entries.push({text:chunk,type:'Chunk',original,label});}
+    }
+    if(source==='words'||source==='both'){
+     splitChunkWords(chunk).forEach(word=>{
+      const key=`word|${label}|${word.toLowerCase()}`;
+      if(!seen.has(key)){seen.add(key);entries.push({text:word,type:'단어',original,label});}
+     });
+    }
+   });
+  });
+ });
+ chunkCardList=document.getElementById('chunkCardOrder')?.value==='random'?shuffleArray(entries):entries;
+ chunkCardIndex=0;
+ chunkCardRevealed=false;
+ chunkCardFinished=false;
+ hideChunkCardResult();
+}
+function resetChunkCard(){
+ buildChunkCardList();
+ renderChunkCard(false);
+}
+function startChunkCard(){
+ if(!currentQuestionItems.length){alert('먼저 엑셀에서 문장을 불러와줘.');return;}
+ buildChunkCardList();
+ if(!chunkCardList.length){alert('현재 불러온 묶음에 키워드나 chunk가 없어.');return;}
+ renderChunkCard(false);
+}
+function hideChunkCardResult(){
+ const res=document.getElementById('chunkCardResult');
+ if(res){res.classList.add('flash-hidden');res.innerHTML='';}
+}
+function renderChunkCard(){
+ const front=document.getElementById('chunkCardFront');
+ const back=document.getElementById('chunkCardBack');
+ const prog=document.getElementById('chunkCardProgress');
+ const bar=document.getElementById('chunkCardBarInner');
+ if(!front||!back)return;
+ if(chunkCardFinished){
+  front.textContent='Chunk 카드 끝!';
+  back.classList.add('flash-hidden');
+  if(prog)prog.textContent=`${chunkCardList.length} / ${chunkCardList.length}`;
+  if(bar)bar.style.width='100%';
+  return;
+ }
+ if(!chunkCardList.length){
+  front.textContent=currentQuestionItems.length?'현재 불러온 묶음에 키워드나 chunk가 없어.':'표를 불러온 뒤 시작을 눌러줘.';
+  back.classList.add('flash-hidden');
+  back.innerHTML='';
+  if(prog)prog.textContent='0 / 0';
+  if(bar)bar.style.width='0%';
+  return;
+ }
+ const item=chunkCardList[chunkCardIndex];
+ front.innerHTML=`<div style="font-size:13px;color:var(--text-muted);font-weight:900;margin-bottom:8px">${escapeHtml(item.type)} · ${escapeHtml(item.label)}</div>${escapeHtml(item.text)}`;
+ back.innerHTML=`<div style="font-size:13px;color:var(--text-muted);font-weight:900;margin-bottom:8px">원래 문장</div>${formatStress(item.original||'원래 문장이 없어.')}`;
+ back.classList.toggle('flash-hidden',!chunkCardRevealed);
+ if(prog)prog.textContent=`${chunkCardIndex+1} / ${chunkCardList.length}`;
+ if(bar)bar.style.width=`${Math.round(((chunkCardIndex+1)/chunkCardList.length)*100)}%`;
+}
+function flipChunkCard(){
+ if(!chunkCardList.length){startChunkCard();return;}
+ if(chunkCardFinished)return;
+ chunkCardRevealed=!chunkCardRevealed;
+ renderChunkCard();
+}
+function nextChunkCard(){
+ if(!chunkCardList.length){startChunkCard();return;}
+ if(chunkCardFinished)return;
+ if(chunkCardIndex>=chunkCardList.length-1){finishChunkCard();return;}
+ chunkCardIndex++;
+ chunkCardRevealed=false;
+ hideChunkCardResult();
+ renderChunkCard();
+}
+function prevChunkCard(){
+ if(!chunkCardList.length){startChunkCard();return;}
+ if(chunkCardFinished){
+  chunkCardFinished=false;
+  chunkCardIndex=Math.max(0,chunkCardList.length-1);
+ }else if(chunkCardIndex>0){
+  chunkCardIndex--;
+ }
+ chunkCardRevealed=false;
+ hideChunkCardResult();
+ renderChunkCard();
+}
+function handleChunkCardClick(){
+ if(!chunkCardList.length){startChunkCard();return;}
+ if(chunkCardFinished)return;
+ if(!chunkCardRevealed)flipChunkCard();
+ else nextChunkCard();
+}
+async function speakChunkCard(){
+ const item=chunkCardList[chunkCardIndex];
+ if(!item){alert('먼저 Chunk 카드를 시작해줘.');return;}
+ stopSpeak();
+ await sleep(120);
+ const token=++playToken;
+ speaking=true;
+ paused=false;
+ loopOne=false;
+ await speakText(cleanSpeechText(item.text),guessSpeakLang(item.text),document.getElementById('enRate')?.value||1,token);
+ if(token===playToken) speaking=false;
+}
+function finishChunkCard(){
+ chunkCardFinished=true;
+ recordStudyResult('Chunk 카드',chunkCardList.length,0);
+ renderChunkCard();
+ const res=document.getElementById('chunkCardResult');
+ if(res){
+  res.innerHTML=`<div><b>Chunk 카드 완료</b></div><div class="hint">${chunkCardList.length}개를 끝까지 봤어.</div>${nextAnswerButtonHtml()}`;
+  res.classList.remove('flash-hidden');
+ }
+}
+
 let clozeOrderList=[],clozeIndex=0,clozeFinished=false,clozeAnswers=[],clozeChecked=[],clozeHintVisible=false,clozeHintOrders=[];
 function buildClozeOrder(){
  const indices=getVisibleRowIndices().filter(i=>rows[i]&&String(rows[i].en||'').trim());
@@ -3213,6 +3404,13 @@ document.addEventListener('keydown',function(e){
   else if(e.key==='ArrowLeft'){e.preventDefault();prevCloze();}
   return;
  }
+ if(currentMode==='chunkCard'){
+  if(e.code==='Space'){e.preventDefault();flipChunkCard();}
+  else if(e.key==='Enter'){e.preventDefault();handleChunkCardClick();}
+  else if(e.key==='ArrowRight'){nextChunkCard();}
+  else if(e.key==='ArrowLeft'){prevChunkCard();}
+  return;
+ }
  if(e.code==='Space'){e.preventDefault();flipFlashcard();}
  else if(e.key==='Enter'){e.preventDefault();handleFlashCardClick();}
  else if(e.key==='ArrowRight'){nextFlashcard();}
@@ -3340,7 +3538,7 @@ function switchMode(mode){
  const changed=currentMode!==mode;
  currentMode=mode;
  if(changed)startStudyEntry();
- ['table','flash','scramble','molgong','keywordWrite','cloze','englishOnly'].forEach(m=>{
+ ['table','flash','scramble','molgong','keywordWrite','chunkCard','cloze','englishOnly'].forEach(m=>{
    const panel=document.getElementById('mode-'+m);
    const btn=document.getElementById('modeBtn-'+m);
    if(panel)panel.classList.toggle('active', m===mode);
