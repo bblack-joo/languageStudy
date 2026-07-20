@@ -645,7 +645,7 @@ tr.only-forget-hidden{display:none!important}
 let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[],selectedItemKeys=[];
 let studyGroups=[],studyGroupIndex=0;
 let ENGLISH_ONLY_COPY={};
-let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0,flashAutoNextOn=false,flashAutoNextTimer=null,flashAutoScheduleRunId=0;
+let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0,flashAutoNextOn=false,flashAutoNextTimer=null,flashAutoScheduleRunId=0,flashResultCopyText='';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
 function norm(s){return String(s??'').trim().replace(/\s+/g,'').toLowerCase();}
@@ -1968,6 +1968,7 @@ function advanceFlashAutoNext(){
 function hideFlashResult(){
  const res=document.getElementById('flashResult');
  if(res){res.classList.add('flash-hidden');res.innerHTML='';}
+ flashResultCopyText='';
 }
 function getFlashCurrent(){
  if(!flashOrderList.length) buildFlashOrder();
@@ -2101,7 +2102,8 @@ function showFlashAllSentences(){
  const mode=document.getElementById('flashMode')?.value||'ko_en';
  const answerLang=(mode==='en_ko'||mode==='ko_only')?'ko':'en';
  let wrongCount=0;
- let html='<div><b>플래시카드 결과</b></div><table><thead><tr><th class="num-col">번호</th><th>내가 쓴 문장</th><th>정답</th></tr></thead><tbody>';
+ flashResultCopyText=buildFlashResultCopyText(items,answerLang);
+ let html='<div class="toolbar" style="justify-content:space-between;margin-bottom:8px"><b>플래시카드 결과</b><button class="secondary small" onclick="copyFlashResultForFeedback()">첨삭용 복사</button></div><table><thead><tr><th class="num-col">번호</th><th>내가 쓴 문장</th><th>정답</th></tr></thead><tbody>';
  html+=items.map(item=>{
   const myAnswer=flashScratchAnswers[item.pos-1]||'';
   const correct=answerLang==='ko'?(item.row.ko||''):(item.row.en||'');
@@ -2114,6 +2116,29 @@ function showFlashAllSentences(){
  html+='</tbody></table>'+nextAnswerButtonHtml();
  res.innerHTML=html;
  res.classList.remove('flash-hidden');
+}
+function buildFlashResultCopyText(items,answerLang){
+ const lines=[
+  '플래시카드 첨삭 부탁해.',
+  '아래의 "내가 쓴 문장"과 "정답"을 비교해서 틀린 부분과 더 자연스러운 표현을 간단히 알려줘.',
+  ''
+ ];
+ items.forEach(item=>{
+  const myAnswer=(flashScratchAnswers[item.pos-1]||'').trim();
+  const correct=answerLang==='ko'?(item.row.ko||''):(item.row.en||'');
+  const plainCorrect=stripStress(correct).trim();
+  if(!myAnswer&&!plainCorrect)return;
+  const title=[item.row.sheetName,item.row.itemLabel].filter(Boolean).join(' - ');
+  lines.push(`${item.pos}. ${title}`);
+  lines.push(`내가 쓴 문장: ${myAnswer||'(비어 있음)'}`);
+  lines.push(`정답: ${plainCorrect||'(정답 없음)'}`);
+  lines.push('');
+ });
+ return lines.join('\n').trim();
+}
+function copyFlashResultForFeedback(){
+ if(!flashResultCopyText){alert('복사할 플래시카드 결과가 없어.');return;}
+ navigator.clipboard.writeText(flashResultCopyText);
 }
 function handleFlashCardClick(){
  if(!flashOrderList.length){startFlashcards();return;}
