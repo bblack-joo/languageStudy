@@ -133,6 +133,8 @@ tr.only-forget-hidden{display:none!important}
 .flash-help{font-size:12.5px;color:var(--text-muted);margin-top:8px}
 .flash-hidden{display:none!important}
 .flash-scratch-box{margin-top:14px;padding-top:14px;border-top:1px dashed var(--border)}
+.flash-scratch-label{display:block;margin:10px 0 5px;font-size:13px;font-weight:900;color:var(--primary-dark)}
+.flash-scratch-label .label-tag{display:inline-block;background:var(--primary-tint);border:1px solid var(--border);border-radius:8px;padding:3px 8px}
 
 .scramble-box{background:#fbf9f6;border:1px solid var(--neutral);border-left:4px solid var(--primary);border-radius:12px;padding:14px;margin:10px 0 14px}
 .scramble-box b{margin-bottom:0}
@@ -429,12 +431,14 @@ tr.only-forget-hidden{display:none!important}
     <button class="secondary small" onclick="copyFlashText('en')">영어 복사</button>
   </div>
   <div id="flashResult" class="scramble-result flash-hidden"></div>
-  <div class="flash-help">카드 클릭: 정답 보기 → 다음 카드 / Space·Enter: 뒤집기·다음 / 타이핑 중 Ctrl+Enter: 뒤집기·다음 / ← →: 이전·다음</div>
+  <div class="flash-help">카드 클릭: 정답 보기 → 다음 카드 / Space·Enter: 뒤집기·다음 / 타이핑 중 Ctrl+Space·Ctrl+Enter: 뒤집기·다음 / Ctrl+0: 음원 1회 듣기 / ← →: 이전·다음</div>
 </div>
 
 <div class="flash-scratch-box">
-  <div class="flash-help">아래에 쓴 내용은 카드별로 기억했다가 마지막에 정답과 비교해서 보여줘.</div>
-  <textarea id="flashScratchInput" placeholder="자유롭게 써보면서 연습해봐" style="height:90px" oninput="saveFlashScratch(); autoGrow(this);" onkeydown="flashScratchKeydown(event)"></textarea>
+  <label class="flash-scratch-label" for="flashScratchInput"><span class="label-tag">[정답 맞추기]</span></label>
+  <textarea id="flashScratchInput" placeholder="정답을 떠올리며 적어봐" style="height:90px" oninput="saveFlashScratch(); autoGrow(this);" onkeydown="flashScratchKeydown(event)"></textarea>
+  <label class="flash-scratch-label" for="flashFreeInput"><span class="label-tag">[그냥 적어보기]</span></label>
+  <textarea id="flashFreeInput" placeholder="저장 없이 자유롭게 적어봐" style="height:90px" oninput="autoGrow(this);" onkeydown="flashScratchKeydown(event)"></textarea>
   <div class="flash-options">
     <button class="secondary small" onclick="flipFlashcard()">뒤집기</button>
     <button class="green small" onclick="handleFlashCardClick()">확인</button>
@@ -1795,6 +1799,8 @@ function toggleForgetOnly(btn){
 function clearFlashScratch(){
  const el=document.getElementById('flashScratchInput');
  if(el) el.value='';
+ const free=document.getElementById('flashFreeInput');
+ if(free) free.value='';
 }
 function saveFlashScratch(){
  const el=document.getElementById('flashScratchInput');
@@ -1806,6 +1812,8 @@ function loadFlashScratch(){
  if(!el)return;
  el.value=flashScratchAnswers[flashIndex]||'';
  autoGrow(el);
+ const free=document.getElementById('flashFreeInput');
+ if(free){free.value='';autoGrow(free);}
 }
 function getFlashDisplayedSpeakSide(){
  const row=getFlashCurrent();
@@ -1835,6 +1843,15 @@ async function playFlashSpeak(options={}){
     if(runId!==flashSpeakRunId)return false;
    }
  }
+ return true;
+}
+async function playFlashSpeakOnce(options={}){
+ const row=getFlashCurrent();
+ if(!row){if(!options.silent)alert('먼저 플래시카드를 시작해줘.');return false;}
+ const side=getFlashDisplayedSpeakSide();
+ if(!side){if(!options.silent)alert('현재 보이는 카드와 선택한 음성 모드가 맞지 않아.');return false;}
+ if(!side.plain){if(!options.silent)alert('읽을 내용이 없어.');return false;}
+ await speakFlashText(side,getFlashSpeakRate(side.lang));
  return true;
 }
 function stopFlashSpeakPlayback(){
@@ -3183,7 +3200,12 @@ function getQuestionPracticeKey(q){return 'ls_qpractice_'+storageSafe(keyOf(q.un
 function getSavedPractice(key){return localStorage.getItem(key)||'';}
 function savePracticeInput(el){if(!el||!el.dataset.key)return;localStorage.setItem(el.dataset.key,el.value);autoGrow(el);}
 function autoGrow(el){if(!el)return;el.style.height='auto';el.style.height=Math.max(42,el.scrollHeight)+'px';}
-function flashScratchKeydown(e){if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();saveFlashScratch();handleFlashCardClick();}}
+function flashScratchKeydown(e){
+ if(!e.ctrlKey)return;
+ if(e.code==='Space'){e.preventDefault();saveFlashScratch();flipFlashcard();}
+ else if(e.key==='Enter'){e.preventDefault();saveFlashScratch();handleFlashCardClick();}
+ else if(e.key==='0'){e.preventDefault();playFlashSpeakOnce();}
+}
 function practiceKeydown(e,el){if(el&&el.classList.contains('question-practice-input'))return;if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const inputs=[...document.querySelectorAll('.practice-input')];const idx=inputs.indexOf(el);if(idx>=0&&idx<inputs.length-1)inputs[idx+1].focus();}}
 function refreshPracticeHeights(){document.querySelectorAll('.practice-input,.question-practice-input').forEach(autoGrow);}
 function copyPracticeColumn(){const text=getVisibleRowIndices().map(i=>getSavedPractice(getPracticeKey(rows[i]))).join('\n');navigator.clipboard.writeText(text);}
