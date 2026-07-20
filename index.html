@@ -241,6 +241,7 @@ tr.only-forget-hidden{display:none!important}
     <label>아이디 <input id="onlineUserId" placeholder="mintB" style="width:110px"></label>
     <label>비밀번호 <input id="onlinePassword" type="password" placeholder="비밀번호" style="width:130px"></label>
     <button class="green small" onclick="loginOnlineLibrary()">로그인</button>
+    <button class="gray small" onclick="logoutOnlineLibrary()">로그아웃</button>
     <button class="secondary small" onclick="testOnlineServer()">연결 테스트</button>
     <button class="secondary small" onclick="loadOnlineFileList()">온라인 파일 목록</button>
     <select id="onlineFileSelect" style="min-width:220px"><option value="">온라인 파일 없음</option></select>
@@ -764,15 +765,36 @@ async function loginOnlineLibrary(){
  setOnlineStatus('로그인 확인 중...');
  try{
   const res=await onlineJsonp('login',cred);
-  if(!res.ok){setOnlineStatus(res.message||'로그인에 실패했어.');return;}
+  if(!res.ok){
+   const message=res.message||'로그인에 실패했어.';
+   setOnlineStatus(message);
+   recordLocalLogin(cred.user,false,message);
+   return;
+  }
   localStorage.setItem('rr_online_user',cred.user);
   localStorage.setItem('rr_online_password',cred.password);
   setCloudUserOption(res.sheetName||cred.user);
   setOnlineStatus(`${res.displayName||cred.user} 로그인됨 · 자료는 온라인에서 불러와.`);
+  recordLocalLogin(cred.user,true,res.displayName||cred.user);
   await loadOnlineFileList();
  }catch(e){
-  setOnlineStatus(e.message||'로그인 확인 중 오류가 났어.');
+  const message=e.message||'로그인 확인 중 오류가 났어.';
+  setOnlineStatus(message);
+  recordLocalLogin(cred.user,false,message);
  }
+}
+function logoutOnlineLibrary(){
+ const prevUser=(localStorage.getItem('rr_online_user')||document.getElementById('onlineUserId')?.value||'').trim();
+ localStorage.removeItem('rr_online_user');
+ localStorage.removeItem('rr_online_password');
+ const userEl=document.getElementById('onlineUserId');
+ const passwordEl=document.getElementById('onlinePassword');
+ const select=document.getElementById('onlineFileSelect');
+ if(userEl)userEl.value='';
+ if(passwordEl)passwordEl.value='';
+ if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';
+ setOnlineStatus('로그아웃했어. 이 브라우저에 저장된 온라인 로그인 정보도 지웠어.');
+ if(prevUser)recordLocalLogin(prevUser,true,'로그아웃');
 }
 async function loadOnlineFileList(){
  const cred=onlineCredentials();
@@ -844,6 +866,12 @@ function loadCloudSettings(){
  if(onlinePassword)onlinePassword.value=localStorage.getItem('rr_online_password')||'';
  updateTodayStudyInfo();
 }
+function autoLoadOnlineFilesFromLocalLogin(){
+ const cred=onlineCredentials();
+ if(!cred.user||!cred.password)return;
+ setOnlineStatus(`${cred.user} 로컬 로그인 기록 있음 · 온라인 파일 목록 불러오는 중...`);
+ loadOnlineFileList();
+}
 function saveCloudSettings(){
  const user=(document.getElementById('cloudUserName')?.value||'').trim();
  localStorage.setItem('rr_cloud_user',user);
@@ -907,13 +935,25 @@ function addLocalLogEntry(entry){
  saveLocalLogEntries(entries);
  if(currentMode==='log')renderLogView();
 }
+function recordLocalLogin(user,success,message=''){
+ addLocalLogEntry({
+  app:'RepeatRepeat',
+  type:success?'login':'login_failed',
+  user:user||'',
+  date:todayKey(),
+  createdAt:new Date().toISOString(),
+  source:success?'로컬 로그인 기록':'로그인 실패',
+  title:success?'온라인 로그인':'온라인 로그인 실패',
+  memo:message||''
+ });
+}
 function logTypeLabel(type){
- return {answer_load:'답변 불러오기',study_result:'학습 완료'}[type]||type||'기록';
+ return {answer_load:'답변 불러오기',study_result:'학습 완료',login:'로그인',login_failed:'로그인 실패'}[type]||type||'기록';
 }
 function renderLogView(){
  const box=document.getElementById('logView');
  if(!box)return;
- const entries=localLogEntries().filter(e=>['answer_load','study_result'].includes(e.type)).slice().reverse();
+ const entries=localLogEntries().filter(e=>['answer_load','study_result','login','login_failed'].includes(e.type)).slice().reverse();
  const user=cloudSettings().user||'선택 안 됨';
  const today=todayKey();
  const todayEntries=entries.filter(e=>e.date===today);
@@ -3558,6 +3598,7 @@ function downloadPython(){let code=document.getElementById('pythonCode').textCon
 cleanLegacyLogData();
 loadCloudSettings();
 renderLogView();
+autoLoadOnlineFilesFromLocalLogin();
 
 </script>
 </body>
