@@ -626,7 +626,7 @@ tr.only-forget-hidden{display:none!important}
     <div id="chunkCardBack" class="flash-back flash-hidden"></div>
   </div>
   <div id="chunkCardResult" class="scramble-result flash-hidden"></div>
-  <div class="flash-help">키워드/흐름 칸에 적힌 표현을 chunk와 단어로 뽑아 카드처럼 넘겨. 카드 클릭: 원래 문장 보기 → 다음 / Space·Enter: 뒤집기·다음 / ← →: 이전·다음</div>
+  <div class="flash-help">키워드/흐름 칸에 적힌 덩어리를 그대로 카드로 넘겨. 예: mop the floor는 Chunk, furniture는 단어 / 카드 클릭: 원래 문장 보기 → 다음 / Space·Enter: 뒤집기·다음 / ← →: 이전·다음</div>
 </div>
 </div>
 
@@ -796,22 +796,28 @@ function logoutOnlineLibrary(){
  setOnlineStatus('로그아웃했어. 이 브라우저에 저장된 온라인 로그인 정보도 지웠어.');
  if(prevUser)recordLocalLogin(prevUser,true,'로그아웃');
 }
-async function loadOnlineFileList(){
+async function loadOnlineFileList(options={}){
  const cred=onlineCredentials();
  if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
  const select=document.getElementById('onlineFileSelect');
  if(select)select.innerHTML='<option value="">불러오는 중...</option>';
  try{
   const res=await onlineJsonp('listFiles',cred);
-  if(!res.ok){if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';setOnlineStatus(res.message||'파일 목록을 불러오지 못했어.');return;}
+  if(!res.ok){if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';setOnlineStatus(res.message||'파일 목록을 불러오지 못했어.');return false;}
   const files=res.files||[];
   if(select){
    select.innerHTML=files.length?files.map(f=>`<option value="${escapeAttr(f.id)}">${escapeHtml(f.label||f.name)}</option>`).join(''):'<option value="">온라인 파일 없음</option>';
   }
   setOnlineStatus(files.length?`온라인 파일 ${files.length}개를 찾았어.`:'온라인 폴더에 파일이 없어.');
+  if(options.autoLoadFirst&&files.length){
+   if(select)select.value=files[0].id;
+   await loadSelectedOnlineFile({silentMissing:true});
+  }
+  return files.length>0;
  }catch(e){
   if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';
   setOnlineStatus(e.message||'파일 목록 오류');
+  return false;
  }
 }
 function base64ToFile(base64,fileName,mimeType){
@@ -820,20 +826,22 @@ function base64ToFile(base64,fileName,mimeType){
  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
  return new File([bytes],fileName||'online.xlsx',{type:mimeType||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
-async function loadSelectedOnlineFile(){
+async function loadSelectedOnlineFile(options={}){
  const cred=onlineCredentials();
  const fileId=document.getElementById('onlineFileSelect')?.value||'';
  if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
- if(!fileId){alert('불러올 온라인 파일을 선택해줘.');return;}
+ if(!fileId){if(!options.silentMissing)alert('불러올 온라인 파일을 선택해줘.');return false;}
  setOnlineStatus('온라인 파일을 불러오는 중...');
  try{
   const res=await onlineJsonp('getFile',{...cred,fileId});
-  if(!res.ok){setOnlineStatus(res.message||'온라인 파일을 불러오지 못했어.');return;}
+  if(!res.ok){setOnlineStatus(res.message||'온라인 파일을 불러오지 못했어.');return false;}
   const file=base64ToFile(res.base64,res.fileName,res.mimeType);
   await loadWorkbookFiles([file]);
   setOnlineStatus(`${res.fileName||'온라인 파일'} 불러오기 완료`);
+  return true;
  }catch(e){
   setOnlineStatus(e.message||'온라인 파일 불러오기 오류');
+  return false;
  }
 }
 function fileToBase64(file){
@@ -869,8 +877,8 @@ function loadCloudSettings(){
 function autoLoadOnlineFilesFromLocalLogin(){
  const cred=onlineCredentials();
  if(!cred.user||!cred.password)return;
- setOnlineStatus(`${cred.user} 로컬 로그인 기록 있음 · 온라인 파일 목록 불러오는 중...`);
- loadOnlineFileList();
+ setOnlineStatus(`${cred.user} 로컬 로그인 기록 있음 · 온라인 자료 불러오는 중...`);
+ loadOnlineFileList({autoLoadFirst:true});
 }
 function saveCloudSettings(){
  const user=(document.getElementById('cloudUserName')?.value||'').trim();
@@ -2898,11 +2906,9 @@ function splitChunkParts(text){
   .map(x=>x.trim().replace(/^[-–—]+/,'').trim())
   .filter(Boolean);
 }
-function splitChunkWords(text){
- return String(text||'')
-  .split(/\s+/)
-  .map(x=>x.replace(/^[^\w가-힣]+|[^\w가-힣]+$/g,'').trim())
-  .filter(x=>x&&x.length>1);
+function chunkCardType(text){
+ const cleaned=String(text||'').trim();
+ return /\s/.test(cleaned)?'Chunk':'단어';
 }
 function buildChunkCardList(){
  const source=document.getElementById('chunkCardSource')?.value||'both';
@@ -2911,17 +2917,12 @@ function buildChunkCardList(){
   const original=(item.answers||[]).map(a=>stripStress(a.en||'').trim()).filter(Boolean).join('\n');
   const label=item.label||'';
   (item.flows||[]).forEach(flow=>{
-   splitChunkParts(flow).forEach(chunk=>{
-    if(source==='chunks'||source==='both'){
-     const key=`chunk|${label}|${chunk}`;
-     if(!seen.has(key)){seen.add(key);entries.push({text:chunk,type:'Chunk',original,label});}
-    }
-    if(source==='words'||source==='both'){
-     splitChunkWords(chunk).forEach(word=>{
-      const key=`word|${label}|${word.toLowerCase()}`;
-      if(!seen.has(key)){seen.add(key);entries.push({text:word,type:'단어',original,label});}
-     });
-    }
+   splitChunkParts(flow).forEach(part=>{
+    const type=chunkCardType(part);
+    if(source==='chunks'&&type!=='Chunk')return;
+    if(source==='words'&&type!=='단어')return;
+    const key=`${type}|${label}|${part.toLowerCase()}`;
+    if(!seen.has(key)){seen.add(key);entries.push({text:part,type,original,label});}
    });
   });
  });
