@@ -133,6 +133,8 @@ tr.only-forget-hidden{display:none!important}
 .flash-help{font-size:12.5px;color:var(--text-muted);margin-top:8px}
 .flash-hidden{display:none!important}
 .flash-scratch-box{margin-top:14px;padding-top:14px;border-top:1px dashed var(--border)}
+.flash-scratch-label{display:block;margin:10px 0 5px;font-size:13px;font-weight:900;color:var(--primary-dark)}
+.flash-scratch-label .label-tag{display:inline-block;background:var(--primary-tint);border:1px solid var(--border);border-radius:8px;padding:3px 8px}
 
 .scramble-box{background:#fbf9f6;border:1px solid var(--neutral);border-left:4px solid var(--primary);border-radius:12px;padding:14px;margin:10px 0 14px}
 .scramble-box b{margin-bottom:0}
@@ -236,6 +238,17 @@ tr.only-forget-hidden{display:none!important}
 <div class="card">
   <b>학습 기록</b>
   <div class="toolbar">
+    <label>아이디 <input id="onlineUserId" placeholder="mintB" style="width:110px"></label>
+    <label>비밀번호 <input id="onlinePassword" type="password" placeholder="비밀번호" style="width:130px"></label>
+    <button class="green small" onclick="loginOnlineLibrary()">로그인</button>
+    <button class="gray small" onclick="logoutOnlineLibrary()">로그아웃</button>
+    <button class="secondary small" onclick="testOnlineServer()">연결 테스트</button>
+    <button class="secondary small" onclick="loadOnlineFileList()">온라인 파일 목록</button>
+    <select id="onlineFileSelect" style="min-width:220px"><option value="">온라인 파일 없음</option></select>
+    <button class="red small" onclick="loadSelectedOnlineFile()">온라인 자료 불러오기</button>
+  </div>
+  <div id="onlineLoginStatus" class="hint">로그인하면 비공개 Google Drive/Sheet 자료를 불러올 수 있어.</div>
+  <div class="toolbar">
     <label>사용자/탭
       <select id="cloudUserName" onchange="saveCloudSettings()">
         <option value="">선택</option>
@@ -261,6 +274,7 @@ tr.only-forget-hidden{display:none!important}
   <b>엑셀 파일 불러오기</b>
   <div class="toolbar">
     <input type="file" id="bookExcelInput" accept=".xlsx,.xls" multiple onchange="loadWorkbookFiles(this.files)">
+    <button class="green" onclick="uploadCurrentWorkbookToDrive()">선택 파일 드라이브 업로드</button>
     <button class="secondary" onclick="loadAllItems()">전체 문장</button>
     <button class="orange" onclick="loadAllImportantItems()">⭐ 전체 중요문장</button>
     <button class="orange" onclick="loadRandomImportantItem()">🎲 중요문장 랜덤 1개</button>
@@ -324,6 +338,7 @@ tr.only-forget-hidden{display:none!important}
     <button id="modeBtn-scramble" class="mode-btn" onclick="switchMode('scramble')">🔤 단어 배열</button>
     <button id="modeBtn-molgong" class="mode-btn" onclick="switchMode('molgong')">🔥 몰공 모드</button>
     <button id="modeBtn-keywordWrite" class="mode-btn" onclick="switchMode('keywordWrite')">📝 키워드 보고 적기</button>
+    <button id="modeBtn-grammarCheck" class="mode-btn" onclick="switchMode('grammarCheck')">📚 문법 체크</button>
     <button id="modeBtn-cloze" class="mode-btn" onclick="switchMode('cloze')">🕳 빈칸 맞추기</button>
   </div>
   <div class="toolbar mode-switch">
@@ -418,12 +433,14 @@ tr.only-forget-hidden{display:none!important}
     <button class="secondary small" onclick="copyFlashText('en')">영어 복사</button>
   </div>
   <div id="flashResult" class="scramble-result flash-hidden"></div>
-  <div class="flash-help">카드 클릭: 정답 보기 → 다음 카드 / Space·Enter: 뒤집기·다음 / 타이핑 중 Ctrl+Enter: 뒤집기·다음 / ← →: 이전·다음</div>
+  <div class="flash-help">카드 클릭: 정답 보기 → 다음 카드 / Space·Enter: 뒤집기·다음 / 타이핑 중 Ctrl+Space·Ctrl+Enter: 뒤집기·다음 / Ctrl+0: 음원 1회 듣기 / ← →: 이전·다음</div>
 </div>
 
 <div class="flash-scratch-box">
-  <div class="flash-help">아래에 쓴 내용은 카드별로 기억했다가 마지막에 정답과 비교해서 보여줘.</div>
-  <textarea id="flashScratchInput" placeholder="자유롭게 써보면서 연습해봐" style="height:90px" oninput="saveFlashScratch(); autoGrow(this);" onkeydown="flashScratchKeydown(event)"></textarea>
+  <label class="flash-scratch-label" for="flashScratchInput"><span class="label-tag">정답 맞추기</span></label>
+  <textarea id="flashScratchInput" placeholder="정답을 떠올리며 적어봐" style="height:90px" oninput="saveFlashScratch(); autoGrow(this);" onkeydown="flashScratchKeydown(event)"></textarea>
+  <label class="flash-scratch-label" for="flashFreeInput"><span class="label-tag">그냥 적어보기</span></label>
+  <textarea id="flashFreeInput" placeholder="저장 없이 자유롭게 적어봐" style="height:90px" oninput="autoGrow(this);" onkeydown="flashScratchKeydown(event)"></textarea>
   <div class="flash-options">
     <button class="secondary small" onclick="flipFlashcard()">뒤집기</button>
     <button class="green small" onclick="handleFlashCardClick()">확인</button>
@@ -577,6 +594,23 @@ tr.only-forget-hidden{display:none!important}
 </div>
 </div>
 
+<div id="mode-grammarCheck" class="card mode-panel">
+<b>📚 문법 체크</b>
+<div class="toolbar"><button class="secondary small" id="grammarCheckQuestionToggleBtn" onclick="toggleStudyQuestionBox('grammarCheckQuestionBox', this)" style="display:none">질문 보기</button></div>
+<div id="grammarCheckQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="grammarCheckQuestionList"></div></div>
+<div class="flash-card-box">
+  <div class="flash-options">
+    <button class="green small" onclick="loadGrammarCheck(false)">문법 체크 불러오기</button>
+    <button class="secondary small" onclick="loadGrammarCheck(true)">새로 분석</button>
+    <button class="gray small" onclick="copyGrammarCheckText()">결과 복사</button>
+    <button class="red small" onclick="deleteCurrentGrammarCache()">현재 답변 문법 삭제</button>
+    <span id="grammarCheckStatus" class="flash-progress">0 / 0</span>
+  </div>
+  <div id="grammarCheckResult" class="scramble-result"></div>
+  <div class="flash-help">처음 분석한 문장은 구글시트 Grammar_Cache 탭에 저장돼. 다음부터는 삭제하거나 새로 분석하기 전까지 저장된 문법 설명을 그대로 불러와.</div>
+</div>
+</div>
+
 <div id="mode-cloze" class="card mode-panel">
 <b>🕳 빈칸 맞추기</b>
 <div class="toolbar"><button class="secondary small" id="clozeQuestionToggleBtn" onclick="toggleStudyQuestionBox('clozeQuestionBox', this)" style="display:none">질문 보기</button></div>
@@ -630,7 +664,7 @@ tr.only-forget-hidden{display:none!important}
 let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[],selectedItemKeys=[];
 let studyGroups=[],studyGroupIndex=0;
 let ENGLISH_ONLY_COPY={};
-let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0,flashAutoNextOn=false,flashAutoNextTimer=null,flashAutoScheduleRunId=0;
+let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0,flashAutoNextOn=false,flashAutoNextTimer=null,flashAutoScheduleRunId=0,flashResultCopyText='',flashResultExcelText='';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
 function norm(s){return String(s??'').trim().replace(/\s+/g,'').toLowerCase();}
@@ -647,17 +681,185 @@ function compactNo(u,g,q){return `${String(u).trim()}${String(g).trim()}${String
 function escapeHtml(s){return String(s??'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 function stripStress(text){return String(text??'').replace(/\[\[([\s\S]*?)\]\]/g,'$1');}
 const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycby5fJ4a-FuiOcwXbgYH0zJqdC1EPjoU-1iUi5ivLi8Q4goQe7eBpPh7-Apiuk3TpOo0/exec';
-const MODE_LABELS={table:'표',flash:'플래시카드',scramble:'단어 배열',molgong:'몰공 모드',keywordWrite:'키워드 보고 적기',cloze:'빈칸 맞추기',englishOnly:'문장 읽기',log:'기록 보기'};
+const MODE_LABELS={table:'표',flash:'플래시카드',scramble:'단어 배열',molgong:'몰공 모드',keywordWrite:'키워드 보고 적기',grammarCheck:'문법 체크',cloze:'빈칸 맞추기',englishOnly:'문장 읽기',log:'기록 보기'};
 const LOCAL_LOG_KEY='rr_local_log';
 const CLOUD_ALLOWED_TYPES=new Set(['answer_load','study_result']);
+let lastBookFiles=[];
 function todayKey(){return new Date().toLocaleDateString('sv-SE');}
 function rowTitle(row){return [row?.sheetName,row?.itemLabel].filter(Boolean).join(' - ');}
 function cloudSettings(){return{user:localStorage.getItem('rr_cloud_user')||'hoonyB',url:CLOUD_SCRIPT_URL};}
+function onlineCredentials(){
+ return {
+  user:(document.getElementById('onlineUserId')?.value||localStorage.getItem('rr_online_user')||'').trim(),
+  password:(document.getElementById('onlinePassword')?.value||localStorage.getItem('rr_online_password')||'').trim()
+ };
+}
+function setOnlineStatus(text){
+ const el=document.getElementById('onlineLoginStatus');
+ if(el)el.textContent=text;
+}
+function setCloudUserOption(name){
+ const user=document.getElementById('cloudUserName');
+ if(!user||!name)return;
+ if(![...user.options].some(opt=>opt.value===name)){
+  user.insertAdjacentHTML('beforeend',`<option value="${escapeAttr(name)}">${escapeHtml(name)}</option>`);
+ }
+ user.value=name;
+ localStorage.setItem('rr_cloud_user',name);
+ updateTodayStudyInfo();
+}
+function onlineUrl(action,params={}){
+ const query=new URLSearchParams({action,...params});
+ return CLOUD_SCRIPT_URL+'?'+query.toString();
+}
+function onlineJsonp(action,params={}){
+ return new Promise((resolve,reject)=>{
+  const callback='rr_jsonp_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+  const query=new URLSearchParams({action,callback,...params});
+  const script=document.createElement('script');
+  let called=false;
+  const timer=setTimeout(()=>{cleanup();reject(new Error('응답은 없었어. Apps Script를 v2 코드로 저장하고 새 버전으로 배포했는지 확인해줘.'));},30000);
+  function cleanup(){
+   clearTimeout(timer);
+   delete window[callback];
+   script.remove();
+  }
+  window[callback]=(data)=>{called=true;cleanup();resolve(data||{});};
+  script.onload=()=>{setTimeout(()=>{if(!called){cleanup();reject(new Error('서버 응답은 왔지만 v2 형식이 아니야. Apps Script를 v2 코드로 덮어쓰고 새 버전 배포를 해줘.'));}},0);};
+  script.onerror=()=>{cleanup();reject(new Error('온라인 자료 서버에 연결하지 못했어. 웹앱 배포 권한을 "모든 사용자"로 설정했는지 확인해줘.'));};
+  script.src=CLOUD_SCRIPT_URL+'?'+query.toString();
+  document.body.appendChild(script);
+ });
+}
+async function testOnlineServer(){
+ setOnlineStatus('연결 테스트 중...');
+ try{
+  const res=await onlineJsonp('ping');
+  setOnlineStatus(res.ok?`연결 성공: ${res.message||'v2 endpoint ready'}`:'연결은 됐지만 응답이 이상해.');
+ }catch(e){
+  setOnlineStatus((e.message||'연결 테스트 실패')+' 테스트 URL: '+onlineUrl('ping'));
+ }
+}
+async function loginOnlineLibrary(){
+ const cred=onlineCredentials();
+ if(!cred.user||!cred.password){alert('아이디와 비밀번호를 입력해줘.');return;}
+ setOnlineStatus('로그인 확인 중...');
+ try{
+  const res=await onlineJsonp('login',cred);
+  if(!res.ok){
+   const message=res.message||'로그인에 실패했어.';
+   setOnlineStatus(message);
+   recordLocalLogin(cred.user,false,message);
+   return;
+  }
+  localStorage.setItem('rr_online_user',cred.user);
+  localStorage.setItem('rr_online_password',cred.password);
+  setCloudUserOption(res.sheetName||cred.user);
+  setOnlineStatus(`${res.displayName||cred.user} 로그인됨 · 자료는 온라인에서 불러와.`);
+  recordLocalLogin(cred.user,true,res.displayName||cred.user);
+  await loadOnlineFileList();
+ }catch(e){
+  const message=e.message||'로그인 확인 중 오류가 났어.';
+  setOnlineStatus(message);
+  recordLocalLogin(cred.user,false,message);
+ }
+}
+function logoutOnlineLibrary(){
+ const prevUser=(localStorage.getItem('rr_online_user')||document.getElementById('onlineUserId')?.value||'').trim();
+ localStorage.removeItem('rr_online_user');
+ localStorage.removeItem('rr_online_password');
+ const userEl=document.getElementById('onlineUserId');
+ const passwordEl=document.getElementById('onlinePassword');
+ const select=document.getElementById('onlineFileSelect');
+ if(userEl)userEl.value='';
+ if(passwordEl)passwordEl.value='';
+ if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';
+ setOnlineStatus('로그아웃했어. 이 브라우저에 저장된 온라인 로그인 정보도 지웠어.');
+ if(prevUser)recordLocalLogin(prevUser,true,'로그아웃');
+}
+async function loadOnlineFileList(options={}){
+ const cred=onlineCredentials();
+ if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
+ const select=document.getElementById('onlineFileSelect');
+ if(select)select.innerHTML='<option value="">불러오는 중...</option>';
+ try{
+  const res=await onlineJsonp('listFiles',cred);
+  if(!res.ok){if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';setOnlineStatus(res.message||'파일 목록을 불러오지 못했어.');return false;}
+  const files=res.files||[];
+  if(select){
+   select.innerHTML=files.length?files.map(f=>`<option value="${escapeAttr(f.id)}">${escapeHtml(f.label||f.name)}</option>`).join(''):'<option value="">온라인 파일 없음</option>';
+  }
+  setOnlineStatus(files.length?`온라인 파일 ${files.length}개를 찾았어.`:'온라인 폴더에 파일이 없어.');
+  if(options.autoLoadFirst&&files.length){
+   if(select)select.value=files[0].id;
+   await loadSelectedOnlineFile({silentMissing:true});
+  }
+  return files.length>0;
+ }catch(e){
+  if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';
+  setOnlineStatus(e.message||'파일 목록 오류');
+  return false;
+ }
+}
+function base64ToFile(base64,fileName,mimeType){
+ const bin=atob(base64);
+ const bytes=new Uint8Array(bin.length);
+ for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+ return new File([bytes],fileName||'online.xlsx',{type:mimeType||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+async function loadSelectedOnlineFile(options={}){
+ const cred=onlineCredentials();
+ const fileId=document.getElementById('onlineFileSelect')?.value||'';
+ if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
+ if(!fileId){if(!options.silentMissing)alert('불러올 온라인 파일을 선택해줘.');return false;}
+ setOnlineStatus('온라인 파일을 불러오는 중...');
+ try{
+  const res=await onlineJsonp('getFile',{...cred,fileId});
+  if(!res.ok){setOnlineStatus(res.message||'온라인 파일을 불러오지 못했어.');return false;}
+  const file=base64ToFile(res.base64,res.fileName,res.mimeType);
+  await loadWorkbookFiles([file]);
+  setOnlineStatus(`${res.fileName||'온라인 파일'} 불러오기 완료`);
+  return true;
+ }catch(e){
+  setOnlineStatus(e.message||'온라인 파일 불러오기 오류');
+  return false;
+ }
+}
+function fileToBase64(file){
+ return new Promise((resolve,reject)=>{
+  const reader=new FileReader();
+  reader.onload=()=>resolve(String(reader.result||'').split(',')[1]||'');
+  reader.onerror=()=>reject(new Error('파일을 읽지 못했어.'));
+  reader.readAsDataURL(file);
+ });
+}
+async function uploadCurrentWorkbookToDrive(){
+ const cred=onlineCredentials();
+ const files=[...(document.getElementById('bookExcelInput')?.files||lastBookFiles||[])];
+ if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
+ if(!files.length){alert('먼저 업로드할 엑셀 파일을 선택해줘.');return;}
+ setOnlineStatus('드라이브로 업로드 중...');
+ for(const file of files){
+  const base64=await fileToBase64(file);
+  fetch(CLOUD_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'uploadWorkbook',user:cred.user,password:cred.password,fileName:file.name,mimeType:file.type,base64})});
+ }
+ setOnlineStatus(`${files.length}개 파일을 드라이브로 보냈어. 잠시 뒤 파일 목록을 새로고침해줘.`);
+}
 function loadCloudSettings(){
  const s=cloudSettings();
  const user=document.getElementById('cloudUserName');
  if(user&&[...user.options].some(opt=>opt.value===s.user))user.value=s.user;
+ const onlineUser=document.getElementById('onlineUserId');
+ const onlinePassword=document.getElementById('onlinePassword');
+ if(onlineUser)onlineUser.value=localStorage.getItem('rr_online_user')||'';
+ if(onlinePassword)onlinePassword.value=localStorage.getItem('rr_online_password')||'';
  updateTodayStudyInfo();
+}
+function autoLoadOnlineFilesFromLocalLogin(){
+ const cred=onlineCredentials();
+ if(!cred.user||!cred.password)return;
+ setOnlineStatus(`${cred.user} 로컬 로그인 기록 있음 · 온라인 자료 불러오는 중...`);
+ loadOnlineFileList({autoLoadFirst:true});
 }
 function saveCloudSettings(){
  const user=(document.getElementById('cloudUserName')?.value||'').trim();
@@ -722,13 +924,25 @@ function addLocalLogEntry(entry){
  saveLocalLogEntries(entries);
  if(currentMode==='log')renderLogView();
 }
+function recordLocalLogin(user,success,message=''){
+ addLocalLogEntry({
+  app:'RepeatRepeat',
+  type:success?'login':'login_failed',
+  user:user||'',
+  date:todayKey(),
+  createdAt:new Date().toISOString(),
+  source:success?'로컬 로그인 기록':'로그인 실패',
+  title:success?'온라인 로그인':'온라인 로그인 실패',
+  memo:message||''
+ });
+}
 function logTypeLabel(type){
- return {answer_load:'답변 불러오기',study_result:'학습 완료'}[type]||type||'기록';
+ return {answer_load:'답변 불러오기',study_result:'학습 완료',login:'로그인',login_failed:'로그인 실패'}[type]||type||'기록';
 }
 function renderLogView(){
  const box=document.getElementById('logView');
  if(!box)return;
- const entries=localLogEntries().filter(e=>['answer_load','study_result'].includes(e.type)).slice().reverse();
+ const entries=localLogEntries().filter(e=>['answer_load','study_result','login','login_failed'].includes(e.type)).slice().reverse();
  const user=cloudSettings().user||'선택 안 됨';
  const today=todayKey();
  const todayEntries=entries.filter(e=>e.date===today);
@@ -1004,6 +1218,7 @@ function parseAnswerSheet(ws,sheetName){
 }
 async function loadWorkbookFiles(fileList){
  if(!fileList||!fileList.length)return;
+ lastBookFiles=[...fileList];
  stopSpeak();
  clearSelectedItemQueue();
  try{
@@ -1369,6 +1584,7 @@ function showQuestions(items){
  setStudyQuestionToggle('scramble',renderQuestionBox('scrambleQuestionBox','scrambleQuestionList',currentQuestionItems,'scramble',false,true),true);
  setStudyQuestionToggle('molgong',renderQuestionBox('molgongQuestionBox','molgongQuestionList',currentQuestionItems,'molgong',false,true),true);
  setStudyQuestionToggle('keywordWrite',renderQuestionBox('keywordWriteQuestionBox','keywordWriteQuestionList',currentQuestionItems,'keywordWrite',false,true),true);
+ setStudyQuestionToggle('grammarCheck',renderQuestionBox('grammarCheckQuestionBox','grammarCheckQuestionList',currentQuestionItems,'grammarCheck',false,true),true);
  setStudyQuestionToggle('cloze',renderQuestionBox('clozeQuestionBox','clozeQuestionList',currentQuestionItems,'cloze',false,true),true);
  setTimeout(refreshPracticeHeights,0);
 }
@@ -1445,8 +1661,8 @@ function copyKeyword(id){
  if(!box)return;
  navigator.clipboard.writeText(box.textContent||'');
 }
-function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox','molgongQuestionBox','keywordWriteQuestionBox','clozeQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList','molgongQuestionList','keywordWriteQuestionList','clozeQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});['flash','scramble','molgong','keywordWrite','cloze'].forEach(mode=>setStudyQuestionToggle(mode,false));}
-function setRows(pairs,preserveGroups=false){if(!preserveGroups)clearStudyGroups();startStudyEntry();document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',flowText:i.flowText||'',done:false})).filter(i=>i.ko||i.en);renderTable();}
+function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox','molgongQuestionBox','keywordWriteQuestionBox','grammarCheckQuestionBox','clozeQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList','molgongQuestionList','keywordWriteQuestionList','grammarCheckQuestionList','clozeQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});['flash','scramble','molgong','keywordWrite','grammarCheck','cloze'].forEach(mode=>setStudyQuestionToggle(mode,false));}
+function setRows(pairs,preserveGroups=false){if(!preserveGroups)clearStudyGroups();startStudyEntry();grammarCheckResults={};document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',flowText:i.flowText||'',done:false})).filter(i=>i.ko||i.en);renderTable();if(currentMode==='grammarCheck')renderGrammarCheck();}
 function loadSelectedItem(){stopSpeak();clearStudyGroups();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));recordAnswerLoad(item,'선택 답변 불러오기');}
 function canLoadNextSelectedItem(){
  const select=document.getElementById('unitSelect');
@@ -1650,6 +1866,8 @@ function toggleForgetOnly(btn){
 function clearFlashScratch(){
  const el=document.getElementById('flashScratchInput');
  if(el) el.value='';
+ const free=document.getElementById('flashFreeInput');
+ if(free) free.value='';
 }
 function saveFlashScratch(){
  const el=document.getElementById('flashScratchInput');
@@ -1661,6 +1879,8 @@ function loadFlashScratch(){
  if(!el)return;
  el.value=flashScratchAnswers[flashIndex]||'';
  autoGrow(el);
+ const free=document.getElementById('flashFreeInput');
+ if(free){free.value='';autoGrow(free);}
 }
 function getFlashDisplayedSpeakSide(){
  const row=getFlashCurrent();
@@ -1690,6 +1910,15 @@ async function playFlashSpeak(options={}){
     if(runId!==flashSpeakRunId)return false;
    }
  }
+ return true;
+}
+async function playFlashSpeakOnce(options={}){
+ const row=getFlashCurrent();
+ if(!row){if(!options.silent)alert('먼저 플래시카드를 시작해줘.');return false;}
+ const side=getFlashDisplayedSpeakSide();
+ if(!side){if(!options.silent)alert('현재 보이는 카드와 선택한 음성 모드가 맞지 않아.');return false;}
+ if(!side.plain){if(!options.silent)alert('읽을 내용이 없어.');return false;}
+ await speakFlashText(side,getFlashSpeakRate(side.lang));
  return true;
 }
 function stopFlashSpeakPlayback(){
@@ -1806,6 +2035,8 @@ function advanceFlashAutoNext(){
 function hideFlashResult(){
  const res=document.getElementById('flashResult');
  if(res){res.classList.add('flash-hidden');res.innerHTML='';}
+ flashResultCopyText='';
+ flashResultExcelText='';
 }
 function getFlashCurrent(){
  if(!flashOrderList.length) buildFlashOrder();
@@ -1939,7 +2170,9 @@ function showFlashAllSentences(){
  const mode=document.getElementById('flashMode')?.value||'ko_en';
  const answerLang=(mode==='en_ko'||mode==='ko_only')?'ko':'en';
  let wrongCount=0;
- let html='<div><b>플래시카드 결과</b></div><table><thead><tr><th class="num-col">번호</th><th>내가 쓴 문장</th><th>정답</th></tr></thead><tbody>';
+ flashResultCopyText=buildFlashResultCopyText(items,answerLang);
+ flashResultExcelText=buildFlashResultExcelText(items);
+ let html='<div class="toolbar" style="justify-content:space-between;margin-bottom:8px"><b>플래시카드 결과</b><span><button class="secondary small" onclick="copyFlashResultForFeedback()">첨삭용 복사</button> <button class="secondary small" onclick="copyFlashResultForExcel()">엑셀용 복사</button></span></div><table><thead><tr><th class="num-col">번호</th><th>내가 쓴 문장</th><th>정답</th></tr></thead><tbody>';
  html+=items.map(item=>{
   const myAnswer=flashScratchAnswers[item.pos-1]||'';
   const correct=answerLang==='ko'?(item.row.ko||''):(item.row.en||'');
@@ -1952,6 +2185,42 @@ function showFlashAllSentences(){
  html+='</tbody></table>'+nextAnswerButtonHtml();
  res.innerHTML=html;
  res.classList.remove('flash-hidden');
+}
+function buildFlashResultCopyText(items,answerLang){
+ const lines=[
+  '플래시카드 첨삭 부탁해.',
+  '아래의 "내가 쓴 문장"과 "정답"을 비교해서 틀린 부분과 더 자연스러운 표현을 간단히 알려줘.',
+  ''
+ ];
+ items.forEach(item=>{
+  const myAnswer=(flashScratchAnswers[item.pos-1]||'').trim();
+  const correct=answerLang==='ko'?(item.row.ko||''):(item.row.en||'');
+  const plainCorrect=stripStress(correct).trim();
+  if(!myAnswer&&!plainCorrect)return;
+  const title=[item.row.sheetName,item.row.itemLabel].filter(Boolean).join(' - ');
+  lines.push(`${item.pos}. ${title}`);
+  lines.push(`내가 쓴 문장: ${myAnswer||'(비어 있음)'}`);
+  lines.push(`정답: ${plainCorrect||'(정답 없음)'}`);
+  lines.push('');
+ });
+ return lines.join('\n').trim();
+}
+function copyFlashResultForFeedback(){
+ if(!flashResultCopyText){alert('복사할 플래시카드 결과가 없어.');return;}
+ navigator.clipboard.writeText(flashResultCopyText);
+}
+function buildFlashResultExcelText(items){
+ const lines=[];
+ items.forEach(item=>{
+  const ko=String(item.row.ko||'').replace(/\r?\n/g,' ').trim();
+  const en=stripStress(item.row.en||'').replace(/\r?\n/g,' ').trim();
+  if(ko||en)lines.push(`${ko}\t${en}`);
+ });
+ return lines.join('\n');
+}
+function copyFlashResultForExcel(){
+ if(!flashResultExcelText){alert('복사할 전체 내용이 없어.');return;}
+ navigator.clipboard.writeText(flashResultExcelText);
 }
 function handleFlashCardClick(){
  if(!flashOrderList.length){startFlashcards();return;}
@@ -2611,6 +2880,115 @@ function showKeywordWriteResult(){
  res.classList.remove('flash-hidden');
 }
 
+let grammarCheckResults={},grammarCheckLoading=false;
+function grammarSentenceTitle(row){
+ return [row.sheetName,row.itemLabel].filter(Boolean).join(' - ') || currentQuestionTitle() || '현재 답변';
+}
+function grammarSentenceItems(){
+ return rows.map((row,i)=>({
+  index:i+1,
+  title:grammarSentenceTitle(row),
+  ko:String(row.ko||'').trim(),
+  en:stripStress(row.en||'').trim()
+ })).filter(item=>item.en);
+}
+function grammarKey(item){
+ return `${item.title}|${item.index}|${item.en}`;
+}
+function normalizeGrammarResult(result){
+ if(!result||typeof result!=='object')return {summary:'문법 설명을 불러오지 못했어.',points:[]};
+ return {
+  summary:String(result.summary||'').trim(),
+  points:Array.isArray(result.points)?result.points.map(p=>({
+   text:String(p.text||'').trim(),
+   grammar:String(p.grammar||'').trim(),
+   explanation:String(p.explanation||'').trim(),
+   reuseTip:String(p.reuseTip||'').trim()
+  })).filter(p=>p.text||p.grammar||p.explanation||p.reuseTip):[]
+ };
+}
+function renderGrammarCheck(){
+ const box=document.getElementById('grammarCheckResult');
+ const status=document.getElementById('grammarCheckStatus');
+ if(!box)return;
+ const items=grammarSentenceItems();
+ if(status)status.textContent=`${Object.keys(grammarCheckResults).length} / ${items.length}`;
+ if(!items.length){
+  box.innerHTML='<div class="log-empty">먼저 답변을 불러와줘. 영어 문장이 있으면 문장별 문법 포인트를 볼 수 있어.</div>';
+  return;
+ }
+ box.innerHTML=items.map(item=>{
+  const key=grammarKey(item);
+  const saved=grammarCheckResults[key];
+  const state=saved?renderGrammarAnalysis(saved.result,saved.cached):'<div class="hint">아직 문법 체크를 불러오지 않았어.</div>';
+  return `<div class="english-answer-card" style="margin-bottom:10px"><div class="english-answer-head"><div class="english-answer-title">${escapeHtml(item.title)} · ${item.index}</div></div><div class="english-answer-lines"><p class="english-answer-line">${escapeHtml(item.en)}</p>${item.ko?`<p class="hint">${escapeHtml(item.ko)}</p>`:''}</div><div class="english-answer-footer">${state}</div></div>`;
+ }).join('');
+}
+function renderGrammarAnalysis(result,cached){
+ const data=normalizeGrammarResult(result);
+ const points=data.points.length?data.points.map(p=>`<li><b>${escapeHtml(p.text||p.grammar)}</b>${p.grammar?` <span class="hint">(${escapeHtml(p.grammar)})</span>`:''}<div>${escapeHtml(p.explanation||'')}</div>${p.reuseTip?`<div class="hint">활용: ${escapeHtml(p.reuseTip)}</div>`:''}</li>`).join(''):'<li>표시할 문법 포인트가 없어.</li>';
+ return `<div class="hint">${cached?'저장된 문법 설명':'새로 분석한 문법 설명'}</div>${data.summary?`<div style="margin:6px 0">${escapeHtml(data.summary)}</div>`:''}<ul style="margin:6px 0 0 18px">${points}</ul>`;
+}
+async function loadGrammarCheck(force=false){
+ const cred=onlineCredentials();
+ if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
+ const items=grammarSentenceItems();
+ if(!items.length){alert('먼저 답변을 불러와줘.');return;}
+ if(grammarCheckLoading)return;
+ grammarCheckLoading=true;
+ const status=document.getElementById('grammarCheckStatus');
+ renderGrammarCheck();
+ for(let i=0;i<items.length;i++){
+  const item=items[i];
+  if(status)status.textContent=`분석 중 ${i+1} / ${items.length}`;
+  try{
+   const res=await onlineJsonp('grammarCheck',{...cred,title:item.title,sentenceIndex:String(item.index),sentence:item.en,ko:item.ko,force:force?'1':''});
+   if(!res.ok)throw new Error(res.message||'문법 체크 실패');
+   grammarCheckResults[grammarKey(item)]={result:res.result,cached:!!res.cached};
+  }catch(e){
+   grammarCheckResults[grammarKey(item)]={result:{summary:e.message||'문법 체크 중 오류가 났어.',points:[]},cached:false};
+  }
+  renderGrammarCheck();
+ }
+ grammarCheckLoading=false;
+ if(status)status.textContent=`${items.length} / ${items.length}`;
+}
+function copyGrammarCheckText(){
+ const items=grammarSentenceItems();
+ const lines=[];
+ items.forEach(item=>{
+  const saved=grammarCheckResults[grammarKey(item)];
+  if(!saved)return;
+  const data=normalizeGrammarResult(saved.result);
+  lines.push(`${item.title} · ${item.index}`);
+  lines.push(item.en);
+  if(data.summary)lines.push(`요약: ${data.summary}`);
+  data.points.forEach(p=>{
+   lines.push(`- ${p.text||p.grammar}: ${p.explanation}${p.reuseTip?` / 활용: ${p.reuseTip}`:''}`);
+  });
+  lines.push('');
+ });
+ if(!lines.length){alert('복사할 문법 체크 결과가 없어.');return;}
+ navigator.clipboard.writeText(lines.join('\n').trim());
+}
+async function deleteCurrentGrammarCache(){
+ const cred=onlineCredentials();
+ if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
+ const titles=[...new Set(grammarSentenceItems().map(item=>item.title).filter(Boolean))];
+ if(!titles.length){alert('삭제할 현재 답변이 없어.');return;}
+ if(!confirm('현재 답변의 저장된 문법 설명을 구글시트에서 삭제할까요?'))return;
+ let deleted=0;
+ for(const title of titles){
+  try{
+   const res=await onlineJsonp('grammarDelete',{...cred,title});
+   if(res.ok)deleted+=Number(res.deleted||0);
+  }catch(e){}
+ }
+ grammarCheckResults={};
+ renderGrammarCheck();
+ alert(`저장된 문법 설명 ${deleted}개를 삭제했어.`);
+}
+
 let clozeOrderList=[],clozeIndex=0,clozeFinished=false,clozeAnswers=[],clozeChecked=[],clozeHintVisible=false,clozeHintOrders=[];
 function buildClozeOrder(){
  const indices=getVisibleRowIndices().filter(i=>rows[i]&&String(rows[i].en||'').trim());
@@ -3038,7 +3416,12 @@ function getQuestionPracticeKey(q){return 'ls_qpractice_'+storageSafe(keyOf(q.un
 function getSavedPractice(key){return localStorage.getItem(key)||'';}
 function savePracticeInput(el){if(!el||!el.dataset.key)return;localStorage.setItem(el.dataset.key,el.value);autoGrow(el);}
 function autoGrow(el){if(!el)return;el.style.height='auto';el.style.height=Math.max(42,el.scrollHeight)+'px';}
-function flashScratchKeydown(e){if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();saveFlashScratch();handleFlashCardClick();}}
+function flashScratchKeydown(e){
+ if(!e.ctrlKey)return;
+ if(e.code==='Space'){e.preventDefault();saveFlashScratch();flipFlashcard();}
+ else if(e.key==='Enter'){e.preventDefault();saveFlashScratch();handleFlashCardClick();}
+ else if(e.key==='0'){e.preventDefault();playFlashSpeakOnce();}
+}
 function practiceKeydown(e,el){if(el&&el.classList.contains('question-practice-input'))return;if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const inputs=[...document.querySelectorAll('.practice-input')];const idx=inputs.indexOf(el);if(idx>=0&&idx<inputs.length-1)inputs[idx+1].focus();}}
 function refreshPracticeHeights(){document.querySelectorAll('.practice-input,.question-practice-input').forEach(autoGrow);}
 function copyPracticeColumn(){const text=getVisibleRowIndices().map(i=>getSavedPractice(getPracticeKey(rows[i]))).join('\n');navigator.clipboard.writeText(text);}
@@ -3148,7 +3531,7 @@ function switchMode(mode){
  const changed=currentMode!==mode;
  currentMode=mode;
  if(changed)startStudyEntry();
- ['table','flash','scramble','molgong','keywordWrite','cloze','englishOnly'].forEach(m=>{
+ ['table','flash','scramble','molgong','keywordWrite','grammarCheck','cloze','englishOnly'].forEach(m=>{
    const panel=document.getElementById('mode-'+m);
    const btn=document.getElementById('modeBtn-'+m);
    if(panel)panel.classList.toggle('active', m===mode);
@@ -3168,6 +3551,7 @@ function downloadPython(){let code=document.getElementById('pythonCode').textCon
 cleanLegacyLogData();
 loadCloudSettings();
 renderLogView();
+autoLoadOnlineFilesFromLocalLogin();
 
 </script>
 </body>
