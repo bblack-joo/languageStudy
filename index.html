@@ -276,8 +276,8 @@ tr.only-forget-hidden{display:none!important}
     <input type="file" id="bookExcelInput" accept=".xlsx,.xls" multiple onchange="loadWorkbookFiles(this.files)">
     <button class="green" onclick="uploadCurrentWorkbookToDrive()">선택 파일 드라이브 업로드</button>
     <button class="secondary" onclick="loadAllItems()">전체 문장</button>
-    <button class="orange" onclick="loadAllImportantItems()">⭐ 전체 중요문장</button>
-    <button class="orange" onclick="loadRandomImportantItem()">🎲 중요문장 랜덤 1개</button>
+    <button class="orange" onclick="loadAllImportantItems()">? 전체 중요문장</button>
+    <button class="orange" onclick="loadRandomImportantItem()">?? 중요문장 랜덤 1개</button>
   </div>
   <div class="toolbar">
     <select id="unitFilter" onchange="renderItemSelect()"><option value="">전체</option></select>
@@ -302,11 +302,11 @@ tr.only-forget-hidden{display:none!important}
     <button class="green" onclick="loadQueuedItems()">선택한 답변 불러오기</button>
     <button class="orange" onclick="loadImportantItems()">선택 중요문장</button>
   </div>
-  <div class="hint">파일 선택 창에서 여러 개(Ctrl/Shift로 다중 선택)를 고르면 한 번에 합쳐서 불러와. 파일이 2개 이상이면 Unit 목록에 "파일명::시트명"으로 구분해서 표시돼. 답변 탭은 헤더 아래에서 빈 줄 전까지 한 묶음으로 읽어. 같은 묶음 안의 unit/그룹/질문 번호는 전부 질문 박스에 표시해. "선택 중요문장"는 Unit/묶음에서 고른 범위 안에서만, "⭐ 전체 중요문장"는 필터와 상관없이 문장집 전체에서 중요도=1로 표시된 묶음들을 처음부터 빈 줄 직전까지 통째로 전부 불러와. "🎲 중요문장 랜덤 1개"는 문장집 전체의 중요 묶음들 중 딱 하나만 랜덤으로 불러와.</div>
+  <div class="hint">파일 선택 창에서 여러 개(Ctrl/Shift로 다중 선택)를 고르면 한 번에 합쳐서 불러와. 파일이 2개 이상이면 Unit 목록에 "파일명::시트명"으로 구분해서 표시돼. 답변 탭은 헤더 아래에서 빈 줄 전까지 한 묶음으로 읽어. 같은 묶음 안의 unit/그룹/질문 번호는 전부 질문 박스에 표시해. "선택 중요문장"는 Unit/묶음에서 고른 범위 안에서만, "? 전체 중요문장"는 필터와 상관없이 문장집 전체에서 중요도=1로 표시된 묶음들을 처음부터 빈 줄 직전까지 통째로 전부 불러와. "?? 중요문장 랜덤 1개"는 문장집 전체의 중요 묶음들 중 딱 하나만 랜덤으로 불러와.</div>
 </div>
 
 <div class="card">
-<div class="toolbar"><button class="secondary small" id="manualEntryToggleBtn" onclick="toggleManualEntry()">✏ 데이터 직접 넣기</button></div>
+<div class="toolbar"><button class="secondary small" id="manualEntryToggleBtn" onclick="toggleManualEntry()">? 데이터 직접 넣기</button></div>
 <div id="manualEntryBox" style="display:none">
 <div class="hint">탭 또는 엔터로 구분된 한글/영어 문장을 붙여넣거나, Excel/CSV/TXT 파일을 불러와.</div>
 <textarea id="inputText" placeholder="한글<Tab>영어 또는 한글<Enter>영어 형태로 붙여넣기"></textarea>
@@ -316,7 +316,7 @@ tr.only-forget-hidden{display:none!important}
 </div>
 
 <div class="card">
-<div class="toolbar"><button class="secondary small" id="chatGptToggleBtn" onclick="toggleChatGptBox()">💬 ChatGPT에 묻기</button></div>
+<div class="toolbar"><button class="secondary small" id="chatGptToggleBtn" onclick="toggleChatGptBox()">?? ChatGPT에 묻기</button></div>
 <div id="chatGptBox" style="display:none">
 <div class="hint">단어, 표현, 문장을 적고 원하는 질문을 누르면 ChatGPT 새 탭이 열려. 질문문은 클립보드에도 같이 복사돼.</div>
 <textarea id="chatGptInput" placeholder="예: get used to / I usually spend time at home." style="height:70px" oninput="autoGrow(this)"></textarea>
@@ -334,51 +334,51 @@ tr.only-forget-hidden{display:none!important}
 <div class="card">
   <b>학습 모드 선택</b>
   <div class="toolbar mode-switch">
-    <button id="modeBtn-flash" class="mode-btn active" onclick="switchMode('flash')">🧠 플래시카드</button>
-    <button id="modeBtn-scramble" class="mode-btn" onclick="switchMode('scramble')">🔤 단어 배열</button>
-    <button id="modeBtn-molgong" class="mode-btn" onclick="switchMode('molgong')">🔥 몰공 모드</button>
-    <button id="modeBtn-keywordWrite" class="mode-btn" onclick="switchMode('keywordWrite')">📝 키워드 보고 적기</button>
-    <button id="modeBtn-grammarCheck" class="mode-btn" onclick="switchMode('grammarCheck')">📚 문법 체크</button>
-    <button id="modeBtn-cloze" class="mode-btn" onclick="switchMode('cloze')">🕳 빈칸 맞추기</button>
+    <button id="modeBtn-flash" class="mode-btn active" onclick="switchMode('flash')">?? 플래시카드</button>
+    <button id="modeBtn-scramble" class="mode-btn" onclick="switchMode('scramble')">?? 단어 배열</button>
+    <button id="modeBtn-molgong" class="mode-btn" onclick="switchMode('molgong')">?? 몰공 모드</button>
+    <button id="modeBtn-keywordWrite" class="mode-btn" onclick="switchMode('keywordWrite')">?? 키워드 보고 적기</button>
+    <button id="modeBtn-grammarCheck" class="mode-btn" onclick="switchMode('grammarCheck')">?? 문법 체크</button>
+    <button id="modeBtn-cloze" class="mode-btn" onclick="switchMode('cloze')">?? 빈칸 맞추기</button>
   </div>
   <div class="toolbar mode-switch">
-    <button id="modeBtn-table" class="mode-btn" onclick="switchMode('table')">📋 표</button>
-    <button id="modeBtn-englishOnly" class="mode-btn" onclick="switchMode('englishOnly')">📖 문장 읽기</button>
+    <button id="modeBtn-table" class="mode-btn" onclick="switchMode('table')">?? 표</button>
+    <button id="modeBtn-englishOnly" class="mode-btn" onclick="switchMode('englishOnly')">?? 문장 읽기</button>
     <button class="gray" onclick="clearAll()">초기화</button>
   </div>
   <div id="currentItemInfo" class="hint"></div>
   <div id="todayStudyInfo" class="hint"></div>
   <div class="toolbar">
     <span id="timerDisplay" class="flash-progress">00:00</span>
-    <button class="green small" onclick="startTimer()">⏱ 시작</button>
-    <button class="red small" onclick="stopTimer()">⏹ 종료</button>
+    <button class="green small" onclick="startTimer()">? 시작</button>
+    <button class="red small" onclick="stopTimer()">? 종료</button>
   </div>
 </div>
 
 <div id="mode-table" class="card mode-panel">
 <b>표 · 읽기 설정</b>
 <div class="toolbar-label">재생</div>
-<div class="toolbar"><button onclick="readAll('en')">▶ 표 읽기</button><button onclick="readAll('ko')">한글</button><button onclick="readAll('en')">영어</button><button class="orange" onclick="readRandom()">🎲 랜덤 읽기</button><button class="secondary" onclick="pauseSpeak()">⏸ 일시정지</button><button class="green" onclick="resumeSpeak()">▶ 이어읽기</button><button class="red" onclick="stopSpeak()">■ 정지</button></div>
+<div class="toolbar"><button onclick="readAll('en')">▶ 표 읽기</button><button onclick="readAll('ko')">한글</button><button onclick="readAll('en')">영어</button><button class="orange" onclick="readRandom()">?? 랜덤 읽기</button><button class="secondary" onclick="pauseSpeak()">? 일시정지</button><button class="green" onclick="resumeSpeak()">▶ 이어읽기</button><button class="red" onclick="stopSpeak()">■ 정지</button></div>
 <div class="toolbar-label">Python 코드</div>
-<div class="toolbar"><button class="green" onclick="generatePython('both')">🐍 문장별 생성 코드</button><button class="green" onclick="generatePython('ko')">🇰🇷 한글 한 파일 코드</button><button class="green" onclick="generatePython('en')">🇺🇸 영어 한 파일 코드</button><button class="green" onclick="downloadPython()">💾 .py 저장</button><button class="secondary" onclick="copyPython()">📋 코드 복사</button></div>
+<div class="toolbar"><button class="green" onclick="generatePython('both')">?? 문장별 생성 코드</button><button class="green" onclick="generatePython('ko')">???? 한글 한 파일 코드</button><button class="green" onclick="generatePython('en')">???? 영어 한 파일 코드</button><button class="green" onclick="downloadPython()">?? .py 저장</button><button class="secondary" onclick="copyPython()">?? 코드 복사</button></div>
 <div class="toolbar-label">옵션</div>
 <div class="toolbar"><label>읽기 순서<select id="orderMode"><option value="ko_en">한글 → 영어</option><option value="en_ko">영어 → 한글</option></select></label><label>반복 <input id="repeatCount" type="number" min="1" value="1" style="width:60px"> 회</label><label>한글/영어 사이 쉬기 <input id="pairGapSec" type="number" min="0" step="0.1" value="5" style="width:70px"> 초</label><label>문장 사이 쉬기 <input id="gapSec" type="number" min="0" step="0.1" value="1.0" style="width:70px"> 초</label><label>키워드 사이 쉬기 <input id="keywordGapSec" type="number" min="0" step="0.5" value="5" style="width:70px"> 초</label><label><input id="skipNumberRead" type="checkbox"> 숫자 안읽기</label><label><input id="pythonRandom" type="checkbox"> Python 랜덤 순서</label><label>한글 속도 <input id="koRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label><label>영어 속도 <input id="enRate" type="number" min="0.5" max="2" step="0.1" value="1.0" style="width:70px"></label><label>파일명 <input id="baseName" value="opic_practice" style="width:150px"></label></div>
 
 <div id="pythonCard" style="display:none;margin-top:10px"><b>생성된 Python 코드</b><pre id="pythonCode"></pre></div>
 
-<div class="hint" style="margin-top:10px">각 행의 ▶전체 / 한글 / 영어 / 🔁 버튼으로 그 문장만 읽을 수 있어.</div>
+<div class="hint" style="margin-top:10px">각 행의 ▶전체 / 한글 / 영어 / ?? 버튼으로 그 문장만 읽을 수 있어.</div>
 <div id="questionBox" class="question-box" style="display:none"><b>질문</b><div id="questionList"></div></div>
 <div class="toolbar-label">보기 옵션</div>
-<div class="toolbar"><button id="koToggleBtn" class="green small" onclick="displayRow('ko')">한글 숨기기</button><button id="enToggleBtn" class="green small" onclick="displayRow('en')">영어 숨기기</button><button id="practiceToggleBtn" class="green small" onclick="togglePracticeColumn(this)">✍ 연습칸 숨기기</button><button id="actionsToggleBtn" class="green small" onclick="toggleActionsColumn(this)">기능 숨기기</button><button id="forgetOnlyBtn" class="orange small" onclick="toggleForgetOnly(this)">☑ 안 외워진 것만 보기</button></div>
+<div class="toolbar"><button id="koToggleBtn" class="green small" onclick="displayRow('ko')">한글 숨기기</button><button id="enToggleBtn" class="green small" onclick="displayRow('en')">영어 숨기기</button><button id="practiceToggleBtn" class="green small" onclick="togglePracticeColumn(this)">? 연습칸 숨기기</button><button id="actionsToggleBtn" class="green small" onclick="toggleActionsColumn(this)">기능 숨기기</button><button id="forgetOnlyBtn" class="orange small" onclick="toggleForgetOnly(this)">? 안 외워진 것만 보기</button></div>
 <div class="toolbar-label">연습 관리</div>
-<div class="toolbar"><span class="hint" style="margin:0 4px 0 0">연습칸에 적어보며 외우기</span><button class="green small" onclick="copyPracticeColumn()">✍ 연습 복사</button><button class="gray small" onclick="clearCurrentPractice()">현재 표 연습 삭제</button><button class="red small" onclick="clearAllPractice()">전체 연습 삭제</button></div>
+<div class="toolbar"><span class="hint" style="margin:0 4px 0 0">연습칸에 적어보며 외우기</span><button class="green small" onclick="copyPracticeColumn()">? 연습 복사</button><button class="gray small" onclick="clearCurrentPractice()">현재 표 연습 삭제</button><button class="red small" onclick="clearAllPractice()">전체 연습 삭제</button></div>
 <div class="toolbar-label">학습 완료</div>
 <div class="toolbar"><button class="green small" onclick="completeTableStudy('읽기 완료')">읽기 완료</button><button class="green small" onclick="completeTableStudy('타이핑 완료')">타이핑 완료</button></div>
-<div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">✓</th><th class="num">번호</th><th class="kr">한글 <button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="practice-cell">✍ 연습</th><th class="actions actions-header">기능</th></tr></thead><tbody></tbody></table></div>
+<div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">?</th><th class="num">번호</th><th class="kr">한글 <button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="practice-cell">? 연습</th><th class="actions actions-header">기능</th></tr></thead><tbody></tbody></table></div>
 </div>
 
 <div id="mode-flash" class="card mode-panel active">
-<b>🧠 플래시카드로 암기하기</b>
+<b>?? 플래시카드로 암기하기</b>
 <div class="toolbar"><button class="secondary small" id="flashQuestionToggleBtn" onclick="toggleStudyQuestionBox('flashQuestionBox', this)" style="display:none">질문 보기</button></div>
 <div id="flashQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="flashQuestionList"></div></div>
 <div class="flash-card-box">
@@ -406,7 +406,7 @@ tr.only-forget-hidden{display:none!important}
       </select>
     </label>
     <button class="green small" onclick="startFlashcards()">시작</button>
-    <button class="secondary small" onclick="playFlashSpeak()">🔊 듣기</button>
+    <button class="secondary small" onclick="playFlashSpeak()">?? 듣기</button>
     <button class="secondary small" onclick="prevFlashcard()">◀ 이전</button>
     <button class="secondary small" onclick="flipFlashcard()">뒤집기</button>
     <button class="secondary small" onclick="nextFlashcard()">다음 ▶</button>
@@ -449,7 +449,7 @@ tr.only-forget-hidden{display:none!important}
 </div>
 
 <div id="mode-scramble" class="card mode-panel">
-<b>🔤 단어 배열 연습</b>
+<b>?? 단어 배열 연습</b>
 <div class="toolbar"><button class="secondary small" id="scrambleQuestionToggleBtn" onclick="toggleStudyQuestionBox('scrambleQuestionBox', this)" style="display:none">질문 보기</button></div>
 <div id="scrambleQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="scrambleQuestionList"></div></div>
 <div class="scramble-box">
@@ -475,8 +475,8 @@ tr.only-forget-hidden{display:none!important}
       </select>
     </label>
     <button class="green small" onclick="startScramble()">시작</button>
-    <button class="secondary small" onclick="playScramblePrompt()">🔊 듣기</button>
-    <button class="secondary small" id="scramblePoolToggleBtn" onclick="toggleScramblePool()">🙈 단어 숨기기</button>
+    <button class="secondary small" onclick="playScramblePrompt()">?? 듣기</button>
+    <button class="secondary small" id="scramblePoolToggleBtn" onclick="toggleScramblePool()">?? 단어 숨기기</button>
     <span id="scrambleProgress" class="flash-progress">0 / 0</span>
   </div>
   <div class="flash-bar"><div id="scrambleBarInner" class="flash-bar-inner"></div></div>
@@ -507,15 +507,15 @@ tr.only-forget-hidden{display:none!important}
 <div class="scramble-button-row">
 
     <button class="orange small" onclick="startScrambleSpeech()">
-        🎙 입력 시작
+        ?? 입력 시작
     </button>
 
     <button class="red small" onclick="stopScrambleSpeech()">
-        ⏹ 입력 종료
+        ? 입력 종료
     </button>
 
     <button class="secondary small" onclick="scrambleUndo()">
-        ⌫ 되돌리기
+        ? 되돌리기
     </button>
 
     <button class="secondary small" onclick="showNextScrambleHint()">
@@ -531,19 +531,19 @@ tr.only-forget-hidden{display:none!important}
   <div id="scrambleHintBox" class="scramble-answer-zone"><span class="scramble-answer-placeholder">힌트를 누르면 앞 단어부터 하나씩 보여줘.</span></div>
 
   <div class="flash-options">
-    <button class="green small" onclick="checkScramble()">✅ 정답 확인</button>
+    <button class="green small" onclick="checkScramble()">? 정답 확인</button>
     <button class="secondary small" onclick="prevScramble()">◀ 이전</button>
     <button class="secondary small" onclick="nextScramble()">다음 ▶</button>
   </div>
 
 <div id="scrambleFeedback" class="scramble-feedback flash-hidden"></div>
   <div id="scrambleResult" class="scramble-result flash-hidden"></div>
-  <div class="flash-help">단어 칩을 드래그해서 정답 영역에 놓거나, 클릭해서 순서대로 채울 수 있어. 입력창에 직접 타이핑해도 되고, "🙈 단어 숨기기"로 힌트 없이 연습할 수도 있어. "정답 확인"으로 채점하고 "다음"으로 넘어가면, 끝났을 때 틀린 문장만 표 번호와 함께 모아서 보여줘.</div>
+  <div class="flash-help">단어 칩을 드래그해서 정답 영역에 놓거나, 클릭해서 순서대로 채울 수 있어. 입력창에 직접 타이핑해도 되고, "?? 단어 숨기기"로 힌트 없이 연습할 수도 있어. "정답 확인"으로 채점하고 "다음"으로 넘어가면, 끝났을 때 틀린 문장만 표 번호와 함께 모아서 보여줘.</div>
 </div>
 </div>
 
 <div id="mode-molgong" class="card mode-panel">
-<b>🔥 몰공 모드</b>
+<b>?? 몰공 모드</b>
 <div class="toolbar"><button class="secondary small" id="molgongQuestionToggleBtn" onclick="toggleStudyQuestionBox('molgongQuestionBox', this)" style="display:none">질문 보기</button></div>
 <div id="molgongQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="molgongQuestionList"></div></div>
 <div class="flash-card-box">
@@ -567,7 +567,7 @@ tr.only-forget-hidden{display:none!important}
 </div>
 
 <div id="mode-keywordWrite" class="card mode-panel">
-<b>📝 키워드 보고 적기</b>
+<b>?? 키워드 보고 적기</b>
 <div class="toolbar"><button class="secondary small" id="keywordWriteQuestionToggleBtn" onclick="toggleStudyQuestionBox('keywordWriteQuestionBox', this)" style="display:none">질문 보기</button></div>
 <div id="keywordWriteQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="keywordWriteQuestionList"></div></div>
 <div class="flash-card-box">
@@ -595,7 +595,7 @@ tr.only-forget-hidden{display:none!important}
 </div>
 
 <div id="mode-grammarCheck" class="card mode-panel">
-<b>📚 문법 체크</b>
+<b>?? 문법 체크</b>
 <div class="toolbar"><button class="secondary small" id="grammarCheckQuestionToggleBtn" onclick="toggleStudyQuestionBox('grammarCheckQuestionBox', this)" style="display:none">질문 보기</button></div>
 <div id="grammarCheckQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="grammarCheckQuestionList"></div></div>
 <div class="flash-card-box">
@@ -614,7 +614,7 @@ tr.only-forget-hidden{display:none!important}
 </div>
 
 <div id="mode-cloze" class="card mode-panel">
-<b>🕳 빈칸 맞추기</b>
+<b>?? 빈칸 맞추기</b>
 <div class="toolbar"><button class="secondary small" id="clozeQuestionToggleBtn" onclick="toggleStudyQuestionBox('clozeQuestionBox', this)" style="display:none">질문 보기</button></div>
 <div id="clozeQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="clozeQuestionList"></div></div>
 <div class="flash-card-box">
@@ -657,7 +657,7 @@ tr.only-forget-hidden{display:none!important}
 </div>
 
 <div id="mode-englishOnly" class="card mode-panel">
-<b>📖 문장 읽기</b>
+<b>?? 문장 읽기</b>
 <div id="englishOnlyList" class="english-only-list"></div>
 </div>
 
@@ -682,7 +682,7 @@ function keyOf(u,g,q){return `${String(u).trim()}|${String(g).trim()}|${String(q
 function compactNo(u,g,q){return `${String(u).trim()}${String(g).trim()}${String(q).trim()}`;}
 function escapeHtml(s){return String(s??'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 function stripStress(text){return String(text??'').replace(/\[\[([\s\S]*?)\]\]/g,'$1');}
-const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycbwpXukm5gBbz-Y4NhP2-SKZNq64VnmOj_LPYtld7kKUdf3gOVCEO8KMTKbTmFfUr9uc/exec';
+const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycbzmV_Cm7vRkNEznvL6uhuXow35DsyzF_vxbRTg0ZA0A1WYGNxXOWoPZPlro3go7BaPK/exec';
 const MODE_LABELS={table:'표',flash:'플래시카드',scramble:'단어 배열',molgong:'몰공 모드',keywordWrite:'키워드 보고 적기',grammarCheck:'문법 체크',cloze:'빈칸 맞추기',englishOnly:'문장 읽기',log:'기록 보기'};
 const LOCAL_LOG_KEY='rr_local_log';
 const CLOUD_ALLOWED_TYPES=new Set(['answer_load','study_result']);
@@ -730,8 +730,12 @@ function onlineJsonp(action,params={}){
   script.onload=()=>{setTimeout(()=>{if(!called){cleanup();reject(new Error('서버 응답은 왔지만 v2 형식이 아니야. Apps Script를 v2 코드로 덮어쓰고 새 버전 배포를 해줘.'));}},0);};
   script.onerror=()=>{cleanup();reject(new Error('온라인 자료 서버에 연결하지 못했어. 웹앱 배포 권한을 "모든 사용자"로 설정했는지 확인해줘.'));};
   script.src=CLOUD_SCRIPT_URL+'?'+query.toString();
-  document.body.appendChild(script);
+ document.body.appendChild(script);
  });
+}
+function onlinePost(action,data={}){
+ const cred=onlineCredentials();
+ return fetch(CLOUD_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...cred,...data})});
 }
 async function testOnlineServer(){
  setOnlineStatus('연결 테스트 중...');
@@ -1526,7 +1530,7 @@ function buildQuestionHtml(items,prefix){
         ? `<button class="ko-toggle" onclick="toggleQuestionKo('${koId}', this)">한글 보기</button><div id="${koId}" class="q-ko">${escapeHtml(q.trans)}</div>`
         : '';
       const readBtn=qText
-        ? `<button class="ko-toggle" onclick="readQuestionAudio('${qAudioId}')">🔊 질문</button>`
+        ? `<button class="ko-toggle" onclick="readQuestionAudio('${qAudioId}')">?? 질문</button>`
         : '';
       const qPracticeKey=getQuestionPracticeKey(q);
       html.push(`<div class="question-item"><div><span class="question-no">${escapeHtml(no)}.</span><span class="q-en">${qText?formatStress(qText):'질문을 찾지 못했어.'}</span></div><div>${readBtn}${koHtml}</div><div class="q-meta">U${escapeHtml(q.unitNo)} G${escapeHtml(q.groupNo)} Q${escapeHtml(q.questionNo)}</div><div class="question-practice"><div class="question-practice-label">질문 연습</div><textarea class="question-practice-input" data-key="${escapeAttr(qPracticeKey)}" placeholder="질문 답변 연습" oninput="savePracticeInput(this)" onkeydown="practiceKeydown(event,this)">${escapeHtml(getSavedPractice(qPracticeKey))}</textarea></div></div>`);
@@ -1539,7 +1543,7 @@ function buildQuestionHtml(items,prefix){
   if(flowText){
     const flowId=`${prefix}_keyword_${keywordNo++}`;
     keywordAudio[flowId]=flowText;
-    html.push(`<div class="question-item"><button class="keyword-toggle" onclick="readKeywordAudio('${flowId}')">📝 키워드 재생</button><label class="keyword-gap-label">쉬기 <input id="${flowId}_gap" class="keyword-gap-input" type="number" min="0" step="0.5" value="5"> 초</label><button class="secondary small" onclick="pauseSpeak()">⏸ 일시정지</button><button class="green small" onclick="resumeSpeak()">▶ 다시 시작</button><button class="red small" onclick="stopSpeak()">■ 정지</button><button class="keyword-toggle" onclick="toggleKeyword('${flowId}', this)">키워드 보기</button><button class="keyword-copy" onclick="copyKeyword('${flowId}')">복사</button><div id="${flowId}" class="keyword-box">${escapeHtml(flowText)}</div></div>`);
+    html.push(`<div class="question-item"><button class="keyword-toggle" onclick="readKeywordAudio('${flowId}')">?? 키워드 재생</button><label class="keyword-gap-label">쉬기 <input id="${flowId}_gap" class="keyword-gap-input" type="number" min="0" step="0.5" value="5"> 초</label><button class="secondary small" onclick="pauseSpeak()">? 일시정지</button><button class="green small" onclick="resumeSpeak()">▶ 다시 시작</button><button class="red small" onclick="stopSpeak()">■ 정지</button><button class="keyword-toggle" onclick="toggleKeyword('${flowId}', this)">키워드 보기</button><button class="keyword-copy" onclick="copyKeyword('${flowId}')">복사</button><div id="${flowId}" class="keyword-box">${escapeHtml(flowText)}</div></div>`);
   }
   itemNo++;
  });
@@ -1592,7 +1596,7 @@ function showQuestions(items){
 }
 
 function guessSpeakLang(text){
- return /[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(String(text||''))?'ko':'en';
+ return /[가-�Rㄱ-ㅎㅏ-ㅣ]/.test(String(text||''))?'ko':'en';
 }
 function cleanSpeechText(text){
  return String(text||'').replace(/\s+/g,' ').trim();
@@ -1617,7 +1621,7 @@ async function readQuestionAudio(id){
 async function readKeywordAudio(id){
  const raw=KEYWORD_AUDIO[id] || (document.getElementById(id)?.textContent || '');
  const lines=String(raw)
-   .split(/\r?\n|→|>|,|ㆍ|•/)
+   .split(/\r?\n|->|=>|>|,|\/|;|\|/)
    .map(x=>x.trim())
    .filter(Boolean);
  if(!lines.length)return;
@@ -1782,7 +1786,7 @@ function renderTable(){
   tr.id='row'+i;
   if(showOnlyNotMemorized && !r.notMemorized) tr.classList.add('only-forget-hidden');
   const pKey=getPracticeKey(r);
-  tr.innerHTML=`<td class="check-col"><input type="checkbox" class="forget-check" ${r.notMemorized?'checked':''} disabled></td><td class="num">${i+1}</td><td class="${r.important?'important-text':''}">${escapeHtml(r.ko)}</td><td class="${r.important?'important-text':''}">${formatStress(r.en)}</td><td class="practice-cell"><textarea class="practice-input" data-key="${escapeAttr(pKey)}" placeholder="" oninput="savePracticeInput(this)" onkeydown="practiceKeydown(event,this)">${escapeHtml(getSavedPractice(pKey))}</textarea></td><td class="actions actions-col"><button class="small" onclick="readOne(${i},'both')">▶전체</button><button class="small" onclick="readOne(${i},'ko')">한글</button><button class="small" onclick="readOne(${i},'en')">영어</button><button class="small orange" onclick="repeatOne(${i})">🔁</button></td>`;
+  tr.innerHTML=`<td class="check-col"><input type="checkbox" class="forget-check" ${r.notMemorized?'checked':''} disabled></td><td class="num">${i+1}</td><td class="${r.important?'important-text':''}">${escapeHtml(r.ko)}</td><td class="${r.important?'important-text':''}">${formatStress(r.en)}</td><td class="practice-cell"><textarea class="practice-input" data-key="${escapeAttr(pKey)}" placeholder="" oninput="savePracticeInput(this)" onkeydown="practiceKeydown(event,this)">${escapeHtml(getSavedPractice(pKey))}</textarea></td><td class="actions actions-col"><button class="small" onclick="readOne(${i},'both')">▶전체</button><button class="small" onclick="readOne(${i},'ko')">한글</button><button class="small" onclick="readOne(${i},'en')">영어</button><button class="small orange" onclick="repeatOne(${i})">??</button></td>`;
   tb.appendChild(tr);
  });
  updateCountInfo();
@@ -1811,7 +1815,7 @@ function toggleManualEntry(){
  if(!box)return;
  const showing=box.style.display!=='none';
  box.style.display=showing?'none':'block';
- if(btn)btn.textContent=showing?'✏ 데이터 직접 넣기':'✏ 숨기기';
+ if(btn)btn.textContent=showing?'? 데이터 직접 넣기':'? 숨기기';
 }
 function toggleChatGptBox(){
  const box=document.getElementById('chatGptBox');
@@ -1819,7 +1823,7 @@ function toggleChatGptBox(){
  if(!box)return;
  const showing=box.style.display!=='none';
  box.style.display=showing?'none':'block';
- if(btn)btn.textContent=showing?'💬 ChatGPT에 묻기':'💬 숨기기';
+ if(btn)btn.textContent=showing?'?? ChatGPT에 묻기':'?? 숨기기';
  const input=document.getElementById('chatGptInput');
  if(!showing&&input)setTimeout(()=>input.focus(),0);
 }
@@ -1851,7 +1855,7 @@ function updateCountInfo(){
 }
 function applyForgetOnlyButton(){
  const btn=document.getElementById('forgetOnlyBtn');
- if(btn)btn.textContent=showOnlyNotMemorized?'전체 보기':'☑ 안 외워진 것만 보기';
+ if(btn)btn.textContent=showOnlyNotMemorized?'전체 보기':'? 안 외워진 것만 보기';
 }
 function toggleForgetOnly(btn){
  showOnlyNotMemorized=!showOnlyNotMemorized;
@@ -2066,7 +2070,7 @@ function renderFlashcard(autoSpeak=false){
  const bar=document.getElementById('flashBarInner');
  if(!frontEl||!backEl)return;
  if(flashFinished){
-   frontEl.textContent='🎉 이번 플래시카드 끝!';
+   frontEl.textContent='?? 이번 플래시카드 끝!';
    backEl.innerHTML='';
    backEl.classList.add('flash-hidden');
    if(prog)prog.textContent=`${flashOrderList.length} / ${flashOrderList.length}`;
@@ -2386,7 +2390,7 @@ function applyScramblePoolVisibility(){
  const poolEl=document.getElementById('scramblePool');
  const btn=document.getElementById('scramblePoolToggleBtn');
  if(poolEl) poolEl.classList.toggle('flash-hidden', scramblePoolHidden);
- if(btn) btn.textContent = scramblePoolHidden ? '👁 단어 보이기' : '🙈 단어 숨기기';
+ if(btn) btn.textContent = scramblePoolHidden ? '?? 단어 보이기' : '?? 단어 숨기기';
 }
 let scrambleDragPayload=null;
 function scrambleDragStart(e,payload){
@@ -2598,7 +2602,7 @@ function checkScramble(){
  const fb=document.getElementById('scrambleFeedback');
  if(fb){
    fb.className='scramble-feedback '+(correct?'correct':'wrong');
-   fb.innerHTML=correct?'✅ 정답이야!':`❌ 오답이야. 정답: <b>${escapeHtml(stripStress(answerText))}</b>`;
+   fb.innerHTML=correct?'? 정답이야!':`? 오답이야. 정답: <b>${escapeHtml(stripStress(answerText))}</b>`;
  }
  speakScrambleAnswerAuto(answerLang,answerText);
  scrambleChecked=true;
@@ -2630,7 +2634,7 @@ function finishScramble(){
  const bar=document.getElementById('scrambleBarInner');
  const fb=document.getElementById('scrambleFeedback');
  const res=document.getElementById('scrambleResult');
- if(promptEl)promptEl.textContent='🎉 이번 배열 연습 끝!';
+ if(promptEl)promptEl.textContent='?? 이번 배열 연습 끝!';
  if(poolEl)poolEl.innerHTML='';
  if(inputEl){inputEl.value='';inputEl.disabled=true;}
  scrambleHintCount=0;
@@ -2652,7 +2656,7 @@ function finishScramble(){
      html+=uniqueWrongRows.map(w=>`<tr><td class="num-col">${w.rowIndex+1}</td><td>${escapeHtml(w.ko)}</td><td>${formatStress(w.en)}</td></tr>`).join('');
      html+='</tbody></table>';
    }else{
-     html+='<div style="margin-top:8px">오답 없이 전부 맞췄어! 🎉</div>';
+     html+='<div style="margin-top:8px">오답 없이 전부 맞췄어! ??</div>';
    }
    res.innerHTML=html+nextAnswerButtonHtml();
  }
@@ -2689,7 +2693,7 @@ function renderMolgong(focus=false){
  if(!prompt||!box)return;
  if(molgongFinished){
   if(source)source.textContent='';
- prompt.textContent='🎉 몰공 모드 끝!';
+ prompt.textContent='?? 몰공 모드 끝!';
   box.innerHTML='<span class="scramble-answer-placeholder">끝났어. 시작을 누르면 다시 시작해.</span>'+nextAnswerButtonHtml();
   if(prog)prog.textContent=`${molgongOrderList.length} / ${molgongOrderList.length}`;
   if(bar)bar.style.width='100%';
@@ -2814,7 +2818,7 @@ function renderKeywordWrite(focusInput=false){
  const bar=document.getElementById('keywordWriteBarInner');
  if(!prompt||!input)return;
  if(keywordWriteFinished){
-  prompt.textContent='🎉 키워드 보고 적기 끝!';
+  prompt.textContent='?? 키워드 보고 적기 끝!';
   input.value='';
   input.disabled=true;
   if(prog)prog.textContent=`${keywordWriteList.length} / ${keywordWriteList.length}`;
@@ -2884,6 +2888,7 @@ function showKeywordWriteResult(){
 
 let grammarNotesDirty=false;
 const grammarDirtyKeys=new Set();
+let grammarSheetNotes={};
 function grammarSentenceTitle(row){
  return [row.sheetName,row.itemLabel].filter(Boolean).join(' - ') || currentQuestionTitle() || '현재 답변';
 }
@@ -2899,8 +2904,10 @@ function grammarKey(item){
  return `${item.title}|${item.index}|${item.en}`;
 }
 function grammarNotesKey(item){
- const raw=item?grammarKey(item):(currentQuestionTitle()||'empty');
- return 'rr_grammar_notes_'+storageSafe(raw);
+ return item?grammarKey(item):(currentQuestionTitle()||'empty');
+}
+function grammarCurrentTitles(){
+ return [...new Set(grammarSentenceItems().map(item=>item.title).filter(Boolean))];
 }
 function renderGrammarCheck(){
  const box=document.getElementById('grammarCheckResult');
@@ -2913,7 +2920,7 @@ function renderGrammarCheck(){
  }
  box.innerHTML=items.map(item=>{
   const key=grammarNotesKey(item);
-  const saved=localStorage.getItem(key)||'';
+  const saved=grammarSheetNotes[key]||'';
   return `<div class="english-answer-card" style="margin-bottom:10px"><div class="english-answer-head"><div class="english-answer-title">${escapeHtml(item.title)} · ${item.index}</div></div><div class="english-answer-lines"><p class="english-answer-line">${escapeHtml(item.en)}</p>${item.ko?`<p class="hint">${escapeHtml(item.ko)}</p>`:''}</div><div class="flash-scratch-box"><label class="flash-scratch-label"><span class="label-tag">${item.index}번 문법 설명 저장</span></label><textarea class="grammar-note-input" data-key="${escapeAttr(key)}" placeholder="ChatGPT에서 받은 ${item.index}번 문장 문법 설명을 여기에 붙여넣어." style="height:120px" oninput="markGrammarNoteDirty(this); autoGrow(this);">${escapeHtml(saved)}</textarea></div></div>`;
  }).join('');
  setTimeout(()=>document.querySelectorAll('.grammar-note-input').forEach(autoGrow),0);
@@ -2927,7 +2934,7 @@ function markGrammarNoteDirty(el){
 function copyGrammarCheckText(){
  const lines=[];
  grammarSentenceItems().forEach(item=>{
-  const text=(document.querySelector(`.grammar-note-input[data-key="${CSS.escape(grammarNotesKey(item))}"]`)?.value||localStorage.getItem(grammarNotesKey(item))||'').trim();
+  const text=(document.querySelector(`.grammar-note-input[data-key="${CSS.escape(grammarNotesKey(item))}"]`)?.value||grammarSheetNotes[grammarNotesKey(item)]||'').trim();
   if(!text)return;
   lines.push(`${item.title} · ${item.index}`);
   lines.push(item.en);
@@ -2968,21 +2975,45 @@ async function askGrammarCheckChatGpt(){
  try{await navigator.clipboard.writeText(prompt);}catch(e){}
  window.open('https://chatgpt.com/?q='+encodeURIComponent(prompt),'_blank','noopener');
 }
-function saveGrammarNotes(){
+async function saveGrammarNotes(){
+ const cred=onlineCredentials();
+ if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
  if(!grammarSentenceItems().length){alert('먼저 답변을 불러와줘.');return;}
+ const itemMap=new Map(grammarSentenceItems().map(item=>[grammarNotesKey(item),item]));
+ const notes=[];
  document.querySelectorAll('.grammar-note-input').forEach(input=>{
-  if(input.dataset.key)localStorage.setItem(input.dataset.key,input.value||'');
+  const item=itemMap.get(input.dataset.key);
+  if(!item)return;
+  grammarSheetNotes[input.dataset.key]=input.value||'';
+  notes.push({noteKey:input.dataset.key,title:item.title,sentenceIndex:String(item.index),sentence:item.en,ko:item.ko,note:input.value||''});
  });
+ if(!notes.length){alert('저장할 문법 설명 칸이 없어.');return;}
+ await onlinePost('grammarNotesSave',{notes});
  grammarDirtyKeys.clear();
  grammarNotesDirty=false;
  updateGrammarStatus();
+ setOnlineStatus(`문법 설명 ${notes.length}개를 구글시트에 저장했어.`);
 }
-function loadSavedGrammarNotes(showAlert=true){
+async function loadSavedGrammarNotes(showAlert=true){
+ const cred=onlineCredentials();
+ if(!cred.user||!cred.password){if(showAlert)alert('먼저 로그인해줘.');return;}
+ const titles=grammarCurrentTitles();
+ if(!titles.length){if(showAlert)alert('먼저 답변을 불러와줘.');return;}
  let found=false;
+ try{
+  const res=await onlineJsonp('grammarNotesLoad',{...cred,titles:JSON.stringify(titles)});
+  if(!res.ok)throw new Error(res.message||'문법 설명을 불러오지 못했어.');
+  grammarSheetNotes={};
+  (res.notes||[]).forEach(note=>{
+   if(note.noteKey)grammarSheetNotes[note.noteKey]=note.note||'';
+  });
+ }catch(e){
+  if(showAlert)alert(e.message||'문법 설명을 불러오지 못했어.');
+ }
  grammarSentenceItems().forEach(item=>{
   const key=grammarNotesKey(item);
   const input=document.querySelector(`.grammar-note-input[data-key="${CSS.escape(key)}"]`);
-  const saved=localStorage.getItem(key)||'';
+  const saved=grammarSheetNotes[key]||'';
   if(saved)found=true;
   if(input){input.value=saved;autoGrow(input);}
  });
@@ -2991,19 +3022,25 @@ function loadSavedGrammarNotes(showAlert=true){
  updateGrammarStatus();
  if(showAlert&&!found)alert('저장된 문법 설명이 없어.');
 }
-function clearSavedGrammarNotes(){
- if(!confirm('현재 답변에 저장된 문법 설명을 삭제할까요?'))return;
- grammarSentenceItems().forEach(item=>localStorage.removeItem(grammarNotesKey(item)));
+async function clearSavedGrammarNotes(){
+ const cred=onlineCredentials();
+ if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
+ const titles=grammarCurrentTitles();
+ if(!titles.length){alert('먼저 답변을 불러와줘.');return;}
+ if(!confirm('현재 답변에 저장된 문법 설명을 구글시트에서 삭제할까요?'))return;
+ await onlinePost('grammarNotesDelete',{titles});
+ grammarSentenceItems().forEach(item=>delete grammarSheetNotes[grammarNotesKey(item)]);
  document.querySelectorAll('.grammar-note-input').forEach(input=>{input.value='';autoGrow(input);});
  grammarDirtyKeys.clear();
  grammarNotesDirty=false;
  updateGrammarStatus();
+ setOnlineStatus('현재 답변의 문법 설명 삭제 요청을 구글시트로 보냈어.');
 }
 function updateGrammarStatus(){
  const status=document.getElementById('grammarCheckStatus');
  if(!status)return;
  const items=grammarSentenceItems();
- const savedCount=items.filter(item=>!!localStorage.getItem(grammarNotesKey(item))).length;
+ const savedCount=items.filter(item=>!!grammarSheetNotes[grammarNotesKey(item)]).length;
  status.textContent=`${items.length}문장 · 저장 ${savedCount}/${items.length}${grammarNotesDirty?` · 수정 중 ${grammarDirtyKeys.size}`:''}`;
 }
 
@@ -3190,7 +3227,7 @@ function renderCloze(focusInput=false){
  const bar=document.getElementById('clozeBarInner');
  if(!prompt||!sentence||!input)return;
  if(clozeFinished){
-  prompt.textContent='🎉 빈칸 맞추기 끝!';
+  prompt.textContent='?? 빈칸 맞추기 끝!';
   sentence.innerHTML='<span class="scramble-answer-placeholder">결과표에서 내가 쓴 답과 정답을 비교해봐.</span>';
   renderClozeHintBox(null);
   input.value='';
@@ -3319,7 +3356,7 @@ function formatEnglishOnlyCopyItems(items){
 
 function englishOnlyKeywordChips(flowText){
  return String(flowText||'')
-   .split(/\r?\n|→|>|,|ㆍ|•/)
+   .split(/\r?\n|->|=>|>|,|\/|;|\|/)
    .map(x=>x.trim())
    .filter(Boolean)
    .map(x=>`<span class="english-keyword-chip">${escapeHtml(x)}</span>`)
@@ -3540,7 +3577,7 @@ function copyColumn(lang){
  .join('\n');
  navigator.clipboard.writeText(text);
 }
-function applyPracticeVisibility(){document.querySelectorAll('.practice-cell').forEach(cell=>{cell.classList.toggle('practice-hidden',!practiceVisible);});const btn=document.getElementById('practiceToggleBtn');if(btn)btn.textContent=practiceVisible?'✍ 연습칸 숨기기':'✍ 연습칸 보이기';}
+function applyPracticeVisibility(){document.querySelectorAll('.practice-cell').forEach(cell=>{cell.classList.toggle('practice-hidden',!practiceVisible);});const btn=document.getElementById('practiceToggleBtn');if(btn)btn.textContent=practiceVisible?'? 연습칸 숨기기':'? 연습칸 보이기';}
 function togglePracticeColumn(btn){practiceVisible=!practiceVisible;applyPracticeVisibility();if(practiceVisible)setTimeout(refreshPracticeHeights,0);}
 function applyActionsVisibility(){document.querySelectorAll('.actions-col,.actions-header').forEach(el=>{el.classList.toggle('actions-hidden',!actionsVisible);});const btn=document.getElementById('actionsToggleBtn');if(btn)btn.textContent=actionsVisible?'기능 숨기기':'기능 보이기';}
 function toggleActionsColumn(btn){actionsVisible=!actionsVisible;applyActionsVisibility();}
@@ -3555,6 +3592,10 @@ function switchMode(mode){
    if(panel)panel.classList.toggle('active', m===mode);
    if(btn)btn.classList.toggle('active', m===mode);
  });
+ if(mode==='grammarCheck'){
+  renderGrammarCheck();
+  loadSavedGrammarNotes(false);
+ }
  if(changed)recordModeChange(mode);
 }
 document.getElementById('fileInput').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;const name=file.name.toLowerCase();if(name.endsWith('.txt')||name.endsWith('.csv')){document.getElementById('inputText').value=await file.text();parseText();return;}const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];const arr=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false});rows=[];arr.forEach(line=>{const ko=val(line,0),en=val(line,1);if(ko&&en&&!isHeader(ko,en))rows.push({ko,en,important:false,notMemorized:false,done:false});});document.getElementById('inputText').value=rows.map(r=>`${r.ko}\t${r.en}`).join('\n');renderTable();});
