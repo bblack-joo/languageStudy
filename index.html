@@ -600,14 +600,20 @@ tr.only-forget-hidden{display:none!important}
 <div id="grammarCheckQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="grammarCheckQuestionList"></div></div>
 <div class="flash-card-box">
   <div class="flash-options">
-    <button class="green small" onclick="loadGrammarCheck(false)">문법 체크 불러오기</button>
-    <button class="secondary small" onclick="loadGrammarCheck(true)">새로 분석</button>
-    <button class="gray small" onclick="copyGrammarCheckText()">결과 복사</button>
-    <button class="red small" onclick="deleteCurrentGrammarCache()">현재 답변 문법 삭제</button>
+    <button class="green small" onclick="askGrammarCheckChatGpt()">ChatGPT에 묻기</button>
+    <button class="secondary small" onclick="copyGrammarCheckPrompt()">ChatGPT용 복사</button>
+    <button class="green small" onclick="saveGrammarNotes()">저장</button>
+    <button class="secondary small" onclick="loadSavedGrammarNotes()">불러오기</button>
+    <button class="gray small" onclick="copyGrammarCheckText()">저장내용 복사</button>
+    <button class="red small" onclick="clearSavedGrammarNotes()">저장내용 삭제</button>
     <span id="grammarCheckStatus" class="flash-progress">0 / 0</span>
   </div>
   <div id="grammarCheckResult" class="scramble-result"></div>
-  <div class="flash-help">처음 분석한 문장은 구글시트 Grammar_Cache 탭에 저장돼. 다음부터는 삭제하거나 새로 분석하기 전까지 저장된 문법 설명을 그대로 불러와.</div>
+  <div class="flash-scratch-box">
+    <label class="flash-scratch-label" for="grammarNotesInput"><span class="label-tag">ChatGPT 답변 저장</span></label>
+    <textarea id="grammarNotesInput" placeholder="ChatGPT에서 받은 문법 설명을 여기에 붙여넣고 저장해줘." style="height:180px" oninput="grammarNotesDirty=true; updateGrammarStatus(); autoGrow(this);"></textarea>
+  </div>
+  <div class="flash-help">유료 API는 사용하지 않아. ChatGPT에 묻기 또는 ChatGPT용 복사로 문법 설명을 받은 뒤, 아래 칸에 붙여넣고 저장하면 같은 답변에서 다시 불러올 수 있어.</div>
 </div>
 </div>
 
@@ -680,7 +686,7 @@ function keyOf(u,g,q){return `${String(u).trim()}|${String(g).trim()}|${String(q
 function compactNo(u,g,q){return `${String(u).trim()}${String(g).trim()}${String(q).trim()}`;}
 function escapeHtml(s){return String(s??'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 function stripStress(text){return String(text??'').replace(/\[\[([\s\S]*?)\]\]/g,'$1');}
-const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycbzduB52GV-1vOW6ZBH5GVocNg_FZeyF05e3xuYZTcPDwLh5WIt7r5IB386vkny2C44V/exec';
+const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycbwpXukm5gBbz-Y4NhP2-SKZNq64VnmOj_LPYtld7kKUdf3gOVCEO8KMTKbTmFfUr9uc/exec';
 const MODE_LABELS={table:'표',flash:'플래시카드',scramble:'단어 배열',molgong:'몰공 모드',keywordWrite:'키워드 보고 적기',grammarCheck:'문법 체크',cloze:'빈칸 맞추기',englishOnly:'문장 읽기',log:'기록 보기'};
 const LOCAL_LOG_KEY='rr_local_log';
 const CLOUD_ALLOWED_TYPES=new Set(['answer_load','study_result']);
@@ -1662,7 +1668,7 @@ function copyKeyword(id){
  navigator.clipboard.writeText(box.textContent||'');
 }
 function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox','molgongQuestionBox','keywordWriteQuestionBox','grammarCheckQuestionBox','clozeQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList','molgongQuestionList','keywordWriteQuestionList','grammarCheckQuestionList','clozeQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});['flash','scramble','molgong','keywordWrite','grammarCheck','cloze'].forEach(mode=>setStudyQuestionToggle(mode,false));}
-function setRows(pairs,preserveGroups=false){if(!preserveGroups)clearStudyGroups();startStudyEntry();grammarCheckResults={};document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',flowText:i.flowText||'',done:false})).filter(i=>i.ko||i.en);renderTable();if(currentMode==='grammarCheck')renderGrammarCheck();}
+function setRows(pairs,preserveGroups=false){if(!preserveGroups)clearStudyGroups();startStudyEntry();document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',flowText:i.flowText||'',done:false})).filter(i=>i.ko||i.en);renderTable();if(currentMode==='grammarCheck')renderGrammarCheck();}
 function loadSelectedItem(){stopSpeak();clearStudyGroups();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));recordAnswerLoad(item,'선택 답변 불러오기');}
 function canLoadNextSelectedItem(){
  const select=document.getElementById('unitSelect');
@@ -2880,7 +2886,7 @@ function showKeywordWriteResult(){
  res.classList.remove('flash-hidden');
 }
 
-let grammarCheckResults={},grammarCheckLoading=false;
+let grammarNotesDirty=false;
 function grammarSentenceTitle(row){
  return [row.sheetName,row.itemLabel].filter(Boolean).join(' - ') || currentQuestionTitle() || '현재 답변';
 }
@@ -2895,98 +2901,92 @@ function grammarSentenceItems(){
 function grammarKey(item){
  return `${item.title}|${item.index}|${item.en}`;
 }
-function normalizeGrammarResult(result){
- if(!result||typeof result!=='object')return {summary:'문법 설명을 불러오지 못했어.',points:[]};
- return {
-  summary:String(result.summary||'').trim(),
-  points:Array.isArray(result.points)?result.points.map(p=>({
-   text:String(p.text||'').trim(),
-   grammar:String(p.grammar||'').trim(),
-   explanation:String(p.explanation||'').trim(),
-   reuseTip:String(p.reuseTip||'').trim()
-  })).filter(p=>p.text||p.grammar||p.explanation||p.reuseTip):[]
- };
+function grammarNotesKey(){
+ const items=grammarSentenceItems();
+ const raw=items.map(item=>grammarKey(item)).join('\n') || currentQuestionTitle() || 'empty';
+ return 'rr_grammar_notes_'+storageSafe(raw);
 }
 function renderGrammarCheck(){
  const box=document.getElementById('grammarCheckResult');
- const status=document.getElementById('grammarCheckStatus');
  if(!box)return;
  const items=grammarSentenceItems();
- if(status)status.textContent=`${Object.keys(grammarCheckResults).length} / ${items.length}`;
  if(!items.length){
   box.innerHTML='<div class="log-empty">먼저 답변을 불러와줘. 영어 문장이 있으면 문장별 문법 포인트를 볼 수 있어.</div>';
+  updateGrammarStatus();
   return;
  }
- box.innerHTML=items.map(item=>{
-  const key=grammarKey(item);
-  const saved=grammarCheckResults[key];
-  const state=saved?renderGrammarAnalysis(saved.result,saved.cached):'<div class="hint">아직 문법 체크를 불러오지 않았어.</div>';
-  return `<div class="english-answer-card" style="margin-bottom:10px"><div class="english-answer-head"><div class="english-answer-title">${escapeHtml(item.title)} · ${item.index}</div></div><div class="english-answer-lines"><p class="english-answer-line">${escapeHtml(item.en)}</p>${item.ko?`<p class="hint">${escapeHtml(item.ko)}</p>`:''}</div><div class="english-answer-footer">${state}</div></div>`;
- }).join('');
-}
-function renderGrammarAnalysis(result,cached){
- const data=normalizeGrammarResult(result);
- const points=data.points.length?data.points.map(p=>`<li><b>${escapeHtml(p.text||p.grammar)}</b>${p.grammar?` <span class="hint">(${escapeHtml(p.grammar)})</span>`:''}<div>${escapeHtml(p.explanation||'')}</div>${p.reuseTip?`<div class="hint">활용: ${escapeHtml(p.reuseTip)}</div>`:''}</li>`).join(''):'<li>표시할 문법 포인트가 없어.</li>';
- return `<div class="hint">${cached?'저장된 문법 설명':'새로 분석한 문법 설명'}</div>${data.summary?`<div style="margin:6px 0">${escapeHtml(data.summary)}</div>`:''}<ul style="margin:6px 0 0 18px">${points}</ul>`;
-}
-async function loadGrammarCheck(force=false){
- const cred=onlineCredentials();
- if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
- const items=grammarSentenceItems();
- if(!items.length){alert('먼저 답변을 불러와줘.');return;}
- if(grammarCheckLoading)return;
- grammarCheckLoading=true;
- const status=document.getElementById('grammarCheckStatus');
- renderGrammarCheck();
- for(let i=0;i<items.length;i++){
-  const item=items[i];
-  if(status)status.textContent=`분석 중 ${i+1} / ${items.length}`;
-  try{
-   const res=await onlineJsonp('grammarCheck',{...cred,title:item.title,sentenceIndex:String(item.index),sentence:item.en,ko:item.ko,force:force?'1':''});
-   if(!res.ok)throw new Error(res.message||'문법 체크 실패');
-   grammarCheckResults[grammarKey(item)]={result:res.result,cached:!!res.cached};
-  }catch(e){
-   grammarCheckResults[grammarKey(item)]={result:{summary:e.message||'문법 체크 중 오류가 났어.',points:[]},cached:false};
-  }
-  renderGrammarCheck();
- }
- grammarCheckLoading=false;
- if(status)status.textContent=`${items.length} / ${items.length}`;
+ box.innerHTML=items.map(item=>`<div class="english-answer-card" style="margin-bottom:10px"><div class="english-answer-head"><div class="english-answer-title">${escapeHtml(item.title)} · ${item.index}</div></div><div class="english-answer-lines"><p class="english-answer-line">${escapeHtml(item.en)}</p>${item.ko?`<p class="hint">${escapeHtml(item.ko)}</p>`:''}</div></div>`).join('');
+ loadSavedGrammarNotes(false);
+ updateGrammarStatus();
 }
 function copyGrammarCheckText(){
- const items=grammarSentenceItems();
- const lines=[];
- items.forEach(item=>{
-  const saved=grammarCheckResults[grammarKey(item)];
-  if(!saved)return;
-  const data=normalizeGrammarResult(saved.result);
-  lines.push(`${item.title} · ${item.index}`);
-  lines.push(item.en);
-  if(data.summary)lines.push(`요약: ${data.summary}`);
-  data.points.forEach(p=>{
-   lines.push(`- ${p.text||p.grammar}: ${p.explanation}${p.reuseTip?` / 활용: ${p.reuseTip}`:''}`);
-  });
-  lines.push('');
- });
- if(!lines.length){alert('복사할 문법 체크 결과가 없어.');return;}
- navigator.clipboard.writeText(lines.join('\n').trim());
+ const text=(document.getElementById('grammarNotesInput')?.value||'').trim();
+ if(!text){alert('복사할 저장 내용이 없어.');return;}
+ navigator.clipboard.writeText(text);
 }
-async function deleteCurrentGrammarCache(){
- const cred=onlineCredentials();
- if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
- const titles=[...new Set(grammarSentenceItems().map(item=>item.title).filter(Boolean))];
- if(!titles.length){alert('삭제할 현재 답변이 없어.');return;}
- if(!confirm('현재 답변의 저장된 문법 설명을 구글시트에서 삭제할까요?'))return;
- let deleted=0;
- for(const title of titles){
-  try{
-   const res=await onlineJsonp('grammarDelete',{...cred,title});
-   if(res.ok)deleted+=Number(res.deleted||0);
-  }catch(e){}
- }
- grammarCheckResults={};
- renderGrammarCheck();
- alert(`저장된 문법 설명 ${deleted}개를 삭제했어.`);
+function buildGrammarCheckPrompt(){
+ const items=grammarSentenceItems();
+ if(!items.length)return '';
+ const lines=[
+  '아래 영어 문장들을 한국어 학습자가 공부하기 좋게 문법 포인트 중심으로 설명해줘.',
+  '각 문장마다 다음 형식으로 정리해줘.',
+  '1. 문장',
+  '2. 핵심 문법 포인트 2~5개',
+  '3. 각 문법이 왜 쓰였는지 쉬운 한국어 설명',
+  '4. 오픽 답변에서 재사용하기 좋은 말하기 팁',
+  '',
+  '문장 목록:'
+ ];
+ items.forEach(item=>{
+  lines.push('');
+  lines.push(`${item.index}. ${item.en}`);
+  if(item.ko)lines.push(`한글 뜻: ${item.ko}`);
+ });
+ return lines.join('\n').trim();
+}
+async function copyGrammarCheckPrompt(){
+ const prompt=buildGrammarCheckPrompt();
+ if(!prompt){alert('먼저 답변을 불러와줘.');return;}
+ try{await navigator.clipboard.writeText(prompt);}catch(e){}
+}
+async function askGrammarCheckChatGpt(){
+ const prompt=buildGrammarCheckPrompt();
+ if(!prompt){alert('먼저 답변을 불러와줘.');return;}
+ try{await navigator.clipboard.writeText(prompt);}catch(e){}
+ window.open('https://chatgpt.com/?q='+encodeURIComponent(prompt),'_blank','noopener');
+}
+function saveGrammarNotes(){
+ const input=document.getElementById('grammarNotesInput');
+ if(!input){return;}
+ if(!grammarSentenceItems().length){alert('먼저 답변을 불러와줘.');return;}
+ localStorage.setItem(grammarNotesKey(),input.value||'');
+ grammarNotesDirty=false;
+ updateGrammarStatus();
+}
+function loadSavedGrammarNotes(showAlert=true){
+ const input=document.getElementById('grammarNotesInput');
+ if(!input)return;
+ const saved=localStorage.getItem(grammarNotesKey())||'';
+ input.value=saved;
+ autoGrow(input);
+ grammarNotesDirty=false;
+ updateGrammarStatus();
+ if(showAlert&&!saved)alert('저장된 문법 설명이 없어.');
+}
+function clearSavedGrammarNotes(){
+ if(!confirm('현재 답변에 저장된 문법 설명을 삭제할까요?'))return;
+ localStorage.removeItem(grammarNotesKey());
+ const input=document.getElementById('grammarNotesInput');
+ if(input){input.value='';autoGrow(input);}
+ grammarNotesDirty=false;
+ updateGrammarStatus();
+}
+function updateGrammarStatus(){
+ const status=document.getElementById('grammarCheckStatus');
+ if(!status)return;
+ const items=grammarSentenceItems();
+ const hasSaved=!!localStorage.getItem(grammarNotesKey());
+ status.textContent=`${items.length}문장 · ${grammarNotesDirty?'수정 중':hasSaved?'저장됨':'미저장'}`;
 }
 
 let clozeOrderList=[],clozeIndex=0,clozeFinished=false,clozeAnswers=[],clozeChecked=[],clozeHintVisible=false,clozeHintOrders=[];
@@ -3556,4 +3556,3 @@ autoLoadOnlineFilesFromLocalLogin();
 </script>
 </body>
 </html>
-
