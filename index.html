@@ -55,6 +55,8 @@ label{display:inline-flex;align-items:center;gap:5px;margin:4px 10px 4px 0;font-
 .book-row select{min-width:260px}
 #unitFilter,#unitSelect{min-width:220px}
 .hint{font-size:12.5px;color:var(--text-muted);margin-top:6px;line-height:1.5}
+.status-complete-flash{color:var(--danger-dark)!important;font-weight:900!important;animation:statusPulse .75s ease-in-out 2}
+@keyframes statusPulse{0%,100%{background:transparent}50%{background:var(--danger-tint)}}
 table{width:100%;border-collapse:collapse;background:#fff;table-layout:fixed}
 th,td{border:1px solid var(--border);padding:6px 7px;vertical-align:top;font-size:14px}
 th{background:var(--primary-tint);color:var(--primary-dark);font-weight:800}
@@ -125,6 +127,8 @@ tr.only-forget-hidden{display:none!important}
 .flash-options{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0}
 .flash-progress{font-size:13px;font-weight:800;color:var(--filter-dark);margin-left:4px}
 .flash-bar{height:8px;background:var(--neutral-tint);border-radius:99px;overflow:hidden;margin:8px 0}
+.flash-bar.clickable{cursor:pointer}
+.flash-bar.clickable:hover{box-shadow:0 0 0 3px var(--filter-tint)}
 .flash-bar-inner{height:100%;width:0%;background:var(--filter);transition:width .2s ease}
 .flash-card{min-height:150px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:26px 18px;margin-top:10px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;cursor:pointer;box-shadow:0 1px 3px rgba(15,23,42,.05);user-select:none}
 .flash-card:hover{background:#fffdf8}
@@ -217,12 +221,19 @@ tr.only-forget-hidden{display:none!important}
 .selected-answer-chip button{padding:2px 6px;border-radius:6px;font-size:12px;background:#fff;color:var(--danger-dark);border:1px solid var(--border)}
 
 .mode-switch{gap:10px}
+.study-mode-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.study-mode-head>b{font-size:14px;font-weight:800;color:var(--text)}
 .mode-btn{background:#fff;border:1px solid var(--border);color:var(--text-muted);font-weight:800;padding:10px 18px;font-size:14.5px}
 .mode-btn:hover{background:var(--neutral-tint)}
 .mode-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
 .mode-panel{display:none}
 .mode-panel.active{display:block}
-
+.answer-bundle-panel{display:none;background:#fffaf3;border:1px solid var(--filter);border-left:5px solid var(--filter);border-radius:12px;padding:13px 15px;margin:-4px 0 14px;box-shadow:0 1px 3px rgba(15,23,42,.05)}
+.answer-bundle-title{font-size:17px;font-weight:900;color:var(--primary-dark);line-height:1.35;margin-bottom:9px}
+.answer-bundle-buttons{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.answer-bundle-btn{min-width:34px;height:32px;padding:0 10px;margin:0;border-radius:8px;background:#fff;color:var(--filter-dark);border:1px solid var(--border);font-size:13px;font-weight:900}
+.answer-bundle-btn:hover{background:var(--filter-tint)}
+.answer-bundle-btn.active{background:var(--filter);border-color:var(--filter);color:#fff}
 </style>
 </head>
 <body>
@@ -243,9 +254,8 @@ tr.only-forget-hidden{display:none!important}
     <button class="green small" onclick="loginOnlineLibrary()">로그인</button>
     <button class="gray small" onclick="logoutOnlineLibrary()">로그아웃</button>
     <button class="secondary small" onclick="testOnlineServer()">연결 테스트</button>
-    <button class="secondary small" onclick="loadOnlineFileList()">온라인 파일 목록</button>
-    <select id="onlineFileSelect" style="min-width:220px"><option value="">온라인 파일 없음</option></select>
-    <button class="red small" onclick="loadSelectedOnlineFile()">온라인 자료 불러오기</button>
+    <button class="secondary small" onclick="loadOnlineFileList()" style="display:none">온라인 파일 목록</button>
+    <select id="onlineFileSelect" style="min-width:220px" onchange="loadSelectedOnlineFile()"><option value="">선택하세요</option></select>
   </div>
   <div id="onlineLoginStatus" class="hint">로그인하면 비공개 Google Drive/Sheet 자료를 불러올 수 있어.</div>
   <div class="toolbar">
@@ -270,9 +280,9 @@ tr.only-forget-hidden{display:none!important}
 </div>
 
 <div id="loadArea">
-<div class="card">
+<div class="card" id="excelLoadBox">
   <b>엑셀 파일 불러오기</b>
-  <div class="toolbar">
+  <div class="toolbar" id="excelDirectUploadBox" style="display:none">
     <input type="file" id="bookExcelInput" accept=".xlsx,.xls" multiple onchange="loadWorkbookFiles(this.files)">
     <button class="green" onclick="uploadCurrentWorkbookToDrive()">선택 파일 드라이브 업로드</button>
     <button class="secondary" onclick="loadAllItems()">전체 문장</button>
@@ -283,10 +293,10 @@ tr.only-forget-hidden{display:none!important}
     <select id="unitFilter" onchange="renderItemSelect()"><option value="">전체</option></select>
     <select id="unitSelect"><option value="">엑셀 파일을 먼저 선택</option></select>
     <button class="secondary" onclick="addSelectedItemToQueue()">+ 추가</button>
+    <button class="secondary" id="addFilteredItemsBtn" onclick="addFilteredItemsToQueue()">전체 추가하기</button>
     <button class="secondary" onclick="addImportantBundlesToQueue()">+핵심 전체 추가</button>
-    <button class="red" onclick="loadQueuedItems()">불러오기</button>
-    <button class="red" onclick="loadQueuedImportantOnly()">핵심 문장들만 불러오기</button>
   </div>
+  <div class="toolbar" id="nthBundleButtons"></div>
   <div class="toolbar">
     <button class="gray" onclick="clearSelectedItemQueue()">비우기</button>
     <input type="number" id="randomCount" class="random-count" min="1" step="1" value="1">
@@ -302,11 +312,17 @@ tr.only-forget-hidden{display:none!important}
     <button class="green" onclick="loadQueuedItems()">선택한 답변 불러오기</button>
     <button class="orange" onclick="loadImportantItems()">선택 중요문장</button>
   </div>
+  <div class="toolbar" style="justify-content:center;border-top:1px solid var(--border);margin-top:10px;padding-top:12px">
+    <button class="red" onclick="loadQueuedItems()">불러오기</button>
+    <button class="red" onclick="loadQueuedImportantOnly()">핵심 문장들만 불러오기</button>
+    <input type="number" id="queuedRandomSentenceCount" class="random-count" min="1" step="1" value="10" title="랜덤 문장 수">
+    <button class="orange" onclick="loadQueuedRandomSentences()">랜덤 문장 불러오기</button>
+  </div>
   <div class="hint">파일 선택 창에서 여러 개(Ctrl/Shift로 다중 선택)를 고르면 한 번에 합쳐서 불러와. 파일이 2개 이상이면 Unit 목록에 "파일명::시트명"으로 구분해서 표시돼. 답변 탭은 헤더 아래에서 빈 줄 전까지 한 묶음으로 읽어. 같은 묶음 안의 unit/그룹/질문 번호는 전부 질문 박스에 표시해. "선택 중요문장"는 Unit/묶음에서 고른 범위 안에서만, "전체 중요문장"는 필터와 상관없이 문장집 전체에서 중요도=1로 표시된 묶음들을 처음부터 빈 줄 직전까지 통째로 전부 불러와. "랜덤 중요문장 1개"는 문장집 전체의 중요 묶음들 중 딱 하나만 랜덤으로 불러와.</div>
 </div>
 
 <div class="card">
-<div class="toolbar"><button class="secondary small" id="manualEntryToggleBtn" onclick="toggleManualEntry()">데이터 직접 넣기</button></div>
+<div class="toolbar"><button class="secondary small" id="manualEntryToggleBtn" onclick="toggleManualEntry()">데이터 직접 넣기</button><button class="secondary small" id="excelLoadToggleBtn" onclick="toggleExcelLoadBox()">직접 파일 추가</button></div>
 <div id="manualEntryBox" style="display:none">
 <div class="hint">탭 또는 엔터로 구분된 한글/영어 문장을 붙여넣거나, Excel/CSV/TXT 파일을 불러와.</div>
 <textarea id="inputText" placeholder="한글<Tab>영어 또는 한글<Enter>영어 형태로 붙여넣기"></textarea>
@@ -321,7 +337,7 @@ tr.only-forget-hidden{display:none!important}
 <div class="hint">단어, 표현, 문장을 적고 원하는 질문을 누르면 ChatGPT 새 탭이 열려. 질문문은 클립보드에도 같이 복사돼.</div>
 <textarea id="chatGptInput" placeholder="예: get used to / I usually spend time at home." style="height:70px" oninput="autoGrow(this)"></textarea>
 <div class="toolbar">
-  <button class="secondary small" onclick="askChatGpt('simple')">간단히</button>
+  <button class="secondary small" onclick="askChatGpt('simple')">물어보기</button>
   <button class="green small" onclick="askChatGpt('meaning')">뜻 물어보기</button>
   <button class="green small" onclick="askChatGpt('examples')">예문 물어보기</button>
   <button class="orange small" onclick="askChatGpt('opic')">오픽식으로 바꾸기</button>
@@ -332,7 +348,7 @@ tr.only-forget-hidden{display:none!important}
 
 <div id="studyArea" style="display:none">
 <div class="card">
-  <b>학습 모드 선택</b>
+  <div class="study-mode-head"><b>학습 모드 선택</b><button class="red small" style="color:#fff" onclick="clearAll()">초기화</button></div>
   <div class="toolbar mode-switch">
     <button id="modeBtn-flash" class="mode-btn active" onclick="switchMode('flash')">플래시카드</button>
     <button id="modeBtn-scramble" class="mode-btn" onclick="switchMode('scramble')">단어 배열</button>
@@ -344,7 +360,6 @@ tr.only-forget-hidden{display:none!important}
   <div class="toolbar mode-switch">
     <button id="modeBtn-table" class="mode-btn" onclick="switchMode('table')">표</button>
     <button id="modeBtn-englishOnly" class="mode-btn" onclick="switchMode('englishOnly')">문장 읽기</button>
-    <button class="gray" onclick="clearAll()">초기화</button>
   </div>
   <div id="currentItemInfo" class="hint"></div>
   <div id="todayStudyInfo" class="hint"></div>
@@ -355,8 +370,12 @@ tr.only-forget-hidden{display:none!important}
   </div>
 </div>
 
+<div id="answerBundlePanel" class="answer-bundle-panel"></div>
+
 <div id="mode-table" class="card mode-panel">
 <b>표 · 읽기 설정</b>
+<div class="toolbar"><button id="tableReadSettingsToggleBtn" class="secondary small" onclick="toggleTableReadSettings()">읽기 설정 보기</button></div>
+<div id="tableReadSettingsBox" style="display:none">
 <div class="toolbar-label">재생</div>
 <div class="toolbar"><button onclick="readAll('en')">▶ 표 읽기</button><button onclick="readAll('ko')">한글</button><button onclick="readAll('en')">영어</button><button class="orange" onclick="readRandom()">랜덤 읽기</button><button class="secondary" onclick="pauseSpeak()">일시정지</button><button class="green" onclick="resumeSpeak()">▶ 이어읽기</button><button class="red" onclick="stopSpeak()">■ 정지</button></div>
 <div class="toolbar-label">Python 코드</div>
@@ -367,6 +386,7 @@ tr.only-forget-hidden{display:none!important}
 <div id="pythonCard" style="display:none;margin-top:10px"><b>생성된 Python 코드</b><pre id="pythonCode"></pre></div>
 
 <div class="hint" style="margin-top:10px">각 행의 ▶전체 / 한글 / 영어 / 반복 버튼으로 그 문장만 읽을 수 있어.</div>
+</div>
 <div id="questionBox" class="question-box" style="display:none"><b>질문</b><div id="questionList"></div></div>
 <div class="toolbar-label">보기 옵션</div>
 <div class="toolbar"><button id="koToggleBtn" class="green small" onclick="displayRow('ko')">한글 숨기기</button><button id="enToggleBtn" class="green small" onclick="displayRow('en')">영어 숨기기</button><button id="practiceToggleBtn" class="green small" onclick="togglePracticeColumn(this)">연습칸 숨기기</button><button id="actionsToggleBtn" class="green small" onclick="toggleActionsColumn(this)">기능 숨기기</button><button id="forgetOnlyBtn" class="orange small" onclick="toggleForgetOnly(this)">안 외워진 것만 보기</button></div>
@@ -374,6 +394,8 @@ tr.only-forget-hidden{display:none!important}
 <div class="toolbar"><span class="hint" style="margin:0 4px 0 0">연습칸에 적어보며 외우기</span><button class="green small" onclick="copyPracticeColumn()">연습 복사</button><button class="gray small" onclick="clearCurrentPractice()">현재 표 연습 삭제</button><button class="red small" onclick="clearAllPractice()">전체 연습 삭제</button></div>
 <div class="toolbar-label">학습 완료</div>
 <div class="toolbar"><button class="green small" onclick="completeTableStudy('읽기 완료')">읽기 완료</button><button class="green small" onclick="completeTableStudy('타이핑 완료')">타이핑 완료</button></div>
+<div id="tableAnswerNav"></div>
+<div id="tableAnswerBundlePanel" class="answer-bundle-panel"></div>
 <div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">체크</th><th class="num">번호</th><th class="kr">한글 <button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="practice-cell">연습</th><th class="actions actions-header">기능</th></tr></thead><tbody></tbody></table></div>
 </div>
 
@@ -423,8 +445,8 @@ tr.only-forget-hidden{display:none!important}
     <label>한글 속도 <input id="flashKoRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label>
     <label>영어 속도 <input id="flashEnRate" type="number" min="0.5" max="2" step="0.1" value="0.9" style="width:70px"></label>
   </div>
-  <div class="flash-bar"><div id="flashBarInner" class="flash-bar-inner"></div></div>
-  <div id="flashCard" class="flash-card" onclick="handleFlashCardClick()">
+  <div class="flash-bar clickable" onclick="jumpFlashByProgress(event)" title="누른 위치의 카드로 이동"><div id="flashBarInner" class="flash-bar-inner"></div></div>
+  <div id="flashCard" class="flash-card" tabindex="0" onclick="handleFlashCardClick()" onkeydown="flashCardKeydown(event)">
     <div id="flashFront" class="flash-front">표를 불러온 뒤 시작을 눌러줘.</div>
     <div id="flashBack" class="flash-back flash-hidden"></div>
   </div>
@@ -437,13 +459,22 @@ tr.only-forget-hidden{display:none!important}
 </div>
 
 <div class="flash-scratch-box">
-  <label class="flash-scratch-label" for="flashScratchInput"><span class="label-tag">정답 맞추기</span></label>
-  <textarea id="flashScratchInput" placeholder="정답을 떠올리며 적어봐" style="height:90px" oninput="saveFlashScratch(); autoGrow(this);" onkeydown="flashScratchKeydown(event)"></textarea>
-  <label class="flash-scratch-label" for="flashFreeInput"><span class="label-tag">그냥 적어보기</span></label>
-  <textarea id="flashFreeInput" placeholder="저장 없이 자유롭게 적어봐" style="height:90px" oninput="autoGrow(this);" onkeydown="flashScratchKeydown(event)"></textarea>
   <div class="flash-options">
+    <button class="secondary small" id="flashScratchToggleBtn" onclick="toggleFlashScratchInput()">정답 맞추기 숨기기</button>
+    <button class="secondary small" id="flashFreeToggleBtn" onclick="toggleFlashFreeInput()">그냥 적어보기 숨기기</button>
+  </div>
+  <div id="flashScratchInputBox">
+    <label class="flash-scratch-label" for="flashScratchInput"><span class="label-tag">정답 맞추기</span></label>
+    <textarea id="flashScratchInput" placeholder="정답을 떠올리며 적어봐" style="height:90px" oninput="saveFlashScratch(); autoGrow(this);" onkeydown="flashScratchKeydown(event)"></textarea>
+  </div>
+  <div id="flashFreeInputBox">
+    <label class="flash-scratch-label" for="flashFreeInput"><span class="label-tag">그냥 적어보기</span></label>
+    <textarea id="flashFreeInput" placeholder="저장 없이 자유롭게 적어봐" style="height:90px" oninput="autoGrow(this);" onkeydown="flashScratchKeydown(event)"></textarea>
+  </div>
+  <div class="flash-options">
+    <button class="gray small" onclick="clearFlashScratch()">지우기</button>
     <button class="secondary small" onclick="flipFlashcard()">뒤집기</button>
-    <button class="green small" onclick="handleFlashCardClick()">확인</button>
+    <button class="green small" id="flashConfirmBtn" onclick="handleFlashCardClick()" onkeydown="flashConfirmKeydown(event)">확인</button>
   </div>
 </div>
 </div>
@@ -696,9 +727,18 @@ function onlineCredentials(){
   password:(document.getElementById('onlinePassword')?.value||localStorage.getItem('rr_online_password')||'').trim()
  };
 }
+let onlineStatusFlashTimer=null;
 function setOnlineStatus(text){
  const el=document.getElementById('onlineLoginStatus');
- if(el)el.textContent=text;
+ if(!el)return;
+ el.textContent=text;
+ el.classList.remove('status-complete-flash');
+ if(onlineStatusFlashTimer)clearTimeout(onlineStatusFlashTimer);
+ if(String(text||'').includes('완료')){
+  void el.offsetWidth;
+  el.classList.add('status-complete-flash');
+  onlineStatusFlashTimer=setTimeout(()=>el.classList.remove('status-complete-flash'),1700);
+ }
 }
 function setCloudUserOption(name){
  const user=document.getElementById('cloudUserName');
@@ -779,7 +819,7 @@ function logoutOnlineLibrary(){
  const select=document.getElementById('onlineFileSelect');
  if(userEl)userEl.value='';
  if(passwordEl)passwordEl.value='';
- if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';
+ if(select)select.innerHTML='<option value="">선택하세요</option>';
  setOnlineStatus('로그아웃했어. 이 브라우저에 저장된 온라인 로그인 정보도 지웠어.');
  if(prevUser)recordLocalLogin(prevUser,true,'로그아웃');
 }
@@ -791,21 +831,22 @@ async function loadOnlineFileList(options={}){
  try{
   const res=await onlineJsonp('listFiles',cred);
   if(!res.ok){if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';setOnlineStatus(res.message||'파일 목록을 불러오지 못했어.');return false;}
-  const files=res.files||[];
+  const files=sortOnlineFilesByName(res.files||[]);
   if(select){
-   select.innerHTML=files.length?files.map(f=>`<option value="${escapeAttr(f.id)}">${escapeHtml(f.label||f.name)}</option>`).join(''):'<option value="">온라인 파일 없음</option>';
+   select.innerHTML=files.length?'<option value="">선택하세요</option>'+files.map(f=>`<option value="${escapeAttr(f.id)}">${escapeHtml(f.label||f.name)}</option>`).join(''):'<option value="">온라인 파일 없음</option>';
   }
   setOnlineStatus(files.length?`온라인 파일 ${files.length}개를 찾았어.`:'온라인 폴더에 파일이 없어.');
-  if(options.autoLoadFirst&&files.length){
-   if(select)select.value=files[0].id;
-   await loadSelectedOnlineFile({silentMissing:true});
-  }
   return files.length>0;
  }catch(e){
   if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';
   setOnlineStatus(e.message||'파일 목록 오류');
   return false;
  }
+}
+function sortOnlineFilesByName(files){
+ return [...files].sort((a,b)=>
+  String(a?.label||a?.name||'').localeCompare(String(b?.label||b?.name||''),'ko',{numeric:true,sensitivity:'base'})
+ );
 }
 function base64ToFile(base64,fileName,mimeType){
  const bin=atob(base64);
@@ -864,8 +905,8 @@ function loadCloudSettings(){
 function autoLoadOnlineFilesFromLocalLogin(){
  const cred=onlineCredentials();
  if(!cred.user||!cred.password)return;
- setOnlineStatus(`${cred.user} 로컬 로그인 기록 있음 · 온라인 자료 불러오는 중...`);
- loadOnlineFileList({autoLoadFirst:true});
+ setOnlineStatus(`${cred.user} 로컬 로그인 기록 있음 · 온라인 파일 목록 불러오는 중...`);
+ loadOnlineFileList();
 }
 function saveCloudSettings(){
  const user=(document.getElementById('cloudUserName')?.value||'').trim();
@@ -1227,6 +1268,11 @@ async function loadWorkbookFiles(fileList){
  lastBookFiles=[...fileList];
  stopSpeak();
  clearSelectedItemQueue();
+ clearStudyGroups();
+ rows=[];
+ document.getElementById('inputText').value='';
+ renderTable();
+ hideQuestions();
  try{
   const files=[...fileList];
   const multi=files.length>1;
@@ -1300,11 +1346,30 @@ function renderItemSelect(){
    select.innerHTML='<option value="">선택한 Unit에 문장이 없음</option>';
    return;
  }
- select.innerHTML='<option value="__ALL__">▲ 전체 문장</option>'+list.map(i=>{
+ select.innerHTML='<option value="">선택하세요</option><option value="__ALL__">▲ 전체 문장</option>'+list.map(i=>{
    const label=(isItemImportant(i)?'★ ':'')+i.label+(i.memo?`_[${i.memo}]`:'');
    return `<option value="${escapeAttr(i.key)}">${escapeHtml(label)}</option>`;
  }).join('');
+ updateAddFilteredItemsButton();
+ renderNthBundleButtons();
  renderSelectedItemQueue();
+}
+function updateAddFilteredItemsButton(){
+ const btn=document.getElementById('addFilteredItemsBtn');
+ if(!btn)return;
+ const unit=document.getElementById('unitFilter')?.value||'';
+ if(!unit){btn.textContent='전체 추가하기';return;}
+ const match=String(unit).match(/\d+/);
+ btn.textContent=match?`[${match[0]}] 전체 추가하기`:`[${unit}] 전체 추가하기`;
+}
+function renderNthBundleButtons(){
+ const box=document.getElementById('nthBundleButtons');
+ if(!box)return;
+ const list=getFilteredItems();
+ if(!BOOK.items.length||!list.length){box.innerHTML='';return;}
+ const nums=[...new Set(list.map(item=>Number(item.blockNo)).filter(n=>Number.isFinite(n)))].sort((a,b)=>a-b);
+ if(!nums.length){box.innerHTML='';return;}
+ box.innerHTML=`<span class="hint" style="margin:0 4px 0 0">번호별 추가</span><select id="nthBundleSelect">${nums.map(n=>`<option value="${n}">[${n}]만</option>`).join('')}</select><button class="secondary small" onclick="addSelectedNthItemsToQueue()">번호 추가</button>`;
 }
 
 function sentenceMemoryKey(row){return 'ls_auto_forget_'+storageSafe((row?.en||'')+'|'+(row?.ko||''));}
@@ -1357,6 +1422,29 @@ function addSelectedItemToQueue(){
  const selected=getSelectedQueueItem();
  if(!selected)return;
  addQueueEntry(selected.key,false);
+}
+function addFilteredItemsToQueue(){
+ if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}
+ const list=getFilteredItems();
+ if(!list.length){alert('현재 선택 범위에 추가할 답변이 없어.');return;}
+ let added=0;
+ list.forEach(item=>{if(addQueueEntry(item.key,false,true))added++;});
+ renderSelectedItemQueue();
+ if(!added && list.length){alert('현재 범위의 답변은 이미 전부 추가되어 있어.');}
+}
+function addNthItemsToQueue(n){
+ if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}
+ const list=getFilteredItems().filter(item=>Number(item.blockNo)===Number(n));
+ if(!list.length){alert(`[${n}]번 답변을 찾지 못했어.`);return;}
+ let added=0;
+ list.forEach(item=>{if(addQueueEntry(item.key,false,true))added++;});
+ renderSelectedItemQueue();
+ if(!added){alert(`[${n}]번 답변은 이미 전부 추가되어 있어.`);}
+}
+function addSelectedNthItemsToQueue(){
+ const n=document.getElementById('nthBundleSelect')?.value;
+ if(!n){alert('추가할 번호를 선택해줘.');return;}
+ addNthItemsToQueue(n);
 }
 function addSelectedImportantToQueue(){
  const select=document.getElementById('unitSelect');
@@ -1415,6 +1503,8 @@ function clearSelectedItemQueue(){
 function clearStudyGroups(){
  studyGroups=[];
  studyGroupIndex=0;
+ renderAnswerBundleNav();
+ renderTableAnswerNav();
 }
 function makeStudyGroups(entries,pairGetter){
  return entries.map(({entry,item})=>{
@@ -1422,13 +1512,14 @@ function makeStudyGroups(entries,pairGetter){
   return {item,pairs};
  }).filter(group=>group.item&&group.pairs&&group.pairs.length);
 }
-function loadStudyGroup(index=0){
+function loadStudyGroup(index=0,source=''){
  if(!studyGroups.length)return false;
  studyGroupIndex=Math.max(0,Math.min(index,studyGroups.length-1));
  const group=studyGroups[studyGroupIndex];
  showQuestions([group.item]);
  setRows(group.pairs,true);
- recordAnswerLoad(group.item,index===0?'선택 답변 시작':'다음 답변');
+ renderAnswerBundleNav();
+ recordAnswerLoad(group.item,source||(index===0?'선택 답변 시작':'다음 답변'));
  return true;
 }
 function loadStudyGroups(groups){
@@ -1444,6 +1535,20 @@ function loadQueuedItems(){
  const groups=makeStudyGroups(entries);
  if(!groups.length){alert('불러올 문장이 없어.');return;}
  loadStudyGroups(groups);
+}
+function loadQueuedRandomSentences(){
+ stopSpeak();
+ const entries=selectedItemKeys.map(normalizeQueueEntry).map(entry=>({entry,item:BOOK.items.find(item=>item.key===entry.key)})).filter(x=>x.item);
+ if(!entries.length){alert('먼저 추가할 답변들을 선택 목록에 넣어줘.');return;}
+ const groups=makeStudyGroups(entries);
+ const allPairs=groups.flatMap(group=>group.pairs);
+ if(!allPairs.length){alert('랜덤으로 불러올 문장이 없어.');return;}
+ const count=Math.max(1,Number(document.getElementById('queuedRandomSentenceCount')?.value||10));
+ const picked=shuffleArray([...allPairs]).slice(0,Math.min(count,allPairs.length));
+ recordQueuedAnswers(entries,`랜덤 ${picked.length}문장 불러오기`);
+ clearStudyGroups();
+ showQuestions(entries.map(x=>x.item));
+ setRows(picked);
 }
 function loadQueuedImportantOnly(){
  stopSpeak();
@@ -1494,17 +1599,137 @@ function updateCurrentItemInfo(){
  const el=document.getElementById('currentItemInfo');
  if(!el)return;
  const items=currentQuestionItems||[];
- if(!items.length){el.textContent='';return;}
+ if(!items.length){el.innerHTML='';return;}
  if(studyGroups.length>1 && items.length===1){
-   el.textContent=`현재 답변 ${studyGroupIndex+1}/${studyGroups.length}: ${items[0].sheetName} - ${itemLogTitle(items[0])}`;
+   el.innerHTML='';
    return;
  }
  if(items.length===1){
    el.textContent=`현재 문제: ${items[0].sheetName} - ${itemLogTitle(items[0])}`;
  }else{
    const names=items.map(i=>`${i.sheetName} - ${itemLogTitle(i)}`);
-   el.textContent=`현재 문제 (${items.length}개): ${names.join(', ')}`;
+   el.innerHTML=`<details><summary style="cursor:pointer;font-weight:800">현재 문제 (${items.length}개) 펼쳐보기</summary><div style="margin-top:6px;max-height:120px;overflow:auto;line-height:1.55">${names.map(escapeHtml).join('<br>')}</div></details>`;
  }
+}
+function renderTableAnswerNav(){
+ const el=document.getElementById('tableAnswerNav');
+ if(el)el.innerHTML=nextAnswerButtonHtml();
+}
+function studyGroupTitle(group){
+ const item=group?.item;
+ return item?[item.sheetName,itemLogTitle(item)].filter(Boolean).join(' - '):'';
+}
+function answerBundleHtml(){
+ const currentTitle=studyGroupTitle(studyGroups[studyGroupIndex]);
+ const buttons=studyGroups.map((group,idx)=>{
+  const active=idx===studyGroupIndex?' active':'';
+  const title=studyGroupTitle(group);
+  return `<button class="answer-bundle-btn${active}" onclick="goToStudyGroup(${idx})" title="${escapeAttr(title)}">${idx+1}</button>`;
+ }).join('');
+ return `<div class="answer-bundle-title">현재 답변 ${studyGroupIndex+1}/${studyGroups.length}: ${escapeHtml(currentTitle)}</div><div class="answer-bundle-buttons">${buttons}</div>`;
+}
+function renderAnswerBundleNav(){
+ const commonEl=document.getElementById('answerBundlePanel');
+ const tableEl=document.getElementById('tableAnswerBundlePanel');
+ const targets=[commonEl,tableEl].filter(Boolean);
+ if(!targets.length)return;
+ if(studyGroups.length<=1){
+  targets.forEach(el=>{el.style.display='none';el.innerHTML='';});
+  return;
+ }
+ const html=answerBundleHtml();
+ if(commonEl){
+  commonEl.innerHTML=html;
+  commonEl.style.display=currentMode==='table'?'none':'block';
+ }
+ if(tableEl){
+  tableEl.innerHTML=html;
+  tableEl.style.display=currentMode==='table'?'block':'none';
+ }
+}
+function goToStudyGroup(index){
+ switchToStudyGroup(index,'답변 선택');
+}
+function currentStudyGroup(){
+ return studyGroups.length?studyGroups[studyGroupIndex]:null;
+}
+function saveCurrentModeProgress(){
+ const group=currentStudyGroup();
+ if(!group)return;
+ group.progress=group.progress||{};
+ if(currentMode==='flash'){
+  saveFlashScratch();
+  const flashResult=document.getElementById('flashResult');
+  group.progress.flash={
+   order:[...flashOrderList],
+   index:flashIndex,
+   revealed:flashRevealed,
+   finished:flashFinished,
+   scratch:[...flashScratchAnswers],
+   resultHtml:flashResult&&!flashResult.classList.contains('flash-hidden')?flashResult.innerHTML:'',
+   resultCopyText:flashResultCopyText,
+   resultExcelText:flashResultExcelText
+  };
+ }else if(currentMode==='table'){
+  group.progress.table={
+   index:currentIndex,
+   done:rows.map(r=>!!r.done)
+  };
+ }
+}
+function restoreCurrentModeProgress(){
+ const group=currentStudyGroup();
+ const progress=group?.progress||{};
+ if(currentMode==='flash'){
+  const saved=progress.flash;
+  if(saved&&Array.isArray(saved.order)&&saved.order.length){
+   flashOrderList=[...saved.order].filter(i=>rows[i]);
+   if(!flashOrderList.length)buildFlashOrder();
+   flashIndex=Math.max(0,Math.min(Number(saved.index)||0,flashOrderList.length-1));
+   flashRevealed=!!saved.revealed;
+   flashFinished=!!saved.finished;
+   flashScratchAnswers=Array.isArray(saved.scratch)?[...saved.scratch]:new Array(flashOrderList.length).fill('');
+   flashResultCopyText=saved.resultCopyText||'';
+   flashResultExcelText=saved.resultExcelText||'';
+   renderFlashcard(false);
+   const res=document.getElementById('flashResult');
+   if(res){
+    if(flashFinished&&saved.resultHtml){
+     res.innerHTML=saved.resultHtml;
+     res.classList.remove('flash-hidden');
+    }else{
+     res.classList.add('flash-hidden');
+     res.innerHTML='';
+    }
+   }
+  }else{
+   resetFlashcard();
+  }
+ }else if(currentMode==='table'){
+  const saved=progress.table;
+  if(saved){
+   rows.forEach((row,idx)=>{row.done=!!saved.done?.[idx];});
+   renderTable();
+   const idx=Math.max(0,Math.min(Number(saved.index)||0,Math.max(rows.length-1,0)));
+   rows.forEach((row,i)=>{if(row.done)markDone(i);});
+   markActive(idx);
+  }else{
+   renderTable();
+  }
+ }else if(currentMode==='scramble')resetScramble();
+ else if(currentMode==='molgong')resetMolgong();
+ else if(currentMode==='keywordWrite')resetKeywordWrite();
+ else if(currentMode==='grammarCheck'){renderGrammarCheck();loadSavedGrammarNotes(false);}
+ else if(currentMode==='cloze')resetCloze();
+ else if(currentMode==='englishOnly')renderEnglishOnly();
+}
+function switchToStudyGroup(index,source='답변 선택'){
+ if(!studyGroups.length)return;
+ saveCurrentModeProgress();
+ stopFlashSpeakPlayback();
+ stopFlashAutoNext();
+ loadStudyGroup(index,source);
+ restoreCurrentModeProgress();
 }
 function buildQuestionHtml(items,prefix){
  const html=[];
@@ -1683,13 +1908,23 @@ function canLoadNextSelectedItem(){
 function canLoadNextStudyGroup(){
  return studyGroups.length>1 && studyGroupIndex<studyGroups.length-1;
 }
+function canLoadPrevStudyGroup(){
+ return studyGroups.length>1 && studyGroupIndex>0;
+}
 function nextAnswerButtonHtml(){
- return (canLoadNextStudyGroup()||canLoadNextSelectedItem())?'<div class="flash-options"><button class="green small" onclick="loadNextAnswer()">다음 답변 ▶</button></div>':'';
+ const buttons=[];
+ if(canLoadPrevStudyGroup())buttons.push('<button class="secondary small" onclick="loadPrevAnswer()">◀ 이전 답변</button>');
+ if(canLoadNextStudyGroup()||canLoadNextSelectedItem())buttons.push('<button class="green small" onclick="loadNextAnswer()">다음 답변 ▶</button>');
+ return buttons.length?`<div class="flash-options">${buttons.join('')}</div>`:'';
+}
+function loadPrevAnswer(){
+ if(canLoadPrevStudyGroup()){
+  switchToStudyGroup(studyGroupIndex-1,'이전 답변');
+ }
 }
 function loadNextAnswer(){
  if(canLoadNextStudyGroup()){
-  stopSpeak();
-  loadStudyGroup(studyGroupIndex+1);
+  switchToStudyGroup(studyGroupIndex+1,'다음 답변');
   return;
  }
  loadNextSelectedItem();
@@ -1785,6 +2020,7 @@ function renderTable(){
   const tr=document.createElement('tr');
   tr.id='row'+i;
   if(showOnlyNotMemorized && !r.notMemorized) tr.classList.add('only-forget-hidden');
+  if(r.done) tr.classList.add('done');
   const pKey=getPracticeKey(r);
   tr.innerHTML=`<td class="check-col"><input type="checkbox" class="forget-check" ${r.notMemorized?'checked':''} disabled></td><td class="num">${i+1}</td><td class="${r.important?'important-text':''}">${escapeHtml(r.ko)}</td><td class="${r.important?'important-text':''}">${formatStress(r.en)}</td><td class="practice-cell"><textarea class="practice-input" data-key="${escapeAttr(pKey)}" placeholder="" oninput="savePracticeInput(this)" onkeydown="practiceKeydown(event,this)">${escapeHtml(getSavedPractice(pKey))}</textarea></td><td class="actions actions-col"><button class="small" onclick="readOne(${i},'both')">▶전체</button><button class="small" onclick="readOne(${i},'ko')">한글</button><button class="small" onclick="readOne(${i},'en')">영어</button><button class="small orange" onclick="repeatOne(${i})">??</button></td>`;
   tb.appendChild(tr);
@@ -1794,6 +2030,7 @@ function renderTable(){
  applyPracticeVisibility();
  applyActionsVisibility();
  applyForgetOnlyButton();
+ renderTableAnswerNav();
  resetFlashcard();
  resetScramble();
  resetMolgong();
@@ -1817,6 +2054,22 @@ function toggleManualEntry(){
  box.style.display=showing?'none':'block';
  if(btn)btn.textContent=showing?'데이터 직접 넣기':'숨기기';
 }
+function toggleExcelLoadBox(){
+ const box=document.getElementById('excelDirectUploadBox');
+ const btn=document.getElementById('excelLoadToggleBtn');
+ if(!box)return;
+ const showing=box.style.display!=='none';
+ box.style.display=showing?'none':'block';
+ if(btn)btn.textContent=showing?'직접 파일 추가':'직접 파일 숨기기';
+}
+function toggleTableReadSettings(){
+ const box=document.getElementById('tableReadSettingsBox');
+ const btn=document.getElementById('tableReadSettingsToggleBtn');
+ if(!box)return;
+ const showing=box.style.display!=='none';
+ box.style.display=showing?'none':'block';
+ if(btn)btn.textContent=showing?'읽기 설정 보기':'읽기 설정 숨기기';
+}
 function toggleChatGptBox(){
  const box=document.getElementById('chatGptBox');
  const btn=document.getElementById('chatGptToggleBtn');
@@ -1829,7 +2082,7 @@ function toggleChatGptBox(){
 }
 function buildChatGptPrompt(kind,text){
  const value=String(text||'').trim();
- if(kind==='simple')return `${value} 설명해줘`;
+ if(kind==='simple')return value;
  if(kind==='meaning')return `영어 표현 "${value}"의 뜻을 한국어로 쉽게 설명하고, 자연스러운 영어 예문 5개와 오픽 답변에서 쓸 수 있는 짧은 문장 3개를 알려줘.`;
  if(kind==='examples')return `영어 표현 "${value}"을 실제 회화와 오픽 답변에서 자연스럽게 쓰는 예문을 알려줘. 쉬운 문장부터 조금 긴 문장까지 단계별로 보여줘.`;
  if(kind==='opic')return `다음 표현이나 문장을 오픽 답변에서 자연스럽게 쓸 수 있게 바꿔줘. 쉬운 버전, 자연스러운 버전, 조금 더 길게 말하는 버전으로 보여줘: "${value}"`;
@@ -1871,9 +2124,10 @@ function toggleForgetOnly(btn){
 
 function clearFlashScratch(){
  const el=document.getElementById('flashScratchInput');
- if(el) el.value='';
+ if(el){el.value='';autoGrow(el);}
  const free=document.getElementById('flashFreeInput');
- if(free) free.value='';
+ if(free){free.value='';autoGrow(free);}
+ if(flashOrderList.length&&!flashFinished)flashScratchAnswers[flashIndex]='';
 }
 function saveFlashScratch(){
  const el=document.getElementById('flashScratchInput');
@@ -1887,6 +2141,38 @@ function loadFlashScratch(){
  autoGrow(el);
  const free=document.getElementById('flashFreeInput');
  if(free){free.value='';autoGrow(free);}
+}
+function isFlashScratchInputHidden(){
+ return document.getElementById('flashScratchInputBox')?.classList.contains('flash-hidden');
+}
+function isFlashFreeInputHidden(){
+ return document.getElementById('flashFreeInputBox')?.classList.contains('flash-hidden');
+}
+function focusFlashFirstInputOrConfirm(){
+ const target=!isFlashScratchInputHidden()?document.getElementById('flashScratchInput'):!isFlashFreeInputHidden()?document.getElementById('flashFreeInput'):document.getElementById('flashConfirmBtn');
+ target?.focus();
+}
+function focusFlashLastInputOrCard(){
+ const target=!isFlashFreeInputHidden()?document.getElementById('flashFreeInput'):!isFlashScratchInputHidden()?document.getElementById('flashScratchInput'):document.getElementById('flashCard');
+ target?.focus();
+}
+function toggleFlashScratchInput(){
+ const box=document.getElementById('flashScratchInputBox');
+ const btn=document.getElementById('flashScratchToggleBtn');
+ if(!box)return;
+ const hide=!box.classList.contains('flash-hidden');
+ box.classList.toggle('flash-hidden',hide);
+ if(btn)btn.textContent=hide?'정답 맞추기 보이기':'정답 맞추기 숨기기';
+ if(hide&&document.activeElement?.id==='flashScratchInput')focusFlashFirstInputOrConfirm();
+}
+function toggleFlashFreeInput(){
+ const box=document.getElementById('flashFreeInputBox');
+ const btn=document.getElementById('flashFreeToggleBtn');
+ if(!box)return;
+ const hide=!box.classList.contains('flash-hidden');
+ box.classList.toggle('flash-hidden',hide);
+ if(btn)btn.textContent=hide?'그냥 적어보기 보이기':'그냥 적어보기 숨기기';
+ if(hide&&document.activeElement?.id==='flashFreeInput')focusFlashLastInputOrCard();
 }
 function getFlashDisplayedSpeakSide(){
  const row=getFlashCurrent();
@@ -2158,6 +2444,25 @@ function prevFlashcard(){
  renderFlashcard(false);
  scheduleFlashAutoNext();
 }
+function jumpFlashByProgress(event){
+ if(!flashOrderList.length){
+  if(rows.length)startFlashcards();
+  return;
+ }
+ if(!flashOrderList.length)return;
+ const bar=event.currentTarget;
+ const rect=bar.getBoundingClientRect();
+ const ratio=Math.max(0,Math.min(1,(event.clientX-rect.left)/Math.max(rect.width,1)));
+ const target=Math.max(0,Math.min(flashOrderList.length-1,Math.floor(ratio*flashOrderList.length)));
+ stopFlashSpeakPlayback();
+ stopFlashAutoNext();
+ saveFlashScratch();
+ flashFinished=false;
+ flashIndex=target;
+ flashRevealed=false;
+ hideFlashResult();
+ renderFlashcard(false);
+}
 function finishFlashcards(){
  stopFlashSpeakPlayback();
  stopFlashAutoNext();
@@ -2229,11 +2534,12 @@ function copyFlashResultForExcel(){
  navigator.clipboard.writeText(flashResultExcelText);
 }
 function handleFlashCardClick(){
- if(!flashOrderList.length){startFlashcards();return;}
+ if(!flashOrderList.length){startFlashcards();setTimeout(()=>document.getElementById('flashCard')?.focus(),0);return;}
  if(flashFinished)return;
  if(isFlashSingleMode()){nextFlashcard();}
  else if(!flashRevealed){flipFlashcard();}
  else{nextFlashcard();}
+ setTimeout(()=>document.getElementById('flashCard')?.focus(),0);
 }
 function copyFlashText(lang){
  const row=getFlashCurrent();
@@ -3474,10 +3780,42 @@ function getSavedPractice(key){return localStorage.getItem(key)||'';}
 function savePracticeInput(el){if(!el||!el.dataset.key)return;localStorage.setItem(el.dataset.key,el.value);autoGrow(el);}
 function autoGrow(el){if(!el)return;el.style.height='auto';el.style.height=Math.max(42,el.scrollHeight)+'px';}
 function flashScratchKeydown(e){
+ if(e.key==='ArrowUp'&&e.target?.id==='flashScratchInput'){
+  e.preventDefault();
+  document.getElementById('flashCard')?.focus();
+  return;
+ }
+ if(e.key==='ArrowDown'&&e.target?.id==='flashScratchInput'){
+  e.preventDefault();
+  (isFlashFreeInputHidden()?document.getElementById('flashConfirmBtn'):document.getElementById('flashFreeInput'))?.focus();
+  return;
+ }
+ if(e.key==='ArrowUp'&&e.target?.id==='flashFreeInput'){
+  e.preventDefault();
+  (isFlashScratchInputHidden()?document.getElementById('flashCard'):document.getElementById('flashScratchInput'))?.focus();
+  return;
+ }
+ if(e.key==='ArrowDown'&&e.target?.id==='flashFreeInput'){
+  e.preventDefault();
+  document.getElementById('flashConfirmBtn')?.focus();
+  return;
+ }
  if(!e.ctrlKey)return;
  if(e.code==='Space'){e.preventDefault();saveFlashScratch();flipFlashcard();}
  else if(e.key==='Enter'){e.preventDefault();saveFlashScratch();handleFlashCardClick();}
  else if(e.key==='0'){e.preventDefault();playFlashSpeakOnce();}
+}
+function flashCardKeydown(e){
+ if(e.key==='ArrowDown'){
+  e.preventDefault();
+  focusFlashFirstInputOrConfirm();
+ }
+}
+function flashConfirmKeydown(e){
+ if(e.key==='ArrowUp'){
+  e.preventDefault();
+  focusFlashLastInputOrCard();
+ }
 }
 function practiceKeydown(e,el){if(el&&el.classList.contains('question-practice-input'))return;if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const inputs=[...document.querySelectorAll('.practice-input')];const idx=inputs.indexOf(el);if(idx>=0&&idx<inputs.length-1)inputs[idx+1].focus();}}
 function refreshPracticeHeights(){document.querySelectorAll('.practice-input,.question-practice-input').forEach(autoGrow);}
@@ -3508,7 +3846,7 @@ speechSynthesis.getVoices();
 if('onvoiceschanged' in speechSynthesis) speechSynthesis.onvoiceschanged=()=>{speechSynthesis.getVoices();};
 function markActive(i){currentIndex=i;document.querySelectorAll('tr').forEach(x=>x.classList.remove('active'));const tr=document.getElementById('row'+i);if(tr)tr.classList.add('active');}
 function clearActive(){document.querySelectorAll('tr').forEach(x=>x.classList.remove('active'));}
-function markDone(i){const tr=document.getElementById('row'+i);if(tr)tr.classList.add('done');}
+function markDone(i){if(rows[i])rows[i].done=true;const tr=document.getElementById('row'+i);if(tr)tr.classList.add('done');}
 async function speakRow(i,mode,token){
  if(token!==playToken||!rows[i])return;
  markActive(i);
@@ -3598,6 +3936,8 @@ function switchMode(mode){
   renderGrammarCheck();
   loadSavedGrammarNotes(false);
  }
+ renderTableAnswerNav();
+ renderAnswerBundleNav();
  if(changed)recordModeChange(mode);
 }
 document.getElementById('fileInput').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;const name=file.name.toLowerCase();if(name.endsWith('.txt')||name.endsWith('.csv')){document.getElementById('inputText').value=await file.text();parseText();return;}const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];const arr=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false});rows=[];arr.forEach(line=>{const ko=val(line,0),en=val(line,1);if(ko&&en&&!isHeader(ko,en))rows.push({ko,en,important:false,notMemorized:false,done:false});});document.getElementById('inputText').value=rows.map(r=>`${r.ko}\t${r.en}`).join('\n');renderTable();});
