@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>한글 영어 읽기 프로그램</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 :root{
   --primary:#40301F;--primary-dark:#2f2315;--primary-tint:#F1E9DC;
@@ -234,14 +235,22 @@ tr.only-forget-hidden{display:none!important}
 .answer-bundle-btn{min-width:34px;height:32px;padding:0 10px;margin:0;border-radius:8px;background:#fff;color:var(--filter-dark);border:1px solid var(--border);font-size:13px;font-weight:900}
 .answer-bundle-btn:hover{background:var(--filter-tint)}
 .answer-bundle-btn.active{background:var(--filter);border-color:var(--filter);color:#fff}
+.manager-panel{display:none;border-top:1px dashed var(--border);margin-top:8px;padding-top:10px}
+.important-editor-list{display:flex;flex-direction:column;gap:7px;margin-top:8px}
+.important-editor-row{display:grid;grid-template-columns:36px 90px 1fr 1.35fr;gap:8px;align-items:start;border:1px solid var(--border);border-radius:8px;padding:8px;background:#fff;cursor:pointer}
+.important-editor-row:hover{background:var(--neutral-tint)}
+.important-editor-row.checked{background:var(--highlight-tint);border-color:#D6B98A}
+.important-editor-row label{margin:0;justify-content:center}
+.important-editor-text{font-size:13px;line-height:1.45;white-space:pre-wrap}
+.important-editor-meta{font-size:12px;font-weight:800;color:var(--text-muted)}
 </style>
 </head>
 <body>
 <div class="wrap">
 <div class="brand">
   <div class="brand-head">
-    <h1 class="brand-title" onclick="location.reload()" style="cursor:pointer" title="새로고침"><span class="brand-repeat-1">Repeat</span><span class="brand-repeat-2">Repeat</span></h1>
-    <a class="brand-link" href="https://bblack-joo.github.io/opicSetPractice/" target="_blank" rel="noopener">시험모드↗</a>
+    <h1 class="brand-title"><span class="brand-repeat-1">Repeat</span><span class="brand-repeat-2">Repeat</span></h1>
+    <span style="display:inline-flex;align-items:center;gap:10px"><a class="brand-link" href="https://bblack-joo.github.io/opicSetPractice/" target="_blank" rel="noopener">시험모드↗</a><button type="button" class="secondary small" id="managerModeToggleBtn" onclick="toggleManagerMode()">관리 모드</button></span>
   </div>
   <div class="brand-tagline">A language learning tool for studying any two languages.</div>
 </div>
@@ -371,6 +380,26 @@ tr.only-forget-hidden{display:none!important}
 </div>
 
 <div id="answerBundlePanel" class="answer-bundle-panel"></div>
+
+<div id="managerModeBox" style="display:none">
+<div class="card">
+  <div class="study-mode-head"><b>문장 관리 모드</b></div>
+  <div class="toolbar">
+    <button type="button" class="secondary small" id="importantEditorToggleBtn" onclick="toggleImportantEditor()">핵심문장 수정</button>
+    <button type="button" class="secondary small" onclick="refreshImportantEditor()">새로고침</button>
+  </div>
+  <div id="importantEditorPanel" class="manager-panel">
+    <div class="toolbar">
+      <button type="button" class="secondary small" id="importantOnlyEditorBtn" onclick="toggleImportantEditorOnly()">핵심문장만 보기</button>
+      <button type="button" class="secondary small" onclick="copyImportantValues()">값 복사</button>
+      <button type="button" class="orange small" onclick="saveImportantValuesToExcel()">서식 유지 저장</button>
+      <button type="button" class="green small" onclick="saveImportantEditor(event)">저장</button>
+    </div>
+    <div class="hint">전체 문장 앞 체크박스로 핵심문장을 수정한 뒤 저장하면, 표 표시와 핵심문장 불러오기에 반영돼.</div>
+    <div id="importantEditorList" class="important-editor-list"></div>
+  </div>
+</div>
+</div>
 
 <div id="mode-table" class="card mode-panel">
 <b>표 · 읽기 설정</b>
@@ -697,6 +726,7 @@ tr.only-forget-hidden{display:none!important}
 let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[],selectedItemKeys=[];
 let studyGroups=[],studyGroupIndex=0;
 let ENGLISH_ONLY_COPY={};
+let englishOnlyImportantOnly=false;
 let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0,flashAutoNextOn=false,flashAutoNextTimer=null,flashAutoScheduleRunId=0,flashResultCopyText='',flashResultExcelText='';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
@@ -713,11 +743,12 @@ function keyOf(u,g,q){return `${String(u).trim()}|${String(g).trim()}|${String(q
 function compactNo(u,g,q){return `${String(u).trim()}${String(g).trim()}${String(q).trim()}`;}
 function escapeHtml(s){return String(s??'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 function stripStress(text){return String(text??'').replace(/\[\[([\s\S]*?)\]\]/g,'$1');}
-const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycbzmV_Cm7vRkNEznvL6uhuXow35DsyzF_vxbRTg0ZA0A1WYGNxXOWoPZPlro3go7BaPK/exec';
+const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycbwjeW28Yp6y0o7Nn4yPQb5Ah15W_xGAW7tcxKn4zC-1RlPmtUdWhKmcNL73EidldzeP/exec';
 const MODE_LABELS={table:'표',flash:'플래시카드',scramble:'단어 배열',molgong:'몰공 모드',keywordWrite:'키워드 보고 적기',grammarCheck:'문법 체크',cloze:'빈칸 맞추기',englishOnly:'문장 읽기',log:'기록 보기'};
 const LOCAL_LOG_KEY='rr_local_log';
 const CLOUD_ALLOWED_TYPES=new Set(['answer_load','study_result']);
 let lastBookFiles=[];
+let loadedWorkbookFiles=[];
 function todayKey(){return new Date().toLocaleDateString('sv-SE');}
 function rowTitle(row){return [row?.sheetName,row?.itemLabel].filter(Boolean).join(' - ');}
 function cloudSettings(){return{user:localStorage.getItem('rr_cloud_user')||'hoonyB',url:CLOUD_SCRIPT_URL};}
@@ -776,6 +807,49 @@ function onlineJsonp(action,params={}){
 function onlinePost(action,data={}){
  const cred=onlineCredentials();
  return fetch(CLOUD_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...cred,...data})});
+}
+async function saveImportantOverridesOnline(fileId,entries){
+ const cred=onlineCredentials();
+ const compact=(entries||[]).map(entry=>({
+  itemKey:entry.itemKey,
+  answerIndex:entry.answerIndex,
+  important:!!entry.important,
+  title:entry.title||''
+ }));
+ const res=await onlineJsonp('importantOverridesSave',{...cred,fileId,entries:JSON.stringify(compact)});
+ if(!res.ok)throw new Error(res.message||'핵심문장 저장 실패');
+ return res;
+}
+function currentOnlineFileId(){
+ return document.getElementById('onlineFileSelect')?.value||'';
+}
+function applyImportantOverrides(entries=[]){
+ const map=new Map((entries||[]).map(entry=>[`${entry.itemKey}__${Number(entry.answerIndex)}`,!!entry.important]));
+ if(!map.size)return 0;
+ let applied=0;
+ BOOK.items.forEach(item=>{
+  (item.answers||[]).forEach((answer,answerIndex)=>{
+   const key=`${item.key}__${answerIndex}`;
+   if(map.has(key)){
+    answer.important=map.get(key);
+    applied++;
+   }
+  });
+ });
+ return applied;
+}
+async function loadImportantOverridesForCurrentFile(){
+ const cred=onlineCredentials();
+ const fileId=currentOnlineFileId();
+ if(!cred.user||!cred.password||!fileId)return 0;
+ try{
+  const res=await onlineJsonp('importantOverridesLoad',{...cred,fileId});
+  if(!res.ok)return 0;
+  return applyImportantOverrides(res.entries||[]);
+ }catch(e){
+  console.warn('important overrides load failed',e);
+  return 0;
+ }
 }
 async function testOnlineServer(){
  setOnlineStatus('연결 테스트 중...');
@@ -854,23 +928,31 @@ function base64ToFile(base64,fileName,mimeType){
  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
  return new File([bytes],fileName||'online.xlsx',{type:mimeType||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
-async function loadSelectedOnlineFile(options={}){
+async function fetchSelectedOnlineWorkbookFile(options={}){
  const cred=onlineCredentials();
  const fileId=document.getElementById('onlineFileSelect')?.value||'';
  if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
  if(!fileId){if(!options.silentMissing)alert('불러올 온라인 파일을 선택해줘.');return false;}
- setOnlineStatus('온라인 파일을 불러오는 중...');
  try{
   const res=await onlineJsonp('getFile',{...cred,fileId});
   if(!res.ok){setOnlineStatus(res.message||'온라인 파일을 불러오지 못했어.');return false;}
   const file=base64ToFile(res.base64,res.fileName,res.mimeType);
-  await loadWorkbookFiles([file]);
-  setOnlineStatus(`${res.fileName||'온라인 파일'} 불러오기 완료`);
-  return true;
+  file.onlineFileId=fileId;
+  return file;
  }catch(e){
   setOnlineStatus(e.message||'온라인 파일 불러오기 오류');
   return false;
  }
+}
+async function loadSelectedOnlineFile(options={}){
+ const fileId=document.getElementById('onlineFileSelect')?.value||'';
+ if(!fileId){if(!options.silentMissing)alert('불러올 온라인 파일을 선택해줘.');return false;}
+ setOnlineStatus('온라인 파일을 불러오는 중...');
+ const file=await fetchSelectedOnlineWorkbookFile(options);
+ if(!file)return false;
+ await loadWorkbookFiles([file]);
+ setOnlineStatus(`${file.name||'온라인 파일'} 불러오기 완료`);
+ return true;
 }
 function fileToBase64(file){
  return new Promise((resolve,reject)=>{
@@ -1090,6 +1172,7 @@ function formatStress(text){
 
 function escapeAttr(s){return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function pyStr(s){return JSON.stringify(String(s??''));}
+function isTruthyCell(v){return ['1','true','y','yes','o','ok','v','✓','✔','체크','핵심'].includes(String(v??'').trim().toLowerCase());}
 function uniqueRefs(refs){const seen=new Set(),out=[]; refs.forEach(r=>{if(!r.unitNo||!r.groupNo||!r.questionNo)return; const k=keyOf(r.unitNo,r.groupNo,r.questionNo); if(!seen.has(k)){seen.add(k);out.push(r);}}); return out;}
 function findHeaderRow(arr, required){
   for(let r=0;r<arr.length;r++){
@@ -1147,7 +1230,7 @@ function parseQuestionSheet(ws){
  }
  return res;
 }
-function parseAnswerSheet(ws,sheetName){
+function parseAnswerSheet(ws,sheetName,fileName=''){
  const arr=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:true,defval:''});
  const header=findHeaderRow(arr,{
    unit:['unit번호','유닛번호'],
@@ -1164,11 +1247,20 @@ function parseAnswerSheet(ws,sheetName){
  let flowCol=headerCells.findIndex(v=>['답변흐름','내답변키워드','답변키워드','키워드','흐름'].includes(v));
  if(flowCol<0) flowCol=7;
 
- // 키워드 열 뒤의 "중요도" 읽기
- // 1순위: 헤더명 "중요도 / 중요 / importance"
- // 2순위: 키워드 열 바로 다음 열
- let importanceCol=headerCells.findIndex(v=>['중요도','중요','importance'].includes(v));
+ // "중요도"는 답변 묶음 전체가 핵심 답변인지 표시한다.
+ let importanceCol=headerCells.findIndex(v=>['중요도','중요','importance','important'].includes(v));
  if(importanceCol<0 && flowCol>=0) importanceCol=flowCol+1;
+
+ // "핵심 문장"은 각 문장별 핵심 여부를 표시한다.
+ let keySentenceCol=headerCells.findIndex(v=>['핵심','핵심문장','핵심문장여부','키문장','keysentence'].includes(v));
+ if(keySentenceCol<0){
+   keySentenceCol=headerCells.length;
+   const headerAddr=XLSX.utils.encode_cell({r:header.rowIndex,c:keySentenceCol});
+   ws[headerAddr]={t:'s',v:'핵심 문장'};
+   const range=XLSX.utils.decode_range(ws['!ref']||'A1');
+   if(range.e.c<keySentenceCol)range.e.c=keySentenceCol;
+   ws['!ref']=XLSX.utils.encode_range(range);
+ }
 
  // 중요도 옆의 "안외워짐" 읽기
  // 1순위: 헤더명 "안외워짐 / 안 외워짐 / 미암기"
@@ -1190,7 +1282,8 @@ function parseAnswerSheet(ws,sheetName){
  let blockNo=1;
  let lastUnit='';
  let lastGroup='';
- const cols=[header.cols.unit,header.cols.group,header.cols.qno,header.cols.ko,header.cols.en,flowCol,importanceCol,notMemorizedCol,memoCol];
+ let blockImportant=false;
+ const cols=[header.cols.unit,header.cols.group,header.cols.qno,header.cols.ko,header.cols.en,flowCol,importanceCol,notMemorizedCol,memoCol,keySentenceCol];
 
  function addRef(u,g,q){
    const unitNo=idCell(u||lastUnit);
@@ -1214,7 +1307,7 @@ function parseAnswerSheet(ws,sheetName){
 
  function saveBlock(){
    if(answers.length===0){
-     refs=[]; flows=[]; memo=''; lastUnit=''; lastGroup='';
+     refs=[]; flows=[]; memo=''; lastUnit=''; lastGroup=''; blockImportant=false;
      return;
    }
    blocks.push({
@@ -1223,7 +1316,8 @@ function parseAnswerSheet(ws,sheetName){
      refs:uniqueRefs(refs),
      answers:[...answers],
      flows:[...flows],
-     memo
+     memo,
+     important:blockImportant
    });
    answers=[];
    refs=[];
@@ -1231,6 +1325,7 @@ function parseAnswerSheet(ws,sheetName){
    memo='';
    lastUnit='';
    lastGroup='';
+   blockImportant=false;
  }
 
  for(let r=header.rowIndex+1;r<arr.length;r++){
@@ -1244,10 +1339,10 @@ function parseAnswerSheet(ws,sheetName){
    const ko=val(line,header.cols.ko);
    const en=val(line,header.cols.en);
    const flow=val(line,flowCol);
-   const importance=val(line,importanceCol);
-   const important=String(importance).trim()==='1';
+   if(isTruthyCell(val(line,importanceCol))) blockImportant=true;
+   const important=keySentenceCol>=0 ? isTruthyCell(val(line,keySentenceCol)) : false;
    const notMemorizedValue=val(line,notMemorizedCol);
-   const notMemorized=String(notMemorizedValue).trim()==='1';
+   const notMemorized=isTruthyCell(notMemorizedValue);
    const memoValue=val(line,memoCol);
 
    if(unitNo) lastUnit=unitNo;
@@ -1257,7 +1352,7 @@ function parseAnswerSheet(ws,sheetName){
    addMemoIfAny(memoValue);
 
    if(ko||en){
-     answers.push({ko,en,important,notMemorized});
+     answers.push({ko,en,important,notMemorized,origin:{fileName,sheetName,rowIndex:r,keySentenceCol,headerRowIndex:header.rowIndex}});
    }
  }
  saveBlock();
@@ -1279,10 +1374,12 @@ async function loadWorkbookFiles(fileList){
   BOOK.workbook=null;
   BOOK.questions={};
   BOOK.items=[];
+  loadedWorkbookFiles=[];
 
   for(const file of files){
    const data=await file.arrayBuffer();
    const wb=XLSX.read(data,{type:'array'});
+   loadedWorkbookFiles.push({fileName:file.name,mimeType:file.type||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',fileId:file.onlineFileId||'',workbook:wb,originalBuffer:data.slice(0)});
    const fileLabel=String(file.name||'').replace(/\.(xlsx|xls)$/i,'');
 
    const qName=wb.SheetNames.find(n=>norm(n)==='0.질문')||wb.SheetNames.find(n=>String(n).includes('질문'));
@@ -1290,7 +1387,7 @@ async function loadWorkbookFiles(fileList){
 
    wb.SheetNames.forEach(sheetName=>{
     if(sheetName===qName)return;
-    const blocks=parseAnswerSheet(wb.Sheets[sheetName],sheetName);
+    const blocks=parseAnswerSheet(wb.Sheets[sheetName],sheetName,file.name);
     const displaySheet=multi?`${fileLabel}::${sheetName}`:sheetName;
     blocks.forEach(b=>{
      const questions=b.refs.map(ref=>{
@@ -1300,9 +1397,10 @@ async function loadWorkbookFiles(fileList){
      BOOK.items.push({
       key:`${fileLabel}__${sheetName}__${b.blockNo}`,
       label:`${displaySheet}_${b.blockNo}`,
-      sheetName:displaySheet,
-      blockNo:b.blockNo,
-      refs:b.refs,
+     sheetName:displaySheet,
+     blockNo:b.blockNo,
+     important:!!b.important,
+     refs:b.refs,
       questions,
       answers:b.answers,
       flows:b.flows||[],
@@ -1312,6 +1410,7 @@ async function loadWorkbookFiles(fileList){
    });
   }
 
+  await loadImportantOverridesForCurrentFile();
   const select=document.getElementById('unitSelect');
   if(!BOOK.items.length){
     select.innerHTML='<option value="">불러올 문장이 없음</option>';
@@ -1374,7 +1473,7 @@ function renderNthBundleButtons(){
 
 function sentenceMemoryKey(row){return 'ls_auto_forget_'+storageSafe((row?.en||'')+'|'+(row?.ko||''));}
 function isAutoNotMemorized(row){try{return localStorage.getItem(sentenceMemoryKey(row))==='1';}catch(e){return false;}}
-function itemToPairs(item){const flowText=(item.flows||[]).map(x=>String(x).trim()).filter(Boolean).join('\n');return item.answers.map(a=>({ko:a.ko,en:a.en,important:!!a.important,notMemorized:!!a.notMemorized||isAutoNotMemorized(a),itemLabel:item.label||'',sheetName:item.sheetName||'',flowText}));}
+function itemToPairs(item){const flowText=(item.flows||[]).map(x=>String(x).trim()).filter(Boolean).join('\n');return item.answers.map((a,answerIndex)=>({ko:a.ko,en:a.en,important:!!a.important,notMemorized:!!a.notMemorized||isAutoNotMemorized(a),itemLabel:item.label||'',sheetName:item.sheetName||'',itemKey:item.key||'',answerIndex,flowText,origin:a.origin||null}));}
 function itemToImportantPairs(item){return itemToPairs(item).filter(p=>p.important);}
 function itemToNotMemorizedPairs(item){return itemToPairs(item).filter(p=>p.notMemorized);}
 function itemOptionLabel(item){
@@ -1522,10 +1621,10 @@ function loadStudyGroup(index=0,source=''){
  recordAnswerLoad(group.item,source||(index===0?'선택 답변 시작':'다음 답변'));
  return true;
 }
-function loadStudyGroups(groups){
+function loadStudyGroups(groups,source=''){
  studyGroups=groups||[];
  studyGroupIndex=0;
- return loadStudyGroup(0);
+ return loadStudyGroup(0,source);
 }
 function loadQueuedItems(){
  stopSpeak();
@@ -1893,7 +1992,7 @@ function copyKeyword(id){
  navigator.clipboard.writeText(box.textContent||'');
 }
 function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox','molgongQuestionBox','keywordWriteQuestionBox','grammarCheckQuestionBox','clozeQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList','molgongQuestionList','keywordWriteQuestionList','grammarCheckQuestionList','clozeQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});['flash','scramble','molgong','keywordWrite','grammarCheck','cloze'].forEach(mode=>setStudyQuestionToggle(mode,false));}
-function setRows(pairs,preserveGroups=false){if(!preserveGroups)clearStudyGroups();startStudyEntry();document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',flowText:i.flowText||'',done:false})).filter(i=>i.ko||i.en);renderTable();if(currentMode==='grammarCheck')renderGrammarCheck();}
+function setRows(pairs,preserveGroups=false){if(!preserveGroups)clearStudyGroups();startStudyEntry();document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',itemKey:i.itemKey||'',answerIndex:Number.isFinite(Number(i.answerIndex))?Number(i.answerIndex):null,flowText:i.flowText||'',origin:i.origin||null,done:false})).filter(i=>i.ko||i.en);renderTable();if(currentMode==='grammarCheck')renderGrammarCheck();}
 function loadSelectedItem(){stopSpeak();clearStudyGroups();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));recordAnswerLoad(item,'선택 답변 불러오기');}
 function canLoadNextSelectedItem(){
  const select=document.getElementById('unitSelect');
@@ -1942,7 +2041,7 @@ function loadNextSelectedItem(){
  }
  alert('다음 답변이 없어.');
 }
-function isItemImportant(item){return item.answers.some(a=>a.important);}
+function isItemImportant(item){return !!item?.important;}
 function loadImportantItems(){
  stopSpeak();
  if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}
@@ -1963,16 +2062,14 @@ function loadImportantItems(){
  }
  const list=scope.filter(isItemImportant);
  if(!list.length){alert('선택한 범위에 중요도 1인 묶음이 없어.');return;}
- showQuestions(list);
- setRows(list.flatMap(itemToPairs));
+ loadItemsAsStudyGroups(list,'핵심 문장묶음 불러오기');
 }
 function loadAllImportantItems(){
  stopSpeak();
  if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}
  const list=BOOK.items.filter(isItemImportant);
  if(!list.length){alert('문장집 전체에 중요도 1인 묶음이 없어.');return;}
- showQuestions(list);
- setRows(list.flatMap(itemToPairs));
+ loadItemsAsStudyGroups(list,'핵심 문장 전체 불러오기');
 }
 function loadRandomImportantItem(){
  stopSpeak();
@@ -1984,7 +2081,13 @@ function loadRandomImportantItem(){
  setRows(itemToPairs(picked));
  recordAnswerLoad(picked,'중요문장 랜덤 1개');
 }
-function loadAllItems(){stopSpeak();clearStudyGroups();if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}const list=getFilteredItems();if(!list.length){alert('선택한 Unit에 불러올 문장이 없어.');return;}showQuestions(list);setRows(list.flatMap(itemToPairs));}
+function loadItemsAsStudyGroups(list,source){
+ const entries=(list||[]).map(item=>({entry:{key:item.key},item})).filter(x=>x.item);
+ const groups=makeStudyGroups(entries);
+ if(!groups.length){alert('불러올 문장이 없어.');return;}
+ loadStudyGroups(groups,source);
+}
+function loadAllItems(){stopSpeak();if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}const list=getFilteredItems();if(!list.length){alert('선택한 Unit에 불러올 문장이 없어.');return;}loadItemsAsStudyGroups(list,'전체 답변 불러오기');}
 function shuffleArray(a){return a.map(v=>({v,s:Math.random()})).sort((x,y)=>x.s-y.s).map(x=>x.v)}
 function loadRandomItems(){
  stopSpeak();
@@ -2037,8 +2140,335 @@ function renderTable(){
  resetKeywordWrite();
  resetCloze();
  renderEnglishOnly();
+ renderImportantEditor();
  applyStudyAreaVisibility();
  setTimeout(refreshPracticeHeights,0);
+}
+let importantEditorOnly=false;
+function toggleImportantEditor(){
+ const panel=document.getElementById('importantEditorPanel');
+ const btn=document.getElementById('importantEditorToggleBtn');
+ if(!panel)return;
+ const showing=panel.style.display!=='none'&&panel.style.display!=='';
+ panel.style.display=showing?'none':'block';
+ if(btn)btn.textContent=showing?'핵심문장 수정':'핵심문장 수정 닫기';
+ if(!showing)renderImportantEditor();
+}
+function toggleImportantEditorOnly(){
+ importantEditorOnly=!importantEditorOnly;
+ const btn=document.getElementById('importantOnlyEditorBtn');
+ if(btn)btn.textContent=importantEditorOnly?'전체 문장 보기':'핵심문장만 보기';
+ renderImportantEditor();
+}
+function renderImportantEditor(){
+ const panel=document.getElementById('importantEditorPanel');
+ const box=document.getElementById('importantEditorList');
+ if(!panel||!box||panel.style.display==='none'||panel.style.display==='')return;
+ const list=rows.map((row,index)=>({row,index})).filter(x=>!importantEditorOnly||x.row.important);
+ if(!rows.length){box.innerHTML='<div class="log-empty">먼저 문장을 불러와줘.</div>';return;}
+ if(!list.length){box.innerHTML='<div class="log-empty">핵심문장으로 체크된 문장이 없어.</div>';return;}
+ box.innerHTML=list.map(({row,index})=>`
+  <div class="important-editor-row ${row.important?'checked':''}" onclick="toggleImportantEditorRow(this, event)">
+   <label><input type="checkbox" class="important-editor-check" data-row-index="${index}" ${row.important?'checked':''} onclick="event.stopPropagation()" onchange="syncImportantEditorRow(this)"></label>
+   <div class="important-editor-meta">${index+1}번<br>${escapeHtml([row.sheetName,row.itemLabel].filter(Boolean).join(' - '))}</div>
+   <div class="important-editor-text">${escapeHtml(row.ko||'')}</div>
+   <div class="important-editor-text">${formatStress(row.en||'')}</div>
+  </div>
+ `).join('');
+}
+function toggleImportantEditorRow(rowEl,event){
+ if(event?.target?.classList?.contains('important-editor-check'))return;
+ const check=rowEl.querySelector('.important-editor-check');
+ if(!check)return;
+ check.checked=!check.checked;
+ syncImportantEditorRow(check);
+}
+function syncImportantEditorRow(check){
+ const rowEl=check.closest('.important-editor-row');
+ if(rowEl)rowEl.classList.toggle('checked',!!check.checked);
+}
+function currentImportantEditorValues(){
+ const checkedByIndex=new Map([...document.querySelectorAll('.important-editor-check')].map(check=>[Number(check.dataset.rowIndex),!!check.checked]));
+ return rows.map((row,index)=>{
+  const checked=checkedByIndex.has(index)?checkedByIndex.get(index):!!row.important;
+  return checked?'1':'';
+ });
+}
+async function copyImportantValues(){
+ const values=currentImportantEditorValues();
+ if(!values.length){alert('복사할 문장이 없어.');return;}
+ const text=values.join('\n');
+ try{
+  await navigator.clipboard.writeText(text);
+  setOnlineStatus(`핵심 문장 값 ${values.length}줄 복사 완료`);
+ }catch(e){
+  alert('복사에 실패했어. 브라우저 권한을 확인해줘.');
+ }
+}
+function xmlDoc(text){return new DOMParser().parseFromString(text,'application/xml');}
+function xmlText(doc){return new XMLSerializer().serializeToString(doc);}
+function relTargetPath(base,target){
+ const parts=base.split('/').slice(0,-1).concat(String(target||'').split('/'));
+ const out=[];
+ parts.forEach(part=>{if(!part||part==='.'){return;} if(part==='..')out.pop(); else out.push(part);});
+ return out.join('/');
+}
+async function workbookSheetPath(zip,sheetName){
+ const wbText=await zip.file('xl/workbook.xml')?.async('text');
+ const relText=await zip.file('xl/_rels/workbook.xml.rels')?.async('text');
+ if(!wbText||!relText)return '';
+ const wb=xmlDoc(wbText);
+ const rels=xmlDoc(relText);
+ const sheets=[...wb.getElementsByTagName('sheet')];
+ const sheet=sheets.find(node=>node.getAttribute('name')===sheetName);
+ if(!sheet)return '';
+ const relId=sheet.getAttribute('r:id')||sheet.getAttribute('id');
+ const rel=[...rels.getElementsByTagName('Relationship')].find(node=>node.getAttribute('Id')===relId);
+ if(!rel)return '';
+ return relTargetPath('xl/workbook.xml',rel.getAttribute('Target'));
+}
+function ensureWorksheetCell(doc,rowNumber,cellRef){
+ let sheetData=doc.getElementsByTagName('sheetData')[0];
+ if(!sheetData){
+  const worksheet=doc.getElementsByTagName('worksheet')[0]||doc.documentElement;
+  sheetData=doc.createElement('sheetData');
+  worksheet.appendChild(sheetData);
+ }
+ let row=[...sheetData.getElementsByTagName('row')].find(node=>Number(node.getAttribute('r'))===rowNumber);
+ if(!row){
+  row=doc.createElement('row');
+  row.setAttribute('r',String(rowNumber));
+  sheetData.appendChild(row);
+ }
+ let cell=[...row.getElementsByTagName('c')].find(node=>node.getAttribute('r')===cellRef);
+ if(!cell){
+  cell=doc.createElement('c');
+  cell.setAttribute('r',cellRef);
+  row.appendChild(cell);
+ }
+ return cell;
+}
+function setWorksheetCellValue(doc,rowIndex,colIndex,value){
+ const rowNumber=Number(rowIndex)+1;
+ const cellRef=XLSX.utils.encode_cell({r:Number(rowIndex),c:Number(colIndex)});
+ const cell=ensureWorksheetCell(doc,rowNumber,cellRef);
+ cell.removeAttribute('t');
+ [...cell.getElementsByTagName('v')].forEach(v=>v.parentNode.removeChild(v));
+ if(value){
+  if(typeof value==='string'){
+   cell.setAttribute('t','str');
+  }
+  const v=doc.createElement('v');
+  v.textContent=typeof value==='string'?value:'1';
+  cell.appendChild(v);
+ }
+ const dimension=doc.getElementsByTagName('dimension')[0];
+ if(dimension){
+  const range=XLSX.utils.decode_range(dimension.getAttribute('ref')||'A1');
+  if(range.e.r<Number(rowIndex))range.e.r=Number(rowIndex);
+  if(range.e.c<Number(colIndex))range.e.c=Number(colIndex);
+  dimension.setAttribute('ref',XLSX.utils.encode_range(range));
+ }
+}
+async function patchWorkbookImportantValues(meta){
+ if(!window.JSZip)throw new Error('JSZip을 불러오지 못했어. 인터넷 연결을 확인해줘.');
+ if(!meta?.originalBuffer)throw new Error('원본 엑셀 데이터를 찾지 못했어. 파일을 다시 불러와줘.');
+ const zip=await JSZip.loadAsync(meta.originalBuffer);
+ const targets=rows.filter(row=>row.origin&&row.origin.fileName===meta.fileName);
+ const bySheet=new Map();
+ targets.forEach(row=>{
+  const list=bySheet.get(row.origin.sheetName)||[];
+  list.push(row);
+  bySheet.set(row.origin.sheetName,list);
+ });
+ for(const [sheetName,list] of bySheet.entries()){
+  const path=await workbookSheetPath(zip,sheetName);
+  if(!path)continue;
+  const file=zip.file(path);
+  if(!file)continue;
+  const doc=xmlDoc(await file.async('text'));
+  const firstOrigin=list[0]?.origin;
+  if(firstOrigin&&firstOrigin.headerRowIndex!=null)setWorksheetCellValue(doc,firstOrigin.headerRowIndex,firstOrigin.keySentenceCol,'핵심 문장');
+  list.forEach(row=>setWorksheetCellValue(doc,row.origin.rowIndex,row.origin.keySentenceCol,!!row.important));
+  zip.file(path,xmlText(doc));
+ }
+ return await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+async function uploadPatchedWorkbook(meta,blob){
+ const cred=onlineCredentials();
+ if(!cred.user||!cred.password||!meta.fileId)return false;
+ const file=new File([blob],meta.fileName,{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+ const base64=await fileToBase64(file);
+ fetch(CLOUD_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'uploadWorkbook',user:cred.user,password:cred.password,fileId:meta.fileId,fileName:meta.fileName,mimeType:file.type,base64})});
+ return true;
+}
+function downloadBlob(blob,fileName){
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);
+ a.download=fileName;
+ a.click();
+ URL.revokeObjectURL(a.href);
+}
+async function saveImportantValuesToExcel(){
+ try{
+  const checks=[...document.querySelectorAll('.important-editor-check')];
+  if(!checks.length){alert('저장할 문장이 없어.');return;}
+  checks.forEach(check=>{
+   const index=Number(check.dataset.rowIndex);
+   if(rows[index])setRowImportant(index,!!check.checked);
+  });
+  if(!loadedWorkbookFiles.length){alert('엑셀 파일을 다시 불러온 뒤 시도해줘.');return;}
+  setOnlineStatus('엑셀 서식을 유지하면서 핵심 문장 값만 저장 중...');
+  let uploaded=0,downloaded=0;
+  for(const meta of loadedWorkbookFiles){
+   const blob=await patchWorkbookImportantValues(meta);
+   if(await uploadPatchedWorkbook(meta,blob))uploaded++;
+   else{downloadBlob(blob,meta.fileName.replace(/\.xlsx?$/i,'')+'_핵심문장.xlsx');downloaded++;}
+  }
+  setOnlineStatus(uploaded?`서식 유지 저장 요청 완료: ${uploaded}개 파일`:`서식 유지 파일 ${downloaded}개 다운로드 완료`);
+ }catch(e){
+  console.error(e);
+  alert(e.message||'서식 유지 저장 중 오류가 났어.');
+ }
+}
+async function saveImportantEditor(event){
+ if(event?.preventDefault)event.preventDefault();
+ if(event?.stopPropagation)event.stopPropagation();
+ try{
+  const checks=[...document.querySelectorAll('.important-editor-check')];
+  if(!checks.length){alert('저장할 문장이 없어.');return;}
+  const entries=[];
+  checks.forEach(check=>{
+   const index=Number(check.dataset.rowIndex);
+   if(!rows[index])return;
+   setRowImportant(index,!!check.checked);
+   const row=rows[index];
+   if(row.itemKey&&row.answerIndex!=null){
+    entries.push({
+     itemKey:row.itemKey,
+     answerIndex:Number(row.answerIndex),
+     important:!!check.checked,
+     title:[row.sheetName,row.itemLabel].filter(Boolean).join(' - '),
+     ko:row.ko||'',
+     en:stripStress(row.en||'')
+    });
+   }
+  });
+  const fileId=currentOnlineFileId();
+  if(fileId&&entries.length){
+   setOnlineStatus('핵심문장 저장 중...');
+   const res=await saveImportantOverridesOnline(fileId,entries);
+   setOnlineStatus(`핵심문장 ${res.saved||entries.length}개 저장 완료`);
+  }
+  renderItemSelect();
+  renderSelectedItemQueue();
+  refreshImportantVisuals();
+  renderEnglishOnly();
+  renderImportantEditor();
+  alert('저장되었습니다');
+ }catch(e){
+  console.error(e);
+  alert('핵심문장 저장 중 오류가 났어. 다시 한 번 시도해줘.');
+ }
+}
+function setRowImportant(index,important){
+ rows[index].important=important;
+ const itemKey=rows[index].itemKey;
+ const answerIndex=rows[index].answerIndex;
+ if(itemKey&&answerIndex!=null){
+  const item=BOOK.items.find(v=>v.key===itemKey);
+  if(item&&item.answers&&item.answers[answerIndex])item.answers[answerIndex].important=important;
+  studyGroups.forEach(group=>{
+   (group.pairs||[]).forEach(pair=>{
+    if(pair.itemKey===itemKey&&Number(pair.answerIndex)===Number(answerIndex))pair.important=important;
+   });
+  });
+ }
+}
+function refreshImportantVisuals(){
+ rows.forEach((row,index)=>{
+  const tr=document.getElementById('row'+index);
+  if(!tr)return;
+  [2,3].forEach(col=>{
+   const cell=tr.children[col];
+   if(cell)cell.classList.toggle('important-text',!!row.important);
+  });
+ });
+}
+function syncImportantEditorFromSource(){
+ rows.forEach((row,index)=>{
+  if(!row)return;
+  const item=row.itemKey?BOOK.items.find(v=>v.key===row.itemKey):null;
+  const source=item&&row.answerIndex!=null&&item.answers?item.answers[Number(row.answerIndex)]:null;
+  if(source)rows[index].important=!!source.important;
+ });
+ studyGroups.forEach(group=>{
+  (group.pairs||[]).forEach(pair=>{
+   const item=pair.itemKey?BOOK.items.find(v=>v.key===pair.itemKey):null;
+   const source=item&&pair.answerIndex!=null&&item.answers?item.answers[Number(pair.answerIndex)]:null;
+   if(source)pair.important=!!source.important;
+  });
+ });
+}
+function captureImportantRefreshState(){
+ return {
+  groupIndex:studyGroupIndex,
+  groups:studyGroups.map(group=>({itemKey:group?.item?.key||'',pairs:(group?.pairs||[]).map(pair=>({itemKey:pair.itemKey,answerIndex:pair.answerIndex}))})),
+  rows:rows.map(row=>({itemKey:row.itemKey,answerIndex:row.answerIndex})),
+  selectedItemKeys:[...selectedItemKeys]
+ };
+}
+function pairsFromRefs(refs){
+ return (refs||[]).map(ref=>{
+  const item=ref.itemKey?BOOK.items.find(v=>v.key===ref.itemKey):null;
+  const answer=item&&ref.answerIndex!=null&&item.answers?item.answers[Number(ref.answerIndex)]:null;
+  if(!item||!answer)return null;
+  return {...answer,itemLabel:item.label,sheetName:item.sheetName,itemKey:item.key,answerIndex:Number(ref.answerIndex),flowText:(item.flows||[]).join('\n')};
+ }).filter(Boolean);
+}
+function restoreImportantRefreshState(state){
+ if(!state)return;
+ selectedItemKeys=[...(state.selectedItemKeys||[])];
+ const groups=(state.groups||[]).map(saved=>{
+  const item=saved.itemKey?BOOK.items.find(v=>v.key===saved.itemKey):null;
+  const pairs=pairsFromRefs(saved.pairs);
+  return item&&pairs.length?{item,pairs}:null;
+ }).filter(Boolean);
+ if(groups.length){
+  studyGroups=groups;
+  studyGroupIndex=Math.max(0,Math.min(Number(state.groupIndex)||0,studyGroups.length-1));
+  const group=studyGroups[studyGroupIndex];
+  showQuestions([group.item]);
+  setRows(group.pairs,true);
+  return;
+ }
+ const restoredRows=pairsFromRefs(state.rows);
+ if(restoredRows.length)setRows(restoredRows);
+}
+async function refreshImportantEditor(){
+ const panel=document.getElementById('importantEditorPanel');
+ const btn=document.getElementById('importantEditorToggleBtn');
+ if(panel&&(panel.style.display==='none'||panel.style.display==='')){
+  panel.style.display='block';
+  if(btn)btn.textContent='핵심문장 수정 닫기';
+ }
+ const fileId=document.getElementById('onlineFileSelect')?.value||'';
+ if(fileId){
+  const state=captureImportantRefreshState();
+  setOnlineStatus('문장 관리 내용을 새로고침 중...');
+  const file=await fetchSelectedOnlineWorkbookFile({silentMissing:true});
+  if(file){
+   await loadWorkbookFiles([file]);
+   restoreImportantRefreshState(state);
+   setOnlineStatus('문장 관리 새로고침 완료');
+  }
+ }
+ syncImportantEditorFromSource();
+ renderItemSelect();
+ renderSelectedItemQueue();
+ refreshImportantVisuals();
+ renderEnglishOnly();
+ renderImportantEditor();
 }
 function applyStudyAreaVisibility(){
  const area=document.getElementById('studyArea');
@@ -2061,6 +2491,15 @@ function toggleExcelLoadBox(){
  const showing=box.style.display!=='none';
  box.style.display=showing?'none':'block';
  if(btn)btn.textContent=showing?'직접 파일 추가':'직접 파일 숨기기';
+}
+function toggleManagerMode(){
+ const box=document.getElementById('managerModeBox');
+ const btn=document.getElementById('managerModeToggleBtn');
+ if(!box)return;
+ const showing=box.style.display!=='none';
+ box.style.display=showing?'none':'block';
+ if(btn)btn.textContent=showing?'관리 모드':'관리 모드 닫기';
+ if(!showing)renderImportantEditor();
 }
 function toggleTableReadSettings(){
  const box=document.getElementById('tableReadSettingsBox');
@@ -3674,10 +4113,11 @@ function englishOnlyKeywordChips(flowText){
 function renderEnglishOnly(){
  const box=document.getElementById('englishOnlyList');
  if(!box)return;
- const list=rows.map((r,i)=>({i,en:stripStress(r.en||'').trim(),title:[r.sheetName,r.itemLabel].filter(Boolean).join(' - '),flowText:String(r.flowText||'').trim()})).filter(x=>x.en);
+ const allList=rows.map((r,i)=>({i,en:stripStress(r.en||'').trim(),title:[r.sheetName,r.itemLabel].filter(Boolean).join(' - '),flowText:String(r.flowText||'').trim(),important:!!r.important})).filter(x=>x.en);
+ const list=englishOnlyImportantOnly?allList.filter(x=>x.important):allList;
  if(!list.length){
   ENGLISH_ONLY_COPY={};
-  box.innerHTML='<div>표를 불러오면 문장이 여기에 표시돼.</div>';
+  box.innerHTML=rows.length&&englishOnlyImportantOnly?'<div class="english-only-topbar"><button class="secondary small" onclick="toggleEnglishOnlyImportantOnly()">전체 문장 보기</button></div><div>핵심문장으로 체크된 문장이 없어.</div>':'<div>표를 불러오면 문장이 여기에 표시돼.</div>';
   return;
  }
  const titles=[...new Set(list.map(x=>x.title).filter(Boolean))];
@@ -3687,7 +4127,7 @@ function renderEnglishOnly(){
  let groupStartIndex=0;
  const lines=[];
  ENGLISH_ONLY_COPY={all:formatEnglishOnlyCopyItems(list)};
- lines.push('<div class="english-only-topbar"><button class="green small" onclick="completeEnglishOnlyStudy()">읽기 완료</button><button class="secondary small" onclick="copyEnglishOnlyText(\'all\', \'전체 문장\')">전체 복사</button></div>');
+ lines.push(`<div class="english-only-topbar"><button class="green small" onclick="completeEnglishOnlyStudy()">읽기 완료</button><button class="secondary small" onclick="copyEnglishOnlyText('all', '전체 문장')">전체 복사</button><button class="orange small" onclick="toggleEnglishOnlyImportantOnly()">${englishOnlyImportantOnly?'전체 문장 보기':'핵심문장만 보기'}</button></div>`);
  list.forEach((x,idx)=>{
   if(idx===0 || x.title!==lastTitle){
    lastTitle=x.title;
@@ -3712,6 +4152,10 @@ function renderEnglishOnly(){
  });
  box.innerHTML=lines.join('')+nextAnswerButtonHtml();
 }
+function toggleEnglishOnlyImportantOnly(){
+ englishOnlyImportantOnly=!englishOnlyImportantOnly;
+ renderEnglishOnly();
+}
 
 function completeTableStudy(source){
  if(!rows.length){alert('먼저 문장을 불러와줘.');return;}
@@ -3720,7 +4164,8 @@ function completeTableStudy(source){
 
 function completeEnglishOnlyStudy(){
  if(!rows.length){alert('먼저 문장을 불러와줘.');return;}
- recordStudyResult('문장 읽기',rows.filter(r=>String(r.en||'').trim()).length,0,'읽기 완료');
+ const total=rows.filter(r=>String(r.en||'').trim()&&(!englishOnlyImportantOnly||r.important)).length;
+ recordStudyResult('문장 읽기',total,0,englishOnlyImportantOnly?'핵심문장 읽기 완료':'읽기 완료');
 }
 
 function copyEnglishOnlyText(id,label){
