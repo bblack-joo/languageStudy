@@ -144,6 +144,11 @@ tr.only-forget-hidden{display:none!important}
 .flash-record-title{font-size:13px;font-weight:900;color:var(--primary-dark);margin-bottom:6px}
 .flash-record-status{font-size:12.5px;font-weight:800;color:var(--text-muted)}
 .flash-record-status.recording{color:var(--danger-dark)}
+.flash-record-status-line{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
+.flash-status-pill{display:inline-flex;align-items:center;min-height:26px;padding:4px 9px;border:1px solid var(--border);border-radius:999px;background:#fff;color:var(--text-muted);font-size:12.5px;font-weight:900}
+.flash-status-pill.active{background:var(--danger-tint);border-color:var(--danger);color:var(--danger-dark)}
+.flash-status-pill.done{background:var(--success-tint);border-color:var(--success);color:var(--success-dark)}
+.flash-status-pill.error{background:var(--danger-tint);border-color:var(--danger);color:var(--danger-dark)}
 .flash-record-audio{display:block;width:100%;margin-top:8px}
 
 .scramble-box{background:#fbf9f6;border:1px solid var(--neutral);border-left:4px solid var(--primary);border-radius:12px;padding:14px;margin:10px 0 14px}
@@ -269,7 +274,8 @@ tr.only-forget-hidden{display:none!important}
     <button class="gray small" onclick="logoutOnlineLibrary()">로그아웃</button>
     <button class="secondary small" onclick="testOnlineServer()">연결 테스트</button>
     <button class="secondary small" onclick="loadOnlineFileList()" style="display:none">온라인 파일 목록</button>
-    <select id="onlineFileSelect" style="min-width:220px" onchange="loadSelectedOnlineFile()"><option value="">선택하세요</option></select>
+    <select id="onlineFileSelect" multiple size="5" style="min-width:320px"><option value="">선택하세요</option></select>
+    <button class="green small" onclick="loadSelectedOnlineFile()">선택 파일 불러오기</button>
   </div>
   <div id="onlineLoginStatus" class="hint">로그인하면 비공개 Google Drive/Sheet 자료를 불러올 수 있어.</div>
   <div class="toolbar">
@@ -516,7 +522,10 @@ tr.only-forget-hidden{display:none!important}
       <button class="red small" id="flashSpeechStopBtn" onclick="stopFlashSpeechRecognition()" disabled>인식 정지</button>
       <button class="secondary small" onclick="putFlashSpeechTextIntoScratch()">정답칸에 넣기</button>
     </div>
-    <span id="flashRecordStatus" class="flash-record-status">녹음 없음</span>
+    <div class="flash-record-status-line">
+      <span id="flashRecordingStatus" class="flash-status-pill">녹음 대기</span>
+      <span id="flashRecognitionStatus" class="flash-status-pill">인식 대기</span>
+    </div>
     <audio id="flashRecordAudio" class="flash-record-audio" controls style="display:none"></audio>
     <textarea id="flashSpeechText" placeholder="음성 인식 결과가 여기에 표시돼" style="height:70px;margin-top:8px" oninput="saveFlashSpeechText(); autoGrow(this);"></textarea>
   </div>
@@ -748,7 +757,8 @@ let studyGroups=[],studyGroupIndex=0;
 let ENGLISH_ONLY_COPY={};
 let englishOnlyImportantOnly=false;
 let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0,flashAutoNextOn=false,flashAutoNextTimer=null,flashAutoScheduleRunId=0,flashResultCopyText='',flashResultExcelText='';
-let flashRecorder=null,flashRecordStream=null,flashRecordChunks=[],flashRecognition=null,flashRecognizing=false;
+let flashRecorder=null,flashMicStream=null,flashRecordChunks=[],flashRecognition=null,flashRecognizing=false;
+let flashRecordingSequenceAudio=null,flashRecordingSequenceStopped=false;
 const flashRecordings=new Map(),flashSpeechTexts=new Map();
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
@@ -853,7 +863,12 @@ async function saveImportantOverridesOnline(fileId,entries){
  return res;
 }
 function currentOnlineFileId(){
- return document.getElementById('onlineFileSelect')?.value||'';
+ return getSelectedOnlineFileIds()[0]||'';
+}
+function getSelectedOnlineFileIds(){
+ const select=document.getElementById('onlineFileSelect');
+ if(!select)return [];
+ return [...select.selectedOptions].map(opt=>opt.value).filter(Boolean);
 }
 function applyImportantOverrides(entries=[]){
  const map=new Map((entries||[]).map(entry=>[`${entry.itemKey}__${Number(entry.answerIndex)}`,!!entry.important]));
@@ -882,6 +897,25 @@ async function loadImportantOverridesForCurrentFile(){
   console.warn('important overrides load failed',e);
   return 0;
  }
+}
+async function loadImportantOverridesForFile(fileId){
+ const cred=onlineCredentials();
+ if(!cred.user||!cred.password||!fileId)return 0;
+ try{
+  const res=await onlineJsonp('importantOverridesLoad',{...cred,fileId});
+  if(!res.ok)return 0;
+  return applyImportantOverrides(res.entries||[]);
+ }catch(e){
+  console.warn('important overrides load failed',e);
+  return 0;
+ }
+}
+async function loadImportantOverridesForLoadedFiles(){
+ let total=0;
+ for(const meta of loadedWorkbookFiles){
+  if(meta.fileId)total+=await loadImportantOverridesForFile(meta.fileId);
+ }
+ return total;
 }
 async function testOnlineServer(){
  setOnlineStatus('연결 테스트 중...');
@@ -960,9 +994,8 @@ function base64ToFile(base64,fileName,mimeType){
  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
  return new File([bytes],fileName||'online.xlsx',{type:mimeType||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
-async function fetchSelectedOnlineWorkbookFile(options={}){
+async function fetchOnlineWorkbookFile(fileId,options={}){
  const cred=onlineCredentials();
- const fileId=document.getElementById('onlineFileSelect')?.value||'';
  if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
  if(!fileId){if(!options.silentMissing)alert('불러올 온라인 파일을 선택해줘.');return false;}
  try{
@@ -976,14 +1009,23 @@ async function fetchSelectedOnlineWorkbookFile(options={}){
   return false;
  }
 }
+async function fetchSelectedOnlineWorkbookFile(options={}){
+ const fileId=currentOnlineFileId();
+ return fetchOnlineWorkbookFile(fileId,options);
+}
 async function loadSelectedOnlineFile(options={}){
- const fileId=document.getElementById('onlineFileSelect')?.value||'';
- if(!fileId){if(!options.silentMissing)alert('불러올 온라인 파일을 선택해줘.');return false;}
- setOnlineStatus('온라인 파일을 불러오는 중...');
- const file=await fetchSelectedOnlineWorkbookFile(options);
- if(!file)return false;
- await loadWorkbookFiles([file]);
- setOnlineStatus(`${file.name||'온라인 파일'} 불러오기 완료`);
+ const fileIds=getSelectedOnlineFileIds();
+ if(!fileIds.length){if(!options.silentMissing)alert('불러올 온라인 파일을 선택해줘.');return false;}
+ setOnlineStatus(`온라인 파일 ${fileIds.length}개를 불러오는 중...`);
+ const files=[];
+ for(let i=0;i<fileIds.length;i++){
+  setOnlineStatus(`온라인 파일 불러오는 중... ${i+1}/${fileIds.length}`);
+  const file=await fetchOnlineWorkbookFile(fileIds[i],options);
+  if(file)files.push(file);
+ }
+ if(!files.length)return false;
+ await loadWorkbookFiles(files);
+ setOnlineStatus(`${files.length}개 온라인 파일 불러오기 완료`);
  return true;
 }
 function fileToBase64(file){
@@ -1442,7 +1484,7 @@ async function loadWorkbookFiles(fileList){
    });
   }
 
-  await loadImportantOverridesForCurrentFile();
+  await loadImportantOverridesForLoadedFiles();
   const select=document.getElementById('unitSelect');
   if(!BOOK.items.length){
     select.innerHTML='<option value="">불러올 문장이 없음</option>';
@@ -2387,10 +2429,24 @@ async function saveImportantEditor(event){
    }
   });
   const fileId=currentOnlineFileId();
-  if(fileId&&entries.length){
+  const entriesByFile=new Map();
+  entries.forEach(entry=>{
+   const row=rows.find(r=>r.itemKey===entry.itemKey&&Number(r.answerIndex)===Number(entry.answerIndex));
+   const meta=row?.origin?.fileName?loadedWorkbookFiles.find(file=>file.fileName===row.origin.fileName):null;
+   const targetFileId=meta?.fileId||fileId;
+   if(!targetFileId)return;
+   const list=entriesByFile.get(targetFileId)||[];
+   list.push(entry);
+   entriesByFile.set(targetFileId,list);
+  });
+  if(entriesByFile.size){
    setOnlineStatus('핵심문장 저장 중...');
-   const res=await saveImportantOverridesOnline(fileId,entries);
-   setOnlineStatus(`핵심문장 ${res.saved||entries.length}개 저장 완료`);
+   let saved=0;
+   for(const [targetFileId,list] of entriesByFile.entries()){
+    const res=await saveImportantOverridesOnline(targetFileId,list);
+    saved+=Number(res.saved||list.length);
+   }
+   setOnlineStatus(`핵심문장 ${saved||entries.length}개 저장 완료`);
   }
   renderItemSelect();
   renderSelectedItemQueue();
@@ -2484,13 +2540,17 @@ async function refreshImportantEditor(){
   panel.style.display='block';
   if(btn)btn.textContent='핵심문장 수정 닫기';
  }
- const fileId=document.getElementById('onlineFileSelect')?.value||'';
- if(fileId){
+ const fileIds=getSelectedOnlineFileIds();
+ if(fileIds.length){
   const state=captureImportantRefreshState();
   setOnlineStatus('문장 관리 내용을 새로고침 중...');
-  const file=await fetchSelectedOnlineWorkbookFile({silentMissing:true});
-  if(file){
-   await loadWorkbookFiles([file]);
+  const files=[];
+  for(const fileId of fileIds){
+   const file=await fetchOnlineWorkbookFile(fileId,{silentMissing:true});
+   if(file)files.push(file);
+  }
+  if(files.length){
+   await loadWorkbookFiles(files);
    restoreImportantRefreshState(state);
    setOnlineStatus('문장 관리 새로고침 완료');
   }
@@ -2618,11 +2678,22 @@ function flashVoiceKey(){
  if(!flashOrderList.length||flashFinished)return '';
  return String(flashOrderList[flashIndex]);
 }
-function setFlashRecordStatus(text,recording=false){
- const status=document.getElementById('flashRecordStatus');
+function setFlashStatusPill(id,text,state='idle'){
+ const status=document.getElementById(id);
  if(!status)return;
  status.textContent=text;
- status.classList.toggle('recording',!!recording);
+ status.classList.toggle('active',state==='active');
+ status.classList.toggle('done',state==='done');
+ status.classList.toggle('error',state==='error');
+}
+function setFlashRecordingStatus(text,state='idle'){
+ setFlashStatusPill('flashRecordingStatus',text,state);
+}
+function setFlashRecognitionStatus(text,state='idle'){
+ setFlashStatusPill('flashRecognitionStatus',text,state);
+}
+function setFlashRecordStatus(text,recording=false){
+ setFlashRecordingStatus(text,recording?'active':'idle');
 }
 function loadFlashVoicePractice(){
  const key=flashVoiceKey();
@@ -2637,7 +2708,16 @@ function loadFlashVoicePractice(){
   speech.value=key?(flashSpeechTexts.get(key)||''):'';
   autoGrow(speech);
  }
- setFlashRecordStatus(rec?'녹음 있음':'녹음 없음');
+ setFlashRecordingStatus(rec?'녹음 완료':'녹음 대기',rec?'done':'idle');
+ if(!flashRecognizing){
+  const hasSpeech=!!(key&&(flashSpeechTexts.get(key)||'').trim());
+  setFlashRecognitionStatus(hasSpeech?'인식 완료':'인식 대기',hasSpeech?'done':'idle');
+ }
+}
+async function getFlashMicStream(){
+ if(flashMicStream&&flashMicStream.getTracks().some(track=>track.readyState==='live'))return flashMicStream;
+ flashMicStream=await navigator.mediaDevices.getUserMedia({audio:true});
+ return flashMicStream;
 }
 async function startFlashRecording(){
  if(!flashOrderList.length||flashFinished){alert('먼저 플래시카드를 시작해줘.');return;}
@@ -2645,9 +2725,9 @@ async function startFlashRecording(){
  if(flashRecorder&&flashRecorder.state==='recording')return;
  try{
   const recordKey=flashVoiceKey();
-  flashRecordStream=await navigator.mediaDevices.getUserMedia({audio:true});
+  const stream=await getFlashMicStream();
   flashRecordChunks=[];
-  flashRecorder=new MediaRecorder(flashRecordStream);
+  flashRecorder=new MediaRecorder(stream);
   flashRecorder.ondataavailable=e=>{if(e.data&&e.data.size)flashRecordChunks.push(e.data);};
   flashRecorder.onstop=()=>{
    const key=recordKey;
@@ -2655,32 +2735,68 @@ async function startFlashRecording(){
    const prev=key?flashRecordings.get(key):null;
    if(prev?.url)URL.revokeObjectURL(prev.url);
    if(key)flashRecordings.set(key,{blob,url:URL.createObjectURL(blob)});
-   if(flashRecordStream)flashRecordStream.getTracks().forEach(track=>track.stop());
-   flashRecordStream=null;
    updateFlashRecordButtons(false);
    loadFlashVoicePractice();
+   setFlashRecordingStatus('녹음 완료','done');
   };
   flashRecorder.start();
   updateFlashRecordButtons(true);
-  setFlashRecordStatus('녹음 중...',true);
+  setFlashRecordingStatus('녹음 중','active');
  }catch(e){
+  setFlashRecordingStatus('녹음 오류','error');
   alert('마이크 권한을 허용해야 녹음할 수 있어.');
  }
 }
 function stopFlashRecording(){
- if(flashRecorder&&flashRecorder.state==='recording')flashRecorder.stop();
+ if(flashRecorder&&flashRecorder.state==='recording'){
+  setFlashRecordingStatus('녹음 저장 중','active');
+  flashRecorder.stop();
+ }
 }
 function updateFlashRecordButtons(recording){
  const start=document.getElementById('flashRecordStartBtn');
  const stop=document.getElementById('flashRecordStopBtn');
  if(start)start.disabled=!!recording;
  if(stop)stop.disabled=!recording;
+ if(start)start.textContent=recording?'녹음 중':'녹음 시작';
+ if(stop)stop.textContent=recording?'녹음 끝내기':'녹음 정지';
 }
 function playFlashRecording(){
  const key=flashVoiceKey();
  const audio=document.getElementById('flashRecordAudio');
  if(!key||!flashRecordings.has(key)||!audio?.src){alert('현재 카드에 녹음이 없어.');return;}
  audio.play();
+}
+function flashResultRecordingItems(){
+ return flashOrderList.map((rowIndex,pos)=>({pos:pos+1,rowIndex,rec:flashRecordings.get(String(rowIndex))})).filter(item=>item.rec?.url);
+}
+async function playFlashRecordingSequence(){
+ const list=flashResultRecordingItems();
+ if(!list.length){alert('재생할 녹음이 없어.');return;}
+ stopFlashRecordingSequence();
+ flashRecordingSequenceStopped=false;
+ for(const item of list){
+  if(flashRecordingSequenceStopped)break;
+  setFlashRecordingStatus(`${item.pos}번 녹음 재생 중`,'active');
+  await new Promise(resolve=>{
+   const audio=new Audio(item.rec.url);
+   flashRecordingSequenceAudio=audio;
+   audio.onended=resolve;
+   audio.onerror=resolve;
+   audio.play().catch(resolve);
+  });
+  flashRecordingSequenceAudio=null;
+  await sleep(250);
+ }
+ if(!flashRecordingSequenceStopped)setFlashRecordingStatus('녹음 순서 재생 완료','done');
+}
+function stopFlashRecordingSequence(){
+ flashRecordingSequenceStopped=true;
+ if(flashRecordingSequenceAudio){
+  flashRecordingSequenceAudio.pause();
+  flashRecordingSequenceAudio.currentTime=0;
+  flashRecordingSequenceAudio=null;
+ }
 }
 function deleteFlashRecording(){
  const key=flashVoiceKey();
@@ -2689,6 +2805,7 @@ function deleteFlashRecording(){
  if(rec?.url)URL.revokeObjectURL(rec.url);
  flashRecordings.delete(key);
  loadFlashVoicePractice();
+ setFlashRecordingStatus('녹음 삭제됨','idle');
 }
 function speechRecognitionCtor(){
  return window.SpeechRecognition||window.webkitSpeechRecognition||null;
@@ -2698,6 +2815,8 @@ function updateFlashSpeechButtons(recognizing){
  const stop=document.getElementById('flashSpeechStopBtn');
  if(start)start.disabled=!!recognizing;
  if(stop)stop.disabled=!recognizing;
+ if(start)start.textContent=recognizing?'인식 중':'음성 인식 시작';
+ if(stop)stop.textContent=recognizing?'인식 끝내기':'인식 정지';
 }
 function startFlashSpeechRecognition(){
  if(!flashOrderList.length||flashFinished){alert('먼저 플래시카드를 시작해줘.');return;}
@@ -2711,7 +2830,7 @@ function startFlashSpeechRecognition(){
  flashRecognition.lang='en-US';
  flashRecognition.interimResults=false;
  flashRecognition.continuous=true;
- flashRecognition.onstart=()=>{flashRecognizing=true;updateFlashSpeechButtons(true);setFlashRecordStatus('음성 인식 중...',true);};
+ flashRecognition.onstart=()=>{flashRecognizing=true;updateFlashSpeechButtons(true);setFlashRecognitionStatus('인식 중','active');};
  flashRecognition.onresult=e=>{
   for(let i=e.resultIndex;i<e.results.length;i++){
    const text=e.results[i][0]?.transcript||'';
@@ -2720,17 +2839,20 @@ function startFlashSpeechRecognition(){
   const value=finalText.trim();
   const area=document.getElementById('flashSpeechText');
   if(area){area.value=value;autoGrow(area);}
-  if(key)flashSpeechTexts.set(key,value);
+ if(key)flashSpeechTexts.set(key,value);
  };
  flashRecognition.onerror=e=>{
   console.warn(e);
-  setFlashRecordStatus('음성 인식 오류');
+  setFlashRecognitionStatus('인식 오류','error');
  };
- flashRecognition.onend=()=>{flashRecognizing=false;updateFlashSpeechButtons(false);loadFlashVoicePractice();};
- try{flashRecognition.start();}catch(e){}
+ flashRecognition.onend=()=>{flashRecognizing=false;updateFlashSpeechButtons(false);const hasText=!!(key&&(flashSpeechTexts.get(key)||'').trim());setFlashRecognitionStatus(hasText?'인식 완료':'인식 종료',hasText?'done':'idle');};
+ try{flashRecognition.start();}catch(e){setFlashRecognitionStatus('인식 오류','error');}
 }
 function stopFlashSpeechRecognition(){
- if(flashRecognition&&flashRecognizing)flashRecognition.stop();
+ if(flashRecognition&&flashRecognizing){
+  setFlashRecognitionStatus('인식 정리 중','active');
+  flashRecognition.stop();
+ }
 }
 function saveFlashSpeechText(){
  const key=flashVoiceKey();
@@ -3080,21 +3202,23 @@ function finishFlashcards(){
 function showFlashAllSentences(){
  const res=document.getElementById('flashResult');
  if(!res)return;
- const items=flashOrderList.map((rowIndex,pos)=>({pos:pos+1,row:rows[rowIndex]})).filter(x=>x.row);
+ const items=flashOrderList.map((rowIndex,pos)=>({pos:pos+1,rowIndex,row:rows[rowIndex]})).filter(x=>x.row);
  if(!items.length){hideFlashResult();return;}
  const mode=document.getElementById('flashMode')?.value||'ko_en';
  const answerLang=(mode==='en_ko'||mode==='ko_only')?'ko':'en';
  let wrongCount=0;
  flashResultCopyText=buildFlashResultCopyText(items,answerLang);
  flashResultExcelText=buildFlashResultExcelText(items);
- let html='<div class="toolbar" style="justify-content:space-between;margin-bottom:8px"><b>플래시카드 결과</b><span><button class="secondary small" onclick="copyFlashResultForFeedback()">첨삭용 복사</button> <button class="secondary small" onclick="copyFlashResultForExcel()">엑셀용 복사</button></span></div><table><thead><tr><th class="num-col">번호</th><th>내가 쓴 문장</th><th>정답</th></tr></thead><tbody>';
+ let html='<div class="toolbar" style="justify-content:space-between;margin-bottom:8px"><b>플래시카드 결과</b><span><button class="green small" onclick="playFlashRecordingSequence()">녹음 순서대로 재생</button> <button class="red small" onclick="stopFlashRecordingSequence()">재생 정지</button> <button class="secondary small" onclick="copyFlashResultForFeedback()">첨삭용 복사</button> <button class="secondary small" onclick="copyFlashResultForExcel()">엑셀용 복사</button></span></div><table><thead><tr><th class="num-col">번호</th><th>내가 쓴 문장</th><th>녹음</th><th>정답</th></tr></thead><tbody>';
  html+=items.map(item=>{
   const myAnswer=flashScratchAnswers[item.pos-1]||'';
   const correct=answerLang==='ko'?(item.row.ko||''):(item.row.en||'');
   const isWrong=normalizeForCompare(myAnswer)!==normalizeForCompare(stripStress(correct));
   if(isWrong){wrongCount++;markAutoNotMemorized(item.row,'플래시카드','직접 쓴 답 비교');}
   const correctHtml=answerLang==='ko'?escapeHtml(correct):formatStress(correct);
-  return `<tr><td class="num-col">${item.pos}</td><td style="white-space:pre-wrap">${escapeHtml(myAnswer)}</td><td>${correctHtml}</td></tr>`;
+  const rec=flashRecordings.get(String(item.rowIndex));
+  const recordHtml=rec?.url?`<audio controls src="${escapeAttr(rec.url)}" style="width:180px;max-width:100%"></audio>`:'<span class="hint">녹음 없음</span>';
+  return `<tr><td class="num-col">${item.pos}</td><td style="white-space:pre-wrap">${escapeHtml(myAnswer)}</td><td>${recordHtml}</td><td>${correctHtml}</td></tr>`;
  }).join('');
  recordStudyResult('플래시카드',items.length,wrongCount);
  html+='</tbody></table>'+nextAnswerButtonHtml();
@@ -4563,6 +4687,11 @@ cleanLegacyLogData();
 loadCloudSettings();
 renderLogView();
 autoLoadOnlineFilesFromLocalLogin();
+window.addEventListener('beforeunload',()=>{
+ try{
+  if(flashMicStream)flashMicStream.getTracks().forEach(track=>track.stop());
+ }catch(e){}
+});
 
 </script>
 </body>
