@@ -129,6 +129,8 @@ tr.only-forget-hidden{display:none!important}
 .flash-card-box{background:#fffaf3;border:1px solid var(--filter);border-left:4px solid var(--filter);border-radius:12px;padding:14px;margin:10px 0 14px}
 .flash-card-box b{margin-bottom:0}
 .flash-options{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0}
+.flash-result-answer-nav{display:flex;justify-content:flex-end;margin:0 0 8px}
+.flash-result-answer-nav .flash-options{justify-content:flex-end;margin:0}
 .flash-progress{font-size:13px;font-weight:800;color:var(--filter-dark);margin-left:4px}
 .flash-bar{height:8px;background:var(--neutral-tint);border-radius:99px;overflow:hidden;margin:8px 0}
 .flash-bar.clickable{cursor:pointer}
@@ -558,6 +560,7 @@ tr.only-forget-hidden{display:none!important}
 <div id="mode-flash" class="card mode-panel active">
 <b>플래시카드로 암기하기</b>
 <div class="toolbar"><button class="secondary small" id="flashQuestionToggleBtn" onclick="toggleStudyQuestionBox('flashQuestionBox', this)" style="display:none">질문 보기</button></div>
+<div id="flashResultAnswerNav" class="flash-result-answer-nav"></div>
 <div id="flashQuestionBox" class="question-box" style="display:none"><b>질문</b><div id="flashQuestionList"></div></div>
 <div class="flash-card-box">
   <div class="flash-options">
@@ -2588,12 +2591,14 @@ function restoreCurrentModeProgress(){
    renderFlashcard(false);
    const res=document.getElementById('flashResult');
    if(res){
-    if(flashFinished&&saved.resultHtml){
+   if(flashFinished&&saved.resultHtml){
      res.innerHTML=saved.resultHtml;
      res.classList.remove('flash-hidden');
+     renderFlashResultAnswerNav(true);
     }else{
      res.classList.add('flash-hidden');
      res.innerHTML='';
+     renderFlashResultAnswerNav(false);
     }
    }
   }else{
@@ -3865,8 +3870,15 @@ function advanceFlashAutoNext(){
 function hideFlashResult(){
  const res=document.getElementById('flashResult');
  if(res){res.classList.add('flash-hidden');res.innerHTML='';}
+ renderFlashResultAnswerNav(false);
  flashResultCopyText='';
  flashResultExcelText='';
+}
+function renderFlashResultAnswerNav(show=true){
+ const nav=document.getElementById('flashResultAnswerNav');
+ if(!nav)return;
+ nav.innerHTML=show?nextAnswerButtonHtml():'';
+ nav.style.display=show&&nav.innerHTML.trim()?'flex':'none';
 }
 function getFlashCurrent(){
  if(!flashOrderList.length) buildFlashOrder();
@@ -4041,9 +4053,10 @@ function showFlashAllSentences(){
   return `<tr><td class="num-col">${item.pos}</td><td style="white-space:pre-wrap">${escapeHtml(myAnswer)}</td><td>${correctHtml}</td><td>${recordHtml}</td></tr>`;
  }).join('');
  recordStudyResult('플래시카드',items.length,wrongCount);
- html+='</tbody></table>'+nextAnswerButtonHtml();
+ html+='</tbody></table>';
  res.innerHTML=html;
  res.classList.remove('flash-hidden');
+ renderFlashResultAnswerNav(true);
 }
 function buildFlashResultCopyText(items,answerLang){
  const lines=[
