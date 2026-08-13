@@ -573,6 +573,7 @@ tr.only-forget-hidden{display:none!important}
       <button class="gray small" onclick="deleteFlashRecording()">삭제</button>
       <button class="green small" id="flashSpeechStartBtn" onclick="startFlashSpeechRecognition()">음성 인식 시작</button>
       <button class="red small" id="flashSpeechStopBtn" onclick="stopFlashSpeechRecognition()" disabled>인식 정지</button>
+      <button class="secondary small" id="flashSpeechAutoBtn" onclick="toggleFlashSpeechAutoMode()">음성인식 모드 꺼짐</button>
       <button class="secondary small" onclick="putFlashSpeechTextIntoScratch()">정답칸에 넣기</button>
     </div>
     <div class="flash-record-status-line">
@@ -810,7 +811,7 @@ let studyGroups=[],studyGroupIndex=0;
 let ENGLISH_ONLY_COPY={};
 let englishOnlyImportantOnly=false;
 let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0,flashAutoNextOn=false,flashAutoNextTimer=null,flashAutoScheduleRunId=0,flashResultCopyText='',flashResultExcelText='';
-let flashRecorder=null,flashMicStream=null,flashRecordChunks=[],flashRecognition=null,flashRecognizing=false;
+let flashRecorder=null,flashMicStream=null,flashRecordChunks=[],flashRecognition=null,flashRecognizing=false,flashSpeechAutoMode=false,flashSpeechAutoStartTimer=null;
 let flashRecordingSequenceAudio=null,flashRecordingSequenceStopped=false;
 const flashRecordings=new Map(),flashSpeechTexts=new Map();
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -2959,6 +2960,14 @@ function saveFlashScratch(){
  if(!el||flashFinished||!flashOrderList.length)return;
  flashScratchAnswers[flashIndex]=el.value;
 }
+function setFlashScratchFromSpeech(text){
+ const value=String(text||'').trim();
+ const target=document.getElementById('flashScratchInput');
+ if(!target||!value)return;
+ target.value=value;
+ autoGrow(target);
+ saveFlashScratch();
+}
 function loadFlashScratch(){
  const el=document.getElementById('flashScratchInput');
  if(!el)return;
@@ -3112,11 +3121,67 @@ function updateFlashSpeechButtons(recognizing){
  if(start)start.textContent=recognizing?'인식 중':'음성 인식 시작';
  if(stop)stop.textContent=recognizing?'인식 끝내기':'인식 정지';
 }
-function startFlashSpeechRecognition(){
- if(!flashOrderList.length||flashFinished){alert('먼저 플래시카드를 시작해줘.');return;}
+function updateFlashSpeechAutoButton(){
+ const btn=document.getElementById('flashSpeechAutoBtn');
+ if(!btn)return;
+ btn.textContent=flashSpeechAutoMode?'음성인식 모드 켜짐':'음성인식 모드 꺼짐';
+ btn.className=flashSpeechAutoMode?'orange small':'secondary small';
+}
+async function toggleFlashSpeechAutoMode(){
+ if(flashSpeechAutoMode){
+  flashSpeechAutoMode=false;
+  updateFlashSpeechAutoButton();
+  clearTimeout(flashSpeechAutoStartTimer);
+  flashSpeechAutoStartTimer=null;
+  stopFlashSpeechRecognition();
+  return;
+ }
+ if(!navigator.mediaDevices?.getUserMedia){
+  setFlashRecognitionStatus('마이크 사용 불가','error');
+  alert('이 브라우저에서는 마이크 권한을 사용할 수 없어. Chrome이나 Edge에서 열어줘.');
+  return;
+ }
+ try{
+  setFlashRecognitionStatus('마이크 권한 확인 중','active');
+  await getFlashMicStream();
+ }catch(e){
+  console.warn(e);
+  setFlashRecognitionStatus('마이크 권한 필요','error');
+  alert('마이크 권한 창이 안 뜨면 브라우저 주소창의 사이트 설정에서 마이크를 허용해줘. file://로 열면 권한 저장이 제한될 수 있어.');
+  return;
+ }
+ flashSpeechAutoMode=true;
+ updateFlashSpeechAutoButton();
+ scheduleFlashSpeechAutoStart();
+}
+function scheduleFlashSpeechAutoStart(delay=350,attempt=0){
+ clearTimeout(flashSpeechAutoStartTimer);
+ flashSpeechAutoStartTimer=null;
+ if(!flashSpeechAutoMode||flashFinished||!flashOrderList.length)return;
+ flashSpeechAutoStartTimer=setTimeout(()=>{
+  flashSpeechAutoStartTimer=null;
+  if(!flashSpeechAutoMode||flashFinished||!flashOrderList.length)return;
+  if(flashRecognizing){
+   if(attempt<12)scheduleFlashSpeechAutoStart(250,attempt+1);
+   return;
+  }
+  startFlashSpeechRecognition({auto:true});
+ },delay);
+}
+async function startFlashSpeechRecognition(options={}){
+ if(!flashOrderList.length||flashFinished){if(!options.auto)alert('먼저 플래시카드를 시작해줘.');return;}
  const Ctor=speechRecognitionCtor();
- if(!Ctor){alert('이 브라우저에서는 음성 인식을 지원하지 않아. Chrome이나 Edge에서 시도해줘.');return;}
+ if(!Ctor){if(!options.auto)alert('이 브라우저에서는 음성 인식을 지원하지 않아. Chrome이나 Edge에서 시도해줘.');return;}
  if(flashRecognizing)return;
+ if(!navigator.mediaDevices?.getUserMedia){if(!options.auto)alert('이 브라우저에서는 마이크 권한을 사용할 수 없어.');return;}
+ try{
+  await getFlashMicStream();
+ }catch(e){
+  console.warn(e);
+  setFlashRecognitionStatus('마이크 권한 필요','error');
+  if(!options.auto)alert('마이크 권한 창이 안 뜨면 브라우저 주소창의 사이트 설정에서 마이크를 허용해줘. file://로 열면 권한 저장이 제한될 수 있어.');
+  return;
+ }
  const key=flashVoiceKey();
  const base=key?(flashSpeechTexts.get(key)||''):'';
  let finalText=base;
@@ -3133,16 +3198,27 @@ function startFlashSpeechRecognition(){
   const value=finalText.trim();
   const area=document.getElementById('flashSpeechText');
   if(area){area.value=value;autoGrow(area);}
- if(key)flashSpeechTexts.set(key,value);
+  if(key)flashSpeechTexts.set(key,value);
+  setFlashScratchFromSpeech(value);
  };
  flashRecognition.onerror=e=>{
   console.warn(e);
-  setFlashRecognitionStatus('인식 오류','error');
+  const code=e?.error||'';
+  const msg=code==='not-allowed'||code==='service-not-allowed'?'마이크 권한 차단':code==='no-speech'?'말소리 없음':'인식 오류';
+  setFlashRecognitionStatus(msg,'error');
  };
  flashRecognition.onend=()=>{flashRecognizing=false;updateFlashSpeechButtons(false);const hasText=!!(key&&(flashSpeechTexts.get(key)||'').trim());setFlashRecognitionStatus(hasText?'인식 완료':'인식 종료',hasText?'done':'idle');};
  try{flashRecognition.start();}catch(e){setFlashRecognitionStatus('인식 오류','error');}
 }
 function stopFlashSpeechRecognition(){
+ clearTimeout(flashSpeechAutoStartTimer);
+ flashSpeechAutoStartTimer=null;
+ if(flashRecognition&&flashRecognizing){
+  setFlashRecognitionStatus('인식 정리 중','active');
+  flashRecognition.stop();
+ }
+}
+function stopFlashSpeechRecognitionForCardChange(){
  if(flashRecognition&&flashRecognizing){
   setFlashRecognitionStatus('인식 정리 중','active');
   flashRecognition.stop();
@@ -3155,12 +3231,8 @@ function saveFlashSpeechText(){
 }
 function putFlashSpeechTextIntoScratch(){
  const text=(document.getElementById('flashSpeechText')?.value||'').trim();
- const target=document.getElementById('flashScratchInput');
- if(!text||!target)return;
- target.value=text;
- autoGrow(target);
- saveFlashScratch();
- target.focus();
+ setFlashScratchFromSpeech(text);
+ document.getElementById('flashScratchInput')?.focus();
 }
 function isFlashScratchInputHidden(){
  return document.getElementById('flashScratchInputBox')?.classList.contains('flash-hidden');
@@ -3264,14 +3336,18 @@ function buildFlashOrder(){
 }
 function resetFlashcard(){
  stopFlashAutoNext();
+ stopFlashSpeechRecognitionForCardChange();
  buildFlashOrder();
  renderFlashcard(false);
+ scheduleFlashSpeechAutoStart();
 }
 function startFlashcards(){
  if(!rows.length){alert('먼저 표를 생성해줘.');return;}
+ stopFlashSpeechRecognitionForCardChange();
  buildFlashOrder();
  renderFlashcard(true);
  scheduleFlashAutoNext();
+ scheduleFlashSpeechAutoStart();
 }
 function clearFlashAutoNextTimer(){
  if(flashAutoNextTimer){
@@ -3370,6 +3446,7 @@ function flashSide(row,side){
  return {lang,html,plain};
 }
 function renderFlashcard(autoSpeak=false){
+ updateFlashSpeechAutoButton();
  const frontEl=document.getElementById('flashFront');
  const backEl=document.getElementById('flashBack');
  const prog=document.getElementById('flashProgress');
@@ -3437,6 +3514,7 @@ function flipFlashcard(){
 }
 function nextFlashcard(){
  stopFlashSpeakPlayback();
+ stopFlashSpeechRecognitionForCardChange();
  if(!flashOrderList.length) startFlashcards();
  if(!flashOrderList.length)return;
  if(flashFinished)return;
@@ -3447,9 +3525,11 @@ function nextFlashcard(){
  hideFlashResult();
  renderFlashcard(false);
  scheduleFlashAutoNext();
+ scheduleFlashSpeechAutoStart();
 }
 function prevFlashcard(){
  stopFlashSpeakPlayback();
+ stopFlashSpeechRecognitionForCardChange();
  if(!flashOrderList.length) startFlashcards();
  if(!flashOrderList.length)return;
  saveFlashScratch();
@@ -3463,6 +3543,7 @@ function prevFlashcard(){
  hideFlashResult();
  renderFlashcard(false);
  scheduleFlashAutoNext();
+ scheduleFlashSpeechAutoStart();
 }
 function jumpFlashByProgress(event){
  if(!flashOrderList.length){
@@ -3475,6 +3556,7 @@ function jumpFlashByProgress(event){
  const ratio=Math.max(0,Math.min(1,(event.clientX-rect.left)/Math.max(rect.width,1)));
  const target=Math.max(0,Math.min(flashOrderList.length-1,Math.floor(ratio*flashOrderList.length)));
  stopFlashSpeakPlayback();
+ stopFlashSpeechRecognitionForCardChange();
  stopFlashAutoNext();
  saveFlashScratch();
  flashFinished=false;
@@ -3482,9 +3564,11 @@ function jumpFlashByProgress(event){
  flashRevealed=false;
  hideFlashResult();
  renderFlashcard(false);
+ scheduleFlashSpeechAutoStart();
 }
 function finishFlashcards(){
  stopFlashSpeakPlayback();
+ stopFlashSpeechRecognitionForCardChange();
  stopFlashAutoNext();
  saveFlashScratch();
  flashFinished=true;
@@ -3503,7 +3587,7 @@ function showFlashAllSentences(){
  let wrongCount=0;
  flashResultCopyText=buildFlashResultCopyText(items,answerLang);
  flashResultExcelText=buildFlashResultExcelText(items);
- let html='<div class="toolbar" style="justify-content:space-between;margin-bottom:8px"><b>플래시카드 결과</b><span><button class="green small" onclick="playFlashRecordingSequence()">녹음 순서대로 재생</button> <button class="red small" onclick="stopFlashRecordingSequence()">재생 정지</button> <button class="secondary small" onclick="copyFlashResultForFeedback()">첨삭용 복사</button> <button class="secondary small" onclick="copyFlashResultForExcel()">엑셀용 복사</button></span></div><table><thead><tr><th class="num-col">번호</th><th>내가 쓴 문장</th><th>녹음</th><th>정답</th></tr></thead><tbody>';
+ let html='<div class="toolbar" style="justify-content:space-between;margin-bottom:8px"><b>플래시카드 결과</b><span><button class="green small" onclick="playFlashRecordingSequence()">녹음 순서대로 재생</button> <button class="red small" onclick="stopFlashRecordingSequence()">재생 정지</button> <button class="secondary small" onclick="copyFlashResultForFeedback()">첨삭용 복사</button> <button class="secondary small" onclick="copyFlashResultForExcel()">엑셀용 복사</button></span></div><table><thead><tr><th class="num-col">번호</th><th>내가 쓴 문장</th><th>정답</th><th>녹음</th></tr></thead><tbody>';
  html+=items.map(item=>{
   const myAnswer=flashScratchAnswers[item.pos-1]||'';
   const correct=answerLang==='ko'?(item.row.ko||''):(item.row.en||'');
@@ -3512,7 +3596,7 @@ function showFlashAllSentences(){
   const correctHtml=answerLang==='ko'?escapeHtml(correct):formatStress(correct);
   const rec=flashRecordings.get(String(item.rowIndex));
   const recordHtml=rec?.url?`<audio controls src="${escapeAttr(rec.url)}" style="width:180px;max-width:100%"></audio>`:'<span class="hint">녹음 없음</span>';
-  return `<tr><td class="num-col">${item.pos}</td><td style="white-space:pre-wrap">${escapeHtml(myAnswer)}</td><td>${recordHtml}</td><td>${correctHtml}</td></tr>`;
+  return `<tr><td class="num-col">${item.pos}</td><td style="white-space:pre-wrap">${escapeHtml(myAnswer)}</td><td>${correctHtml}</td><td>${recordHtml}</td></tr>`;
  }).join('');
  recordStudyResult('플래시카드',items.length,wrongCount);
  html+='</tbody></table>'+nextAnswerButtonHtml();
