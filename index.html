@@ -262,6 +262,10 @@ tr.only-forget-hidden{display:none!important}
 .load-tab-btn.active{background:var(--filter);border-color:var(--filter);color:#fff}
 .file-load-panel{display:none;padding:10px;border:1px solid var(--border);border-radius:10px;background:#fffaf3}
 .file-load-panel.active{display:block}
+.online-progress{display:none;margin-top:8px;padding:9px 10px;border:1px solid var(--border);border-radius:10px;background:#fff}
+.online-progress-label{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;font-weight:900;color:var(--filter-dark);margin-bottom:7px}
+.online-progress-track{height:8px;background:var(--neutral-tint);border-radius:999px;overflow:hidden}
+.online-progress-bar{height:100%;width:0%;background:var(--filter);transition:width .18s ease}
 .answer-search-box{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0;padding:10px;border:1px solid var(--border);border-radius:10px;background:#fffaf3}
 .answer-search-label{font-size:13px;font-weight:900;color:var(--primary-dark)}
 .answer-search-help{font-size:12.5px;color:var(--text-muted);font-weight:700}
@@ -321,11 +325,15 @@ tr.only-forget-hidden{display:none!important}
       <button class="secondary small" onclick="loadOnlineFileList()">파일 목록 새로고침</button>
       <select id="onlineFolderSelect" style="min-width:260px" onchange="renderOnlineFileOptions()"><option value="">폴더 전체</option></select>
       <button class="green small" onclick="loadSelectedOnlineFolderFiles()">선택 폴더 전체 불러오기</button>
-      <select id="onlineFileSelect" multiple size="5" style="min-width:320px"><option value="">선택하세요</option></select>
+      <select id="onlineFileSelect" size="5" style="min-width:320px"><option value="">선택하세요</option></select>
       <button class="green small" onclick="loadSelectedOnlineFile()">선택 파일 불러오기</button>
       <button class="secondary small" onclick="loadAllOnlineFiles()">전체 파일 불러오기</button>
     </div>
     <div class="hint">폴더를 고르면 그 안 파일만 아래에 보여. 폴더째 불러오거나, 파일을 하나씩 골라서 불러올 수 있어.</div>
+    <div id="onlineLoadProgress" class="online-progress">
+      <div class="online-progress-label"><span id="onlineLoadProgressText">대기 중</span><span id="onlineLoadProgressCount">0 / 0</span></div>
+      <div class="online-progress-track"><div id="onlineLoadProgressBar" class="online-progress-bar"></div></div>
+    </div>
   </div>
   <div id="excelDirectUploadBox" class="file-load-panel">
     <div class="toolbar">
@@ -859,6 +867,22 @@ function hideOnlineStatus(){
  el.classList.remove('status-complete-flash');
  if(onlineStatusFlashTimer)clearTimeout(onlineStatusFlashTimer);
 }
+function setOnlineLoadProgress(done,total,text){
+ const box=document.getElementById('onlineLoadProgress');
+ const label=document.getElementById('onlineLoadProgressText');
+ const count=document.getElementById('onlineLoadProgressCount');
+ const bar=document.getElementById('onlineLoadProgressBar');
+ if(!box)return;
+ const safeTotal=Math.max(0,Number(total)||0);
+ const safeDone=Math.max(0,Math.min(Number(done)||0,safeTotal||Number(done)||0));
+ box.style.display=safeTotal?'block':'none';
+ if(label)label.textContent=text||'불러오는 중...';
+ if(count)count.textContent=safeTotal?`${safeDone} / ${safeTotal}`:'0 / 0';
+ if(bar)bar.style.width=safeTotal?`${Math.round((safeDone/safeTotal)*100)}%`:'0%';
+}
+function hideOnlineLoadProgressSoon(){
+ setTimeout(()=>setOnlineLoadProgress(0,0,''),1800);
+}
 function setCloudUserOption(name){
  const user=document.getElementById('cloudUserName');
  if(!user||!name)return;
@@ -1065,6 +1089,7 @@ async function loadOnlineFileList(options={}){
  if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
  const select=document.getElementById('onlineFileSelect');
  if(select)select.innerHTML='<option value="">불러오는 중...</option>';
+ setOnlineLoadProgress(0,1,'파일 목록 불러오는 중...');
  try{
   const res=await onlineJsonp('listFiles',cred);
   if(!res.ok){if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';setOnlineStatus(res.message||'파일 목록을 불러오지 못했어.');return false;}
@@ -1075,10 +1100,13 @@ async function loadOnlineFileList(options={}){
   renderOnlineFileOptions();
   if(options.silentSuccess&&files.length)hideOnlineStatus();
   else setOnlineStatus(files.length?`온라인 파일 ${files.length}개를 찾았어.`:'온라인 폴더에 파일이 없어.');
+  setOnlineLoadProgress(1,1,files.length?`파일 목록 ${files.length}개 확인 완료`:'온라인 폴더에 파일이 없어.');
+  hideOnlineLoadProgressSoon();
   return files.length>0;
  }catch(e){
   if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';
   setOnlineStatus(e.message||'파일 목록 오류');
+  setOnlineLoadProgress(0,0,'');
   return false;
  }
 }
@@ -1150,15 +1178,22 @@ async function loadSelectedOnlineFolderFiles(options={}){
 }
 async function loadOnlineFilesByIds(fileIds,options={}){
  setOnlineStatus(`온라인 파일 ${fileIds.length}개를 불러오는 중...`);
+ setOnlineLoadProgress(0,fileIds.length,'온라인 파일 불러오는 중...');
  const files=[];
  for(let i=0;i<fileIds.length;i++){
+  const meta=onlineFileMetaById.get(String(fileIds[i]))||{};
+  const name=meta.label||meta.name||`파일 ${i+1}`;
   setOnlineStatus(`온라인 파일 불러오는 중... ${i+1}/${fileIds.length}`);
+  setOnlineLoadProgress(i,fileIds.length,`불러오는 중: ${name}`);
   const file=await fetchOnlineWorkbookFile(fileIds[i],options);
   if(file)files.push(file);
+  setOnlineLoadProgress(i+1,fileIds.length,`완료: ${name}`);
  }
- if(!files.length)return false;
+ if(!files.length){setOnlineLoadProgress(0,0,'');return false;}
  await loadWorkbookFiles(files);
  setOnlineStatus(`${files.length}개 온라인 파일 불러오기 완료`);
+ setOnlineLoadProgress(fileIds.length,fileIds.length,`${files.length}개 온라인 파일 불러오기 완료`);
+ hideOnlineLoadProgressSoon();
  return true;
 }
 function fileToBase64(file){
