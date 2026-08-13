@@ -29,6 +29,9 @@ h1{font-size:23px;font-weight:800;margin:6px 0 16px;letter-spacing:-.2px}
 .brand-tagline{font-size:13px;color:var(--text-muted);font-weight:700;margin-top:7px;letter-spacing:.03em}
 .brand-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;background:transparent;color:var(--primary-dark);border:0;border-radius:0;padding:4px 0 2px;font-size:13.5px;font-weight:800}
 .brand-link:hover{filter:brightness(.96)}
+.brand-quick-links{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.brand-quick-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;background:#fff;color:var(--filter-dark);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;font-weight:900}
+.brand-quick-link:hover{background:var(--filter-tint)}
 .card{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(15,23,42,.05)}
 .card>b{display:block;font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px}
 textarea{width:100%;height:150px;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:15px;line-height:1.45;background:#fff}
@@ -266,18 +269,49 @@ tr.only-forget-hidden{display:none!important}
 .online-progress-label{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;font-weight:900;color:var(--filter-dark);margin-bottom:7px}
 .online-progress-track{height:8px;background:var(--neutral-tint);border-radius:999px;overflow:hidden}
 .online-progress-bar{height:100%;width:0%;background:var(--filter);transition:width .18s ease}
+.blocking-loader{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;background:rgba(42,36,32,.42);backdrop-filter:blur(2px)}
+.blocking-loader.active{display:flex}
+.blocking-loader-card{width:min(360px,calc(100vw - 40px));background:#fff;border:1px solid var(--border);border-radius:14px;padding:18px 20px;box-shadow:0 18px 40px rgba(42,36,32,.22);text-align:center}
+.blocking-loader-title{font-size:16px;font-weight:900;color:var(--primary-dark);margin-bottom:8px}
+.blocking-loader-text{font-size:13.5px;font-weight:800;color:var(--text-muted);line-height:1.45}
+.blocking-loader-bar{height:8px;background:var(--neutral-tint);border-radius:999px;overflow:hidden;margin-top:14px}
+.blocking-loader-bar span{display:block;height:100%;width:45%;border-radius:999px;background:var(--filter);animation:blockingLoaderMove 1.1s ease-in-out infinite}
+@keyframes blockingLoaderMove{0%{transform:translateX(-110%)}50%{transform:translateX(80%)}100%{transform:translateX(260%)}}
 .answer-search-box{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0;padding:10px;border:1px solid var(--border);border-radius:10px;background:#fffaf3}
 .answer-search-label{font-size:13px;font-weight:900;color:var(--primary-dark)}
 .answer-search-help{font-size:12.5px;color:var(--text-muted);font-weight:700}
 .answer-search-count{font-size:12.5px;font-weight:900;color:var(--filter-dark);background:#fff;border:1px solid var(--border);border-radius:999px;padding:4px 9px}
+.subselect-mode-btn{background:#fff;color:var(--filter-dark);border:1px solid var(--border);font-weight:900}
+.subselect-mode-btn.active{background:var(--filter);border-color:var(--filter);color:#fff}
+.subcategory-check-panel{display:none;border:1px solid var(--border);border-radius:10px;background:#fffaf3;padding:10px;margin-top:6px}
+.subcategory-check-panel.active{display:block}
+.subcategory-check-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:7px;margin-top:8px;max-height:260px;overflow:auto}
+.subcategory-check-item{display:flex;align-items:flex-start;gap:7px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:7px 8px;cursor:pointer;font-size:13px;font-weight:800;color:var(--text)}
+.subcategory-check-item:hover{background:var(--neutral-tint)}
+.subcategory-check-item.checked{background:var(--highlight-tint);border-color:#D6B98A}
+.subcategory-check-item input{margin:2px 0 0;accent-color:var(--filter)}
+.week-bundle-list{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 10px}
+.week-bundle-btn{background:#fff;color:var(--filter-dark);border:1px solid var(--border);font-weight:900}
+.week-bundle-btn:hover{background:var(--filter-tint)}
 </style>
 </head>
 <body>
+<div id="blockingLoader" class="blocking-loader" aria-live="polite" aria-busy="true">
+  <div class="blocking-loader-card">
+    <div class="blocking-loader-title">파일 불러오는 중...</div>
+    <div id="blockingLoaderText" class="blocking-loader-text">잠시만 기다려줘.</div>
+    <div class="blocking-loader-bar"><span></span></div>
+  </div>
+</div>
 <div class="wrap">
 <div class="brand">
   <div class="brand-head">
     <h1 class="brand-title"><span class="brand-repeat-1">Repeat</span><span class="brand-repeat-2">Repeat</span></h1>
     <span style="display:inline-flex;align-items:center;gap:10px"><a class="brand-link" href="https://bblack-joo.github.io/opicSetPractice/" target="_blank" rel="noopener">시험모드↗</a><button type="button" class="secondary small" id="managerModeToggleBtn" onclick="toggleManagerMode()">관리 모드</button></span>
+  </div>
+  <div class="brand-quick-links">
+    <a class="brand-quick-link" href="https://bblack-joo.github.io/languageStudy/grammar-in-use-progress.html">Grammar In Use</a>
+    <a class="brand-quick-link" href="https://bblack-joo.github.io/languageStudy/?folder=오픽의 신&week_size=1">OPIC</a>
   </div>
   <div class="brand-tagline">A language learning tool for studying any two languages.</div>
 </div>
@@ -355,10 +389,39 @@ tr.only-forget-hidden{display:none!important}
     <span class="answer-search-label">대분류</span>
     <select id="unitFilter" onchange="renderItemSelect()" title="파일/Unit 범위"><option value="">전체 파일</option></select>
     <span class="answer-search-label">소분류</span>
+    <button type="button" class="subselect-mode-btn active small" id="subSelectModeBtn" onclick="setSubcategoryMode('select')">셀렉트</button>
+    <button type="button" class="subselect-mode-btn small" id="subCheckModeBtn" onclick="setSubcategoryMode('check')">체크박스</button>
     <select id="unitSelect"><option value="">엑셀 파일을 먼저 선택</option></select>
-    <button class="secondary" onclick="addSelectedItemToQueue()">+ 추가</button>
+    <button class="secondary" id="addSelectedItemBtn" onclick="addSelectedItemToQueue()">+ 추가</button>
     <button class="secondary" id="addFilteredItemsBtn" onclick="addFilteredItemsToQueue()">전체 추가하기</button>
     <button class="secondary" onclick="addImportantBundlesToQueue()">+핵심 전체 추가</button>
+  </div>
+  <div id="categoryCheckPanel" class="subcategory-check-panel">
+    <div class="answer-search-label" style="margin-bottom:8px">대분류 체크</div>
+    <div class="toolbar" style="padding:0;margin-bottom:8px">
+      <label>주차 <input id="weekBundleNo" type="number" min="1" value="1" style="width:70px"></label>
+      <label>개수 <input id="weekBundleSize" type="number" min="1" value="4" style="width:70px" onchange="renderWeekBundleButtons()"></label>
+      <button type="button" class="secondary small" onclick="addInputWeekCategoryBundle()">입력 주차 추가</button>
+      <span class="hint">예: 2주차 / 4개 = 대분류 5~8번째 전체 추가</span>
+    </div>
+    <div id="weekBundleButtons" class="week-bundle-list"></div>
+    <div class="toolbar" style="padding:0">
+      <button class="secondary small" onclick="setAllCategoryChecks(true)">대분류 전체 체크</button>
+      <button class="gray small" onclick="setAllCategoryChecks(false)">대분류 전체 해제</button>
+      <button class="green small" onclick="confirmCategoryChecks()">대분류 선택 완료</button>
+      <span id="categoryCheckCount" class="hint">0개 선택</span>
+    </div>
+    <div id="categoryCheckList" class="subcategory-check-list"></div>
+  </div>
+  <div id="subcategoryCheckPanel" class="subcategory-check-panel">
+    <div class="answer-search-label" style="margin-bottom:8px">소분류 체크</div>
+    <div class="toolbar" style="padding:0">
+      <button class="secondary small" onclick="setAllSubcategoryChecks(true)">전체 체크</button>
+      <button class="gray small" onclick="setAllSubcategoryChecks(false)">전체 해제</button>
+      <button class="secondary small" onclick="addCheckedSubcategoriesToQueue()">체크한 답변 추가</button>
+      <span id="subcategoryCheckCount" class="hint">0개 선택</span>
+    </div>
+    <div id="subcategoryCheckList" class="subcategory-check-list"></div>
   </div>
   <div class="toolbar" id="nthBundleButtons"></div>
   <div class="toolbar">
@@ -808,6 +871,8 @@ tr.only-forget-hidden{display:none!important}
 <script>
 let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[],selectedItemKeys=[];
 let studyGroups=[],studyGroupIndex=0;
+let subcategoryMode='select';
+let categorySelectionConfirmed=false,checkedCategoryValues=[];
 let ENGLISH_ONLY_COPY={};
 let englishOnlyImportantOnly=false;
 let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flashScratchAnswers=[],flashSpeakRunId=0,flashAutoNextOn=false,flashAutoNextTimer=null,flashAutoScheduleRunId=0,flashResultCopyText='',flashResultExcelText='';
@@ -830,6 +895,7 @@ function compactNo(u,g,q){return `${String(u).trim()}${String(g).trim()}${String
 function escapeHtml(s){return String(s??'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
 function stripStress(text){return String(text??'').replace(/\[\[([\s\S]*?)\]\]/g,'$1');}
 const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycbyIAKLQzz9l-g2aBmCKXH6EAY2JE37_3szhYsFLUZOzuNljQ-06S5Vr-n0Tlx2Y3hcy/exec';
+const URL_STARTUP_PARAMS=parseStartupParams();
 const MODE_LABELS={table:'표',flash:'플래시카드',scramble:'단어 배열',molgong:'몰공 모드',keywordWrite:'키워드 보고 적기',grammarCheck:'문법 체크',cloze:'빈칸 맞추기',englishOnly:'문장 읽기',log:'기록 보기'};
 const LOCAL_LOG_KEY='rr_local_log';
 const CLOUD_ALLOWED_TYPES=new Set(['answer_load','study_result']);
@@ -837,6 +903,9 @@ let lastBookFiles=[];
 let loadedWorkbookFiles=[];
 let onlineFileMetaById=new Map();
 let onlineFilesCache=[];
+let startupFolderApplied=false,startupFolderAutoLoaded=false,startupModeApplied=false;
+let startupWeekPrompted=false,startupWeekCancelled=false,startupWeekBundleLoaded=false;
+let blockingLoaderCount=0;
 function todayKey(){return new Date().toLocaleDateString('sv-SE');}
 function rowTitle(row){return [row?.sheetName,row?.itemLabel].filter(Boolean).join(' - ');}
 function cloudSettings(){return{user:localStorage.getItem('rr_cloud_user')||'hoonyB',url:CLOUD_SCRIPT_URL};}
@@ -846,7 +915,88 @@ function onlineCredentials(){
   password:(document.getElementById('onlinePassword')?.value||localStorage.getItem('rr_online_password')||'').trim()
  };
 }
+function safeDecodeUrlPart(value){
+ try{return decodeURIComponent(String(value||'').replace(/\+/g,' '));}
+ catch(e){return String(value||'');}
+}
+function parseStartupParams(){
+ const params=new URLSearchParams(location.search||'');
+ if(location.hash&&location.hash.includes('=')){
+  new URLSearchParams(location.hash.replace(/^#\??/,'')).forEach((value,key)=>params.set(key,value));
+ }
+ const pathParts=String(location.pathname||'').split('/').filter(Boolean).map(safeDecodeUrlPart);
+ const languageStudyIndex=pathParts.findIndex(part=>part.toLowerCase()==='languagestudy');
+ let pathFolder=languageStudyIndex>=0&&pathParts.length>languageStudyIndex+1?pathParts.slice(languageStudyIndex+1).join('/'):'';
+ pathFolder=pathFolder.replace(/^folder=/i,'');
+ return {
+  folder:params.get('folder')||params.get('폴더')||params.get('f')||pathFolder||'',
+  mode:params.get('mode')||params.get('선택모드')||'',
+  load:params.get('load')||params.get('autoload')||params.get('불러오기')||'',
+  week:params.get('week')||params.get('주차')||params.get('w')||'',
+  weekSize:params.get('week_size')||params.get('week-size')||params.get('주차개수')||params.get('묶음개수')||params.get('size')||params.get('count')||params.get('개수')||params.get('m')||''
+ };
+}
+function normalizeStartupMatch(value){
+ return safeDecodeUrlPart(value).toLowerCase().replace(/\.[a-z0-9]+$/,'').replace(/[\s\\/_]+/g,'-').replace(/-+/g,'-').trim();
+}
+function shouldStartupAutoLoadFolder(){
+ const value=normalizeStartupMatch(URL_STARTUP_PARAMS.load);
+ return ['1','true','yes','folder','폴더','불러오기','auto'].includes(value)||hasStartupWeekBundleParams();
+}
+function applyStartupSelectionMode(){
+ if(startupModeApplied)return;
+ const mode=normalizeStartupMatch(URL_STARTUP_PARAMS.mode);
+ if(!mode&&!hasStartupWeekBundleParams())return;
+ startupModeApplied=true;
+ if(['check','checkbox','체크박스'].includes(mode)||hasStartupWeekBundleParams())setSubcategoryMode('check');
+ else if(['select','셀렉트'].includes(mode))setSubcategoryMode('select');
+}
+function startupPositiveNumber(value){
+ const number=Number(String(value||'').replace(/[^\d.]/g,''));
+ return Number.isFinite(number)&&number>0?Math.floor(number):0;
+}
+function hasStartupWeekBundleParams(){
+ return !!(URL_STARTUP_PARAMS.week||URL_STARTUP_PARAMS.weekSize);
+}
+function promptStartupWeekIfNeeded(){
+ if(startupWeekPrompted||!hasStartupWeekBundleParams())return;
+ startupWeekPrompted=true;
+ if(startupPositiveNumber(URL_STARTUP_PARAMS.week))return;
+ const answer=prompt('몇 주차를 불러올까?', '1');
+ const week=startupPositiveNumber(answer);
+ if(!week){
+  startupWeekCancelled=true;
+  return;
+ }
+ URL_STARTUP_PARAMS.week=String(week);
+}
+function applyStartupWeekBundleSettings(){
+ const week=startupPositiveNumber(URL_STARTUP_PARAMS.week);
+ const size=startupPositiveNumber(URL_STARTUP_PARAMS.weekSize);
+ const weekEl=document.getElementById('weekBundleNo');
+ const sizeEl=document.getElementById('weekBundleSize');
+ if(week&&weekEl)weekEl.value=week;
+ if(size&&sizeEl)sizeEl.value=size;
+ if(week||size)renderWeekBundleButtons();
+}
 let onlineStatusFlashTimer=null;
+function showBlockingLoader(text='파일 불러오는 중...'){
+ blockingLoaderCount++;
+ const loader=document.getElementById('blockingLoader');
+ const label=document.getElementById('blockingLoaderText');
+ if(label)label.textContent=text;
+ if(loader)loader.classList.add('active');
+}
+function updateBlockingLoader(text){
+ const label=document.getElementById('blockingLoaderText');
+ if(label&&text)label.textContent=text;
+}
+function hideBlockingLoader(){
+ blockingLoaderCount=Math.max(0,blockingLoaderCount-1);
+ if(blockingLoaderCount>0)return;
+ const loader=document.getElementById('blockingLoader');
+ if(loader)loader.classList.remove('active');
+}
 function setOnlineStatus(text){
  const el=document.getElementById('onlineLoginStatus');
  if(!el)return;
@@ -880,6 +1030,7 @@ function setOnlineLoadProgress(done,total,text){
  if(label)label.textContent=text||'불러오는 중...';
  if(count)count.textContent=safeTotal?`${safeDone} / ${safeTotal}`:'0 / 0';
  if(bar)bar.style.width=safeTotal?`${Math.round((safeDone/safeTotal)*100)}%`:'0%';
+ if(safeTotal&&text)updateBlockingLoader(text);
 }
 function hideOnlineLoadProgressSoon(){
  setTimeout(()=>setOnlineLoadProgress(0,0,''),1800);
@@ -978,15 +1129,47 @@ function renderOnlineFolderSelect(){
   const key=onlineFolderKey(file);
   if(seen.has(key))return;
   seen.add(key);
-  folders.push({key,label:onlineFolderLabel(file)});
+  folders.push({key,label:onlineFolderLabel(file),path:file?.folderPath||'최상위',scope:file?.scope||''});
  });
- select.innerHTML='<option value="">폴더 전체</option>'+folders.map(folder=>`<option value="${escapeAttr(folder.key)}">${escapeHtml(folder.label)}</option>`).join('');
+ select.innerHTML='<option value="">폴더 전체</option>'+folders.map(folder=>`<option value="${escapeAttr(folder.key)}" data-path="${escapeAttr(folder.path)}" data-scope="${escapeAttr(folder.scope)}">${escapeHtml(folder.label)}</option>`).join('');
 }
 function renderOnlineFileOptions(){
  const select=document.getElementById('onlineFileSelect');
  if(!select)return;
  const files=onlineFilesForSelectedFolder();
  select.innerHTML=files.length?'<option value="">파일 선택</option>'+files.map(f=>`<option value="${escapeAttr(f.id)}" data-scope="${escapeAttr(f.scope||'')}" data-name="${escapeAttr(f.name||'')}">${escapeHtml(f.label||f.name)}</option>`).join(''):'<option value="">선택한 폴더에 파일 없음</option>';
+}
+function applyStartupFolderSelection(){
+ if(startupFolderApplied||!URL_STARTUP_PARAMS.folder||!onlineFilesCache.length)return false;
+ const select=document.getElementById('onlineFolderSelect');
+ if(!select)return false;
+ const target=normalizeStartupMatch(URL_STARTUP_PARAMS.folder);
+ if(!target)return false;
+ const options=[...select.options].filter(option=>option.value);
+ const optionData=options.map(option=>{
+  const label=option.textContent||'';
+  const path=option.dataset.path||label.replace(/^\[[^\]]+\]\s*/,'');
+  return {
+   option,
+   path,
+   normalizedPath:normalizeStartupMatch(path),
+   normalizedLabel:normalizeStartupMatch(label),
+   normalizedValue:normalizeStartupMatch(option.value)
+  };
+ });
+ const found=optionData.find(data=>data.normalizedPath===target||data.normalizedLabel===target||data.normalizedValue===target)
+  ||optionData.find(data=>data.normalizedPath.endsWith(target)||data.normalizedLabel.includes(target));
+ if(!found)return false;
+ select.value=found.option.value;
+ renderOnlineFileOptions();
+ startupFolderApplied=true;
+ setFileLoadTab('drive');
+ setOnlineStatus(`URL 폴더 선택: ${found.path}`);
+ if(shouldStartupAutoLoadFolder()&&!startupFolderAutoLoaded){
+  startupFolderAutoLoaded=true;
+  loadSelectedOnlineFolderFiles({silentMissing:true});
+ }
+ return true;
 }
 function applyImportantOverrides(entries=[]){
  const map=new Map((entries||[]).map(entry=>[`${entry.itemKey}__${Number(entry.answerIndex)}`,!!entry.important]));
@@ -1088,6 +1271,7 @@ function logoutOnlineLibrary(){
 async function loadOnlineFileList(options={}){
  const cred=onlineCredentials();
  if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
+ showBlockingLoader('온라인 파일 목록 불러오는 중...');
  const select=document.getElementById('onlineFileSelect');
  if(select)select.innerHTML='<option value="">불러오는 중...</option>';
  setOnlineLoadProgress(0,1,'파일 목록 불러오는 중...');
@@ -1103,12 +1287,15 @@ async function loadOnlineFileList(options={}){
   else setOnlineStatus(files.length?`온라인 파일 ${files.length}개를 찾았어.`:'온라인 폴더에 파일이 없어.');
   setOnlineLoadProgress(1,1,files.length?`파일 목록 ${files.length}개 확인 완료`:'온라인 폴더에 파일이 없어.');
   hideOnlineLoadProgressSoon();
+  applyStartupFolderSelection();
   return files.length>0;
  }catch(e){
   if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';
   setOnlineStatus(e.message||'파일 목록 오류');
   setOnlineLoadProgress(0,0,'');
   return false;
+ }finally{
+  hideBlockingLoader();
  }
 }
 function sortOnlineFilesByName(files){
@@ -1178,24 +1365,29 @@ async function loadSelectedOnlineFolderFiles(options={}){
  return loadOnlineFilesByIds(files.map(file=>file.id).filter(Boolean),options);
 }
 async function loadOnlineFilesByIds(fileIds,options={}){
+ showBlockingLoader(`온라인 파일 ${fileIds.length}개를 불러오는 중...`);
  setOnlineStatus(`온라인 파일 ${fileIds.length}개를 불러오는 중...`);
  setOnlineLoadProgress(0,fileIds.length,'온라인 파일 불러오는 중...');
- const files=[];
- for(let i=0;i<fileIds.length;i++){
-  const meta=onlineFileMetaById.get(String(fileIds[i]))||{};
-  const name=meta.label||meta.name||`파일 ${i+1}`;
-  setOnlineStatus(`온라인 파일 불러오는 중... ${i+1}/${fileIds.length}`);
-  setOnlineLoadProgress(i,fileIds.length,`불러오는 중: ${name}`);
-  const file=await fetchOnlineWorkbookFile(fileIds[i],options);
-  if(file)files.push(file);
-  setOnlineLoadProgress(i+1,fileIds.length,`완료: ${name}`);
+ try{
+  const files=[];
+  for(let i=0;i<fileIds.length;i++){
+   const meta=onlineFileMetaById.get(String(fileIds[i]))||{};
+   const name=meta.label||meta.name||`파일 ${i+1}`;
+   setOnlineStatus(`온라인 파일 불러오는 중... ${i+1}/${fileIds.length}`);
+   setOnlineLoadProgress(i,fileIds.length,`불러오는 중: ${name}`);
+   const file=await fetchOnlineWorkbookFile(fileIds[i],options);
+   if(file)files.push(file);
+   setOnlineLoadProgress(i+1,fileIds.length,`완료: ${name}`);
+  }
+  if(!files.length){setOnlineLoadProgress(0,0,'');return false;}
+  await loadWorkbookFiles(files);
+  setOnlineStatus(`${files.length}개 온라인 파일 불러오기 완료`);
+  setOnlineLoadProgress(fileIds.length,fileIds.length,`${files.length}개 온라인 파일 불러오기 완료`);
+  hideOnlineLoadProgressSoon();
+  return true;
+ }finally{
+  hideBlockingLoader();
  }
- if(!files.length){setOnlineLoadProgress(0,0,'');return false;}
- await loadWorkbookFiles(files);
- setOnlineStatus(`${files.length}개 온라인 파일 불러오기 완료`);
- setOnlineLoadProgress(fileIds.length,fileIds.length,`${files.length}개 온라인 파일 불러오기 완료`);
- hideOnlineLoadProgressSoon();
- return true;
 }
 function fileToBase64(file){
  return new Promise((resolve,reject)=>{
@@ -1603,6 +1795,7 @@ function parseAnswerSheet(ws,sheetName,fileName=''){
 }
 async function loadWorkbookFiles(fileList){
  if(!fileList||!fileList.length)return;
+ showBlockingLoader(`${fileList.length}개 엑셀 파일 읽는 중...`);
  lastBookFiles=[...fileList];
  stopSpeak();
  clearSelectedItemQueue();
@@ -1619,7 +1812,9 @@ async function loadWorkbookFiles(fileList){
   BOOK.items=[];
   loadedWorkbookFiles=[];
 
-  for(const file of files){
+  for(let fileIndex=0;fileIndex<files.length;fileIndex++){
+   const file=files[fileIndex];
+   updateBlockingLoader(`엑셀 파일 읽는 중... ${fileIndex+1}/${files.length}`);
    const data=await file.arrayBuffer();
    const wb=XLSX.read(data,{type:'array'});
    loadedWorkbookFiles.push({fileName:file.name,mimeType:file.type||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',fileId:file.onlineFileId||'',workbook:wb,originalBuffer:data.slice(0)});
@@ -1662,7 +1857,11 @@ async function loadWorkbookFiles(fileList){
   }
   renderUnitFilter();
   renderItemSelect();
- }catch(e){console.error(e);alert('엑셀 파일을 불러오지 못했어.');}
+  applyStartupWeekBundleLoad();
+ }catch(e){console.error(e);alert('엑셀 파일을 불러오지 못했어.');
+ }finally{
+  hideBlockingLoader();
+ }
 }
 
 function normalizeAnswerSearchText(text){
@@ -1725,6 +1924,11 @@ function updateAnswerSearchCount(count,total){
  else el.textContent=`전체 ${total}개`;
 }
 function getFilteredItems(){
+ if(subcategoryMode==='check'){
+  if(!categorySelectionConfirmed||!checkedCategoryValues.length)return [];
+  const selected=new Set(checkedCategoryValues);
+  return BOOK.items.filter(item=>selected.has(item.sheetName));
+ }
  const unit=document.getElementById('unitFilter')?.value || '';
  return BOOK.items.filter(item=>!unit||item.sheetName===unit);
 }
@@ -1738,18 +1942,40 @@ function renderUnitFilter(){
  if(!unitSel) return;
  const units=[...new Set(BOOK.items.map(item=>item.sheetName).filter(Boolean))];
  unitSel.innerHTML='<option value="">전체</option>'+units.map(u=>`<option value="${escapeAttr(u)}">${escapeHtml(u)}</option>`).join('');
+ renderCategoryCheckboxes();
+}
+function categoryUnits(){
+ return [...new Set(BOOK.items.map(item=>item.sheetName).filter(Boolean))];
 }
 function renderItemSelect(){
  const select=document.getElementById('unitSelect');
  if(!select) return;
+ applySubcategoryMode();
+ if(subcategoryMode==='check'){
+  select.innerHTML='<option value="">체크박스 모드 사용 중</option>';
+  renderCategoryCheckboxes();
+  const list=categorySelectionConfirmed?getFilteredItems():[];
+  renderSubcategoryCheckboxes(list);
+  renderNthBundleButtons();
+  renderSelectedItemQueue();
+  updateAddFilteredItemsButton();
+  renderAnswerSearchResults();
+  return;
+ }
  const list=getFilteredItems();
  if(!BOOK.items.length){
    select.innerHTML='<option value="">엑셀 파일을 먼저 선택</option>';
+   renderSubcategoryCheckboxes([]);
+   renderNthBundleButtons();
+   updateAddFilteredItemsButton();
    renderAnswerSearchResults();
    return;
  }
  if(!list.length){
    select.innerHTML='<option value="">선택 범위에 답변이 없어</option>';
+   renderSubcategoryCheckboxes([]);
+   renderNthBundleButtons();
+   updateAddFilteredItemsButton();
    renderAnswerSearchResults();
    return;
  }
@@ -1760,7 +1986,211 @@ function renderItemSelect(){
  updateAddFilteredItemsButton();
  renderNthBundleButtons();
  renderSelectedItemQueue();
+ renderSubcategoryCheckboxes(list);
  renderAnswerSearchResults();
+}
+function setSubcategoryMode(mode){
+ subcategoryMode=mode==='check'?'check':'select';
+ categorySelectionConfirmed=false;
+ checkedCategoryValues=[];
+ renderItemSelect();
+}
+function applySubcategoryMode(){
+ const selectMode=subcategoryMode!=='check';
+ document.getElementById('subSelectModeBtn')?.classList.toggle('active',selectMode);
+ document.getElementById('subCheckModeBtn')?.classList.toggle('active',!selectMode);
+ const unitFilter=document.getElementById('unitFilter');
+ const unitSelect=document.getElementById('unitSelect');
+ const addSelected=document.getElementById('addSelectedItemBtn');
+ const categoryPanel=document.getElementById('categoryCheckPanel');
+ const panel=document.getElementById('subcategoryCheckPanel');
+ if(unitFilter)unitFilter.style.display=selectMode?'':'none';
+ if(unitSelect)unitSelect.style.display=selectMode?'':'none';
+ if(addSelected)addSelected.style.display=selectMode?'':'none';
+ categoryPanel?.classList.toggle('active',!selectMode);
+ panel?.classList.toggle('active',!selectMode&&categorySelectionConfirmed);
+}
+function renderCategoryCheckboxes(){
+ const box=document.getElementById('categoryCheckList');
+ const count=document.getElementById('categoryCheckCount');
+ if(!box)return;
+ if(subcategoryMode!=='check'){
+  box.innerHTML='';
+  if(count)count.textContent='0개 선택';
+  renderWeekBundleButtons([]);
+  return;
+ }
+ const units=categoryUnits();
+ renderWeekBundleButtons(units);
+ if(!units.length){
+  box.innerHTML='<div class="hint">엑셀 파일을 먼저 불러와줘.</div>';
+  if(count)count.textContent='0개 선택';
+  return;
+ }
+ const selected=new Set(checkedCategoryValues);
+ box.innerHTML=units.map(unit=>`<label class="subcategory-check-item"><input type="checkbox" value="${escapeAttr(unit)}" ${selected.has(unit)?'checked':''} onchange="handleCategoryCheckChange()"><span>${escapeHtml(unit)}</span></label>`).join('');
+ updateCategoryCheckCount();
+}
+function renderWeekBundleButtons(units=categoryUnits()){
+ const box=document.getElementById('weekBundleButtons');
+ if(!box)return;
+ if(subcategoryMode!=='check'||!units.length){
+  box.innerHTML='';
+  return;
+ }
+ const size=weekBundleSize();
+ const numeric=categoryUnitsHaveNumbers(units);
+ const weekCount=numeric?Math.ceil(Math.max(...units.map(categoryUnitNumber).filter(Number.isFinite))/size):Math.ceil(units.length/size);
+ const chunks=Array.from({length:weekCount},(_,index)=>unitsForWeekBundle(index,units));
+ box.innerHTML=chunks.map((chunk,index)=>{
+  const first=chunk[0]||'';
+  const last=chunk[chunk.length-1]||'';
+  const range=numeric?weekBundleRangeLabel(index,size):(chunk.length>1?`${first} ~ ${last}`:first);
+  const title=chunk.length?`${chunk.join(', ')} 전체 추가`:`${range} 대분류 없음`;
+  return `<button type="button" class="week-bundle-btn small" onclick="addWeekCategoryBundle(${index})" title="${escapeAttr(title)}">${index+1}주차 <span style="font-weight:800;color:var(--text-muted)">(${escapeHtml(range)})</span></button>`;
+ }).join('');
+}
+function weekBundleSize(){
+ return Math.max(1,Number(document.getElementById('weekBundleSize')?.value||4));
+}
+function inputWeekBundleNo(){
+ return Math.max(1,Number(document.getElementById('weekBundleNo')?.value||1));
+}
+function categoryUnitNumber(unit){
+ const name=String(unit||'').split('::').pop();
+ const match=name.match(/\d+/);
+ return match?Number(match[0]):NaN;
+}
+function categoryUnitsHaveNumbers(units=categoryUnits()){
+ return units.some(unit=>Number.isFinite(categoryUnitNumber(unit)));
+}
+function weekBundleRange(index,size=weekBundleSize()){
+ return {start:index*size+1,end:(index+1)*size};
+}
+function weekBundleRangeLabel(index,size=weekBundleSize()){
+ const range=weekBundleRange(index,size);
+ return `${range.start}~${range.end}`;
+}
+function unitsForWeekBundle(index,units=categoryUnits()){
+ const size=weekBundleSize();
+ if(categoryUnitsHaveNumbers(units)){
+  const range=weekBundleRange(index,size);
+  return units.filter(unit=>{
+   const number=categoryUnitNumber(unit);
+   return Number.isFinite(number)&&number>=range.start&&number<=range.end;
+  });
+ }
+ return units.slice(index*size,index*size+size);
+}
+function checkedCategoryKeys(){
+ return [...document.querySelectorAll('#categoryCheckList input[type="checkbox"]:checked')].map(input=>input.value).filter(Boolean);
+}
+function updateCategoryCheckCount(){
+ const count=document.getElementById('categoryCheckCount');
+ const checked=new Set(checkedCategoryKeys());
+ document.querySelectorAll('#categoryCheckList .subcategory-check-item').forEach(label=>{
+  const input=label.querySelector('input');
+  label.classList.toggle('checked',!!input?.checked);
+ });
+ if(count)count.textContent=`${checked.size}개 선택`;
+}
+function handleCategoryCheckChange(){
+ if(categorySelectionConfirmed){
+  categorySelectionConfirmed=false;
+  checkedCategoryValues=[];
+  applySubcategoryMode();
+  renderSubcategoryCheckboxes([]);
+  renderNthBundleButtons();
+  updateAddFilteredItemsButton();
+ }
+ updateCategoryCheckCount();
+}
+function setAllCategoryChecks(checked){
+ document.querySelectorAll('#categoryCheckList input[type="checkbox"]').forEach(input=>{input.checked=!!checked;});
+ handleCategoryCheckChange();
+}
+function addWeekCategoryBundle(index,options={}){
+ const units=categoryUnits();
+ const chunk=unitsForWeekBundle(index,units);
+ if(!chunk.length){alert(`${weekBundleRangeLabel(index)} 대분류를 찾지 못했어.`);return;}
+ const selected=new Set(chunk);
+ document.querySelectorAll('#categoryCheckList input[type="checkbox"]').forEach(input=>{input.checked=selected.has(input.value);});
+ checkedCategoryValues=chunk;
+ categorySelectionConfirmed=true;
+ applySubcategoryMode();
+ renderSubcategoryCheckboxes(getFilteredItems());
+ renderNthBundleButtons();
+ updateAddFilteredItemsButton();
+ updateCategoryCheckCount();
+ addFilteredItemsToQueue();
+}
+function addInputWeekCategoryBundle(){
+ addWeekCategoryBundle(inputWeekBundleNo()-1);
+}
+function applyStartupWeekBundleLoad(){
+ if(startupWeekBundleLoaded||startupWeekCancelled||!hasStartupWeekBundleParams()||!BOOK.items.length)return false;
+ promptStartupWeekIfNeeded();
+ if(startupWeekCancelled)return false;
+ applyStartupWeekBundleSettings();
+ applyStartupSelectionMode();
+ const before=selectedItemKeys.length;
+ addWeekCategoryBundle(inputWeekBundleNo()-1);
+ if(selectedItemKeys.length===before)return false;
+ startupWeekBundleLoaded=true;
+ loadQueuedItems();
+ return true;
+}
+function confirmCategoryChecks(){
+ checkedCategoryValues=checkedCategoryKeys();
+ if(!checkedCategoryValues.length){alert('먼저 대분류를 하나 이상 체크해줘.');return;}
+ categorySelectionConfirmed=true;
+ applySubcategoryMode();
+ renderSubcategoryCheckboxes(getFilteredItems());
+ renderNthBundleButtons();
+ updateAddFilteredItemsButton();
+}
+function renderSubcategoryCheckboxes(list=getFilteredItems()){
+ const box=document.getElementById('subcategoryCheckList');
+ const count=document.getElementById('subcategoryCheckCount');
+ if(!box)return;
+ if(subcategoryMode!=='check'){
+  box.innerHTML='';
+  if(count)count.textContent='0개 선택';
+  return;
+ }
+ if(!categorySelectionConfirmed){
+  box.innerHTML='';
+  if(count)count.textContent='대분류 선택 전';
+  return;
+ }
+ if(!BOOK.items.length){
+  box.innerHTML='<div class="hint">엑셀 파일을 먼저 불러와줘.</div>';
+  if(count)count.textContent='0개 선택';
+  return;
+ }
+ if(!list.length){
+  box.innerHTML='<div class="hint">현재 대분류에 답변이 없어.</div>';
+  if(count)count.textContent='0개 선택';
+  return;
+ }
+ box.innerHTML=list.map(item=>`<label class="subcategory-check-item"><input type="checkbox" value="${escapeAttr(item.key)}" onchange="updateSubcategoryCheckCount()"><span>${escapeHtml(itemOptionLabel(item))}</span></label>`).join('');
+ updateSubcategoryCheckCount();
+}
+function checkedSubcategoryKeys(){
+ return [...document.querySelectorAll('#subcategoryCheckList input[type="checkbox"]:checked')].map(input=>input.value).filter(Boolean);
+}
+function updateSubcategoryCheckCount(){
+ const count=document.getElementById('subcategoryCheckCount');
+ const checked=new Set(checkedSubcategoryKeys());
+ document.querySelectorAll('.subcategory-check-item').forEach(label=>{
+  const input=label.querySelector('input');
+  label.classList.toggle('checked',!!input?.checked);
+ });
+ if(count)count.textContent=`${checked.size}개 선택`;
+}
+function setAllSubcategoryChecks(checked){
+ document.querySelectorAll('#subcategoryCheckList input[type="checkbox"]').forEach(input=>{input.checked=!!checked;});
+ updateSubcategoryCheckCount();
 }
 function renderAnswerSearchResults(){
  const select=document.getElementById('answerSearchSelect');
@@ -1787,6 +2217,10 @@ function renderAnswerSearchResults(){
 function updateAddFilteredItemsButton(){
  const btn=document.getElementById('addFilteredItemsBtn');
  if(!btn)return;
+ if(subcategoryMode==='check'){
+  btn.textContent=categorySelectionConfirmed&&checkedCategoryValues.length?`선택 대분류 ${checkedCategoryValues.length}개 전체 추가`:'대분류 선택 후 전체 추가';
+  return;
+ }
  const unit=document.getElementById('unitFilter')?.value||'';
  if(!unit){btn.textContent='전체 추가하기';return;}
  const match=String(unit).match(/\d+/);
@@ -1860,6 +2294,14 @@ function addSelectedItemToQueue(){
  const selected=getSelectedQueueItem();
  if(!selected)return;
  addQueueEntry(selected.key,false);
+}
+function addCheckedSubcategoriesToQueue(){
+ const keys=checkedSubcategoryKeys();
+ if(!keys.length){alert('추가할 소분류를 체크해줘.');return;}
+ let added=0;
+ keys.forEach(key=>{if(addQueueEntry(key,false,true))added++;});
+ renderSelectedItemQueue();
+ if(!added)alert('체크한 답변은 이미 전부 추가되어 있어.');
 }
 function addSearchResultToQueue(){
  const selected=getSelectedSearchResultItem();
@@ -5064,6 +5506,8 @@ function downloadPython(){let code=document.getElementById('pythonCode').textCon
 cleanLegacyLogData();
 loadCloudSettings();
 renderLogView();
+applyStartupWeekBundleSettings();
+applyStartupSelectionMode();
 autoLoadOnlineFilesFromLocalLogin();
 window.addEventListener('beforeunload',()=>{
  try{
