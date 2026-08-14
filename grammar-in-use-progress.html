@@ -71,7 +71,7 @@ input[type=password],input[type=text]{width:135px}
     <div class="settings">
       <label>회독 <input id="roundInput" type="number" min="1" value="1" onchange="changeRound()"></label>
       <label>총 강의 <input id="totalUnitInput" type="number" min="1" value="145" onchange="renderWeeks()"></label>
-      <label>주차당 <input id="weekSizeInput" type="number" min="1" value="4" onchange="renderWeeks()"></label>
+      <label>일차당 <input id="weekSizeInput" type="number" min="1" value="4" onchange="renderWeeks()"></label>
       <button type="button" class="ghost" onclick="renderWeeks()">다시 나누기</button>
       <button type="button" class="ghost" onclick="copyProgressText()">진도 복사</button>
       <button type="button" class="danger" onclick="clearRoundProgress()">현재 회독 초기화</button>
@@ -91,18 +91,35 @@ const STORAGE_KEY='rr_grammar_in_use_progress_v2';
 const COURSE='Grammar In Use';
 function appBaseUrl(){return location.protocol==='file:'?'repeat-repeat-v2.html':'./';}
 function todayKey(){return new Date().toLocaleDateString('sv-SE');}
-function appUrlForWeek(week,size){const params=new URLSearchParams({folder:COURSE,week:String(week),week_size:String(size)});return appBaseUrl()+'?'+params.toString();}
+function appUrlForWeek(week,size,total){
+ const range=rangeForWeek(week,size,total);
+ const params=new URLSearchParams({folder:COURSE,week:String(week),week_size:String(size),start_unit:String(range.start),end_unit:String(range.end)});
+ return appBaseUrl()+'?'+params.toString();
+}
 function state(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}')||{};}catch(e){return {};}}
 function saveState(data){localStorage.setItem(STORAGE_KEY,JSON.stringify(data||{}));}
 function roundKey(){return String(Math.max(1,Number(document.getElementById('roundInput')?.value||1)));}
-function settings(){const total=Math.max(1,Number(document.getElementById('totalUnitInput')?.value||145));const size=Math.max(1,Number(document.getElementById('weekSizeInput')?.value||4));return {total,size,weeks:Math.ceil(total/size),round:Number(roundKey())};}
-function rangeForWeek(week,size,total){return {start:(week-1)*size+1,end:Math.min(week*size,total)};}
+function settings(){const total=Math.max(1,Number(document.getElementById('totalUnitInput')?.value||145));const size=Math.max(1,Number(document.getElementById('weekSizeInput')?.value||4));return {total,size,weeks:dayCount(total,size),round:Number(roundKey())};}
+function hasGrammarInUseDayException(size){return Number(size)===4;}
+function dayCount(total,size){
+ if(!hasGrammarInUseDayException(size))return Math.ceil(total/size);
+ if(total<=4)return 1;
+ if(total<=6)return 2;
+ return 2+Math.ceil((total-6)/size);
+}
+function rangeForWeek(week,size,total){
+ if(!hasGrammarInUseDayException(size))return {start:(week-1)*size+1,end:Math.min(week*size,total)};
+ if(week===1)return {start:1,end:Math.min(4,total)};
+ if(week===2)return {start:5,end:Math.min(6,total)};
+ const start=7+(week-3)*size;
+ return {start,end:Math.min(start+size-1,total)};
+}
 function roundData(){const data=state();return data[roundKey()]||{};}
 function setRoundData(next){const data=state();data[roundKey()]=next||{};saveState(data);}
 function updateWeek(week,patch){const data=roundData();data[String(week)]={...(data[String(week)]||{}),...patch};setRoundData(data);renderWeeks();}
 function toggleDone(week,checked){const current=roundData()[String(week)]||{};updateWeek(week,{done:!!checked,studyDate:current.studyDate||todayKey()});}
 function setStudyDate(week,value){updateWeek(week,{studyDate:value||''});}
-function updateProgress(weeks,data){const count=Array.from({length:weeks},(_,i)=>data[String(i+1)]?.done).filter(Boolean).length;document.getElementById('progressBar').style.width=weeks?`${Math.round((count/weeks)*100)}%`:'0%';document.getElementById('progressText').textContent=`${roundKey()}회독 · ${count} / ${weeks}주차 완료`;}
+function updateProgress(weeks,data){const count=Array.from({length:weeks},(_,i)=>data[String(i+1)]?.done).filter(Boolean).length;document.getElementById('progressBar').style.width=weeks?`${Math.round((count/weeks)*100)}%`:'0%';document.getElementById('progressText').textContent=`${roundKey()}회독 · ${count} / ${weeks}일차 완료`;}
 function renderWeeks(){
  const grid=document.getElementById('weekGrid');
  const home=document.getElementById('appHomeLink');
@@ -111,10 +128,10 @@ function renderWeeks(){
  if(home)home.href=appBaseUrl();
  updateProgress(weeks,data);
  grid.innerHTML=Array.from({length:weeks},(_,i)=>{
-  const week=i+1,range=rangeForWeek(week,size,total),record=data[String(week)]||{},checked=!!record.done,href=appUrlForWeek(week,size);
+  const week=i+1,range=rangeForWeek(week,size,total),record=data[String(week)]||{},checked=!!record.done,href=appUrlForWeek(week,size,total);
   return `<article class="week-card${checked?' done':''}">
     <div class="week-head">
-      <div class="week-title">${week}주차</div>
+      <div class="week-title">${week}일차</div>
       <label class="check"><input type="checkbox" ${checked?'checked':''} onchange="toggleDone(${week},this.checked)">완료</label>
     </div>
     <div class="range">${range.start}강 ~ ${range.end}강</div>
@@ -125,7 +142,7 @@ function renderWeeks(){
 }
 function changeRound(){renderWeeks();}
 function clearRoundProgress(){if(!confirm(`${roundKey()}회독 진도를 초기화할까?`))return;setRoundData({});renderWeeks();}
-function copyProgressText(){const {total,size,weeks,round}=settings();const data=roundData();const lines=[`${COURSE} ${round}회독`];for(let w=1;w<=weeks;w++){const r=rangeForWeek(w,size,total),v=data[String(w)]||{};lines.push(`${w}주차\t${r.start}-${r.end}강\t${v.done?'완료':'미완료'}\t${v.studyDate||''}`);}navigator.clipboard.writeText(lines.join('\n'));setCloudStatus('진도 내용을 복사했어.');}
+function copyProgressText(){const {total,size,weeks,round}=settings();const data=roundData();const lines=[`${COURSE} ${round}회독`];for(let w=1;w<=weeks;w++){const r=rangeForWeek(w,size,total),v=data[String(w)]||{};lines.push(`${w}일차\t${r.start}-${r.end}강\t${v.done?'완료':'미완료'}\t${v.studyDate||''}`);}navigator.clipboard.writeText(lines.join('\n'));setCloudStatus('진도 내용을 복사했어.');}
 function credentials(){return {user:(document.getElementById('onlineUserId')?.value||localStorage.getItem('rr_online_user')||'').trim(),password:(document.getElementById('onlinePassword')?.value||localStorage.getItem('rr_online_password')||'').trim()};}
 function setCloudStatus(text){document.getElementById('cloudStatus').textContent=text||'';}
 function onlineJsonp(action,params={}){
