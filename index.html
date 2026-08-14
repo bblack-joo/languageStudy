@@ -74,7 +74,7 @@ tr.done{background:var(--success-tint)}
 .actions-col button{margin:0;white-space:nowrap}
 .actions-hidden{display:none!important}
 .kr{width:22%}
-.en{width:32%}
+.lang2{width:32%}
 pre{white-space:pre-wrap;background:#111;color:#e6e6e6;padding:12px;border-radius:10px;max-height:390px;overflow:auto;font-size:13px}
 .random-count{width:90px;background:var(--filter-tint);border:1px solid var(--filter);color:var(--filter-dark);font-weight:600;text-align:center}
 .question-box{background:#fbfcfe;border:1px solid var(--border);border-left:4px solid var(--filter);border-radius:10px;padding:12px;margin:10px 0;line-height:1.5}
@@ -337,6 +337,11 @@ tr.only-forget-hidden{display:none!important}
     <button class="green small" onclick="sendCloudTest()">저장 테스트</button>
     <button class="secondary small" id="studyLogToggleBtn" onclick="toggleStudyLogBox()">기록 보기</button>
   </div>
+  <div class="toolbar">
+    <label>언어1 <select id="lang1CodeSelect" onchange="saveLanguageSettings()"></select></label>
+    <label>언어2 <select id="lang2CodeSelect" onchange="saveLanguageSettings()"></select></label>
+    <span class="hint" style="margin:0">예: 언어1 한글 / 언어2 영어, 또는 중국어 / 독일어처럼 바꿔 쓸 수 있어.</span>
+  </div>
   <div class="hint">선택한 이름과 같은 구글시트 탭에 학습 기록이 저장돼.</div>
   <div id="studyLogBox" style="display:none;margin-top:10px">
     <div class="toolbar">
@@ -379,7 +384,7 @@ tr.only-forget-hidden{display:none!important}
     <div class="hint">컴퓨터에 있는 엑셀 파일을 직접 불러오거나, 현재 선택한 파일을 드라이브로 올릴 수 있어.</div>
   </div>
   <div id="manualEntryBox" class="file-load-panel">
-    <div class="hint">탭 또는 엔터로 구분된 한글/영어 문장을 붙여넣거나, Excel/CSV/TXT 파일을 불러와.</div>
+    <div class="hint">탭 또는 엔터로 구분된 <span data-lang1-label>한글</span>/<span data-lang2-label>영어</span> 문장을 붙여넣거나, Excel/CSV/TXT 파일을 불러와.</div>
     <textarea id="inputText" placeholder="한글<Tab>영어 또는 한글<Enter>영어 형태로 붙여넣기"></textarea>
     <div class="toolbar"><input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.txt" /><button onclick="parseText()">표 생성</button><button class="secondary" onclick="loadSample()">샘플 넣기</button><button class="gray" onclick="clearAll()">초기화</button></div>
   </div>
@@ -535,26 +540,26 @@ tr.only-forget-hidden{display:none!important}
 <div class="toolbar"><button id="tableReadSettingsToggleBtn" class="secondary small" onclick="toggleTableReadSettings()">읽기 설정 보기</button></div>
 <div id="tableReadSettingsBox" style="display:none">
 <div class="toolbar-label">재생</div>
-<div class="toolbar"><button onclick="readAll('en')">▶ 표 읽기</button><button onclick="readAll('ko')">한글</button><button onclick="readAll('en')">영어</button><button class="orange" onclick="readRandom()">랜덤 읽기</button><button class="secondary" onclick="pauseSpeak()">일시정지</button><button class="green" onclick="resumeSpeak()">▶ 이어읽기</button><button class="red" onclick="stopSpeak()">■ 정지</button></div>
+<div class="toolbar"><button onclick="readAll('lang2')">▶ 표 읽기</button><button onclick="readAll('lang1')"><span data-lang1-label>한글</span></button><button onclick="readAll('lang2')"><span data-lang2-label>영어</span></button><button class="orange" onclick="readRandom()">랜덤 읽기</button><button class="secondary" onclick="pauseSpeak()">일시정지</button><button class="green" onclick="resumeSpeak()">▶ 이어읽기</button><button class="red" onclick="stopSpeak()">■ 정지</button></div>
 <div class="toolbar-label">Python 코드</div>
-<div class="toolbar"><button class="green" onclick="generatePython('both')">문장별 생성 코드</button><button class="green" onclick="generatePython('ko')">한글 한 파일 코드</button><button class="green" onclick="generatePython('en')">영어 한 파일 코드</button><button class="green" onclick="downloadPython()">.py 저장</button><button class="secondary" onclick="copyPython()">코드 복사</button></div>
+<div class="toolbar"><button class="green" onclick="generatePython('both')">문장별 생성 코드</button><button class="green" onclick="generatePython('lang1')"><span data-lang1-label>한글</span> 한 파일 코드</button><button class="green" onclick="generatePython('lang2')"><span data-lang2-label>영어</span> 한 파일 코드</button><button class="green" onclick="downloadPython()">.py 저장</button><button class="secondary" onclick="copyPython()">코드 복사</button></div>
 <div class="toolbar-label">옵션</div>
-<div class="toolbar"><label>읽기 순서<select id="orderMode"><option value="ko_en">한글 → 영어</option><option value="en_ko">영어 → 한글</option></select></label><label>반복 <input id="repeatCount" type="number" min="1" value="1" style="width:60px"> 회</label><label>한글/영어 사이 쉬기 <input id="pairGapSec" type="number" min="0" step="0.1" value="5" style="width:70px"> 초</label><label>문장 사이 쉬기 <input id="gapSec" type="number" min="0" step="0.1" value="1.0" style="width:70px"> 초</label><label>키워드 사이 쉬기 <input id="keywordGapSec" type="number" min="0" step="0.5" value="5" style="width:70px"> 초</label><label><input id="skipNumberRead" type="checkbox"> 숫자 안읽기</label><label><input id="pythonRandom" type="checkbox"> Python 랜덤 순서</label><label>한글 속도 <input id="koRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label><label>영어 속도 <input id="enRate" type="number" min="0.5" max="2" step="0.1" value="1.0" style="width:70px"></label><label>파일명 <input id="baseName" value="opic_practice" style="width:150px"></label></div>
+<div class="toolbar"><label>읽기 순서<select id="orderMode"><option value="lang1_lang2">한글 → 영어</option><option value="lang2_lang1">영어 → 한글</option></select></label><label>반복 <input id="repeatCount" type="number" min="1" value="1" style="width:60px"> 회</label><label><span data-lang1-label>한글</span>/<span data-lang2-label>영어</span> 사이 쉬기 <input id="pairGapSec" type="number" min="0" step="0.1" value="5" style="width:70px"> 초</label><label>문장 사이 쉬기 <input id="gapSec" type="number" min="0" step="0.1" value="1.0" style="width:70px"> 초</label><label>키워드 사이 쉬기 <input id="keywordGapSec" type="number" min="0" step="0.5" value="5" style="width:70px"> 초</label><label><input id="skipNumberRead" type="checkbox"> 숫자 안읽기</label><label><input id="pythonRandom" type="checkbox"> Python 랜덤 순서</label><label><span data-lang1-label>한글</span> 속도 <input id="koRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label><label><span data-lang2-label>영어</span> 속도 <input id="enRate" type="number" min="0.5" max="2" step="0.1" value="1.0" style="width:70px"></label><label>파일명 <input id="baseName" value="opic_practice" style="width:150px"></label></div>
 
 <div id="pythonCard" style="display:none;margin-top:10px"><b>생성된 Python 코드</b><pre id="pythonCode"></pre></div>
 
-<div class="hint" style="margin-top:10px">각 행의 ▶전체 / 한글 / 영어 / 반복 버튼으로 그 문장만 읽을 수 있어.</div>
+<div class="hint" style="margin-top:10px">각 행의 ▶전체 / <span data-lang1-label>한글</span> / <span data-lang2-label>영어</span> / 반복 버튼으로 그 문장만 읽을 수 있어.</div>
 </div>
 <div id="questionBox" class="question-box" style="display:none"><b>질문</b><div id="questionList"></div></div>
 <div class="toolbar-label">보기 옵션</div>
-<div class="toolbar"><button id="koToggleBtn" class="green small" onclick="displayRow('ko')">한글 숨기기</button><button id="enToggleBtn" class="green small" onclick="displayRow('en')">영어 숨기기</button><button id="practiceToggleBtn" class="green small" onclick="togglePracticeColumn(this)">연습칸 숨기기</button><button id="actionsToggleBtn" class="green small" onclick="toggleActionsColumn(this)">기능 숨기기</button><button id="forgetOnlyBtn" class="orange small" onclick="toggleForgetOnly(this)">안 외워진 것만 보기</button></div>
+<div class="toolbar"><button id="lang1ToggleBtn" class="green small" onclick="displayRow('lang1')">한글 숨기기</button><button id="lang2ToggleBtn" class="green small" onclick="displayRow('lang2')">영어 숨기기</button><button id="practiceToggleBtn" class="green small" onclick="togglePracticeColumn(this)">연습칸 숨기기</button><button id="actionsToggleBtn" class="green small" onclick="toggleActionsColumn(this)">기능 숨기기</button><button id="forgetOnlyBtn" class="orange small" onclick="toggleForgetOnly(this)">안 외워진 것만 보기</button></div>
 <div class="toolbar-label">연습 관리</div>
 <div class="toolbar"><span class="hint" style="margin:0 4px 0 0">연습칸에 적어보며 외우기</span><button class="green small" onclick="copyPracticeColumn()">연습 복사</button><button class="gray small" onclick="clearCurrentPractice()">현재 표 연습 삭제</button><button class="red small" onclick="clearAllPractice()">전체 연습 삭제</button></div>
 <div class="toolbar-label">학습 완료</div>
 <div class="toolbar"><button class="green small" onclick="completeTableStudy('읽기 완료')">읽기 완료</button><button class="green small" onclick="completeTableStudy('타이핑 완료')">타이핑 완료</button></div>
 <div id="tableAnswerNav"></div>
 <div id="tableAnswerBundlePanel" class="answer-bundle-panel"></div>
-<div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">체크</th><th class="num">번호</th><th class="kr">한글 <button class="secondary small" onclick="copyColumn('ko')">복사</button></th><th class="en">영어 <button class="secondary small" onclick="copyColumn('en')">복사</button></th><th class="practice-cell">연습</th><th class="actions actions-header">기능</th></tr></thead><tbody></tbody></table></div>
+<div id="countInfo" class="hint">0개 문장</div><table id="dataTable"><thead><tr><th class="check-col">체크</th><th class="num">번호</th><th class="kr"><span data-lang1-label>한글</span> <button class="secondary small" onclick="copyColumn('lang1')">복사</button></th><th class="lang2"><span data-lang2-label>영어</span> <button class="secondary small" onclick="copyColumn('lang2')">복사</button></th><th class="practice-cell">연습</th><th class="actions actions-header">기능</th></tr></thead><tbody></tbody></table></div>
 </div>
 
 <div id="mode-flash" class="card mode-panel active">
@@ -566,10 +571,11 @@ tr.only-forget-hidden{display:none!important}
   <div class="flash-options">
     <label>모드
       <select id="flashMode" onchange="resetFlashcard();this.blur();">
-        <option value="ko_en">한글 → 영어</option>
-        <option value="en_ko">영어 → 한글</option>
-        <option value="ko_only">한글만 보기</option>
-        <option value="en_only">영어만 보기</option>
+        <option value="lang1_lang2"></option>
+        <option value="lang2_lang1"></option>
+        <option value="lang1_only"></option>
+        <option value="lang2_only"></option>
+        <option value="both_visible"></option>
       </select>
     </label>
     <label>순서
@@ -581,8 +587,8 @@ tr.only-forget-hidden{display:none!important}
     <label>음성
       <select id="flashSpeakMode" onchange="this.blur();">
         <option value="both">둘 다 읽기</option>
-        <option value="ko">한글만 읽기</option>
-        <option value="en" selected>영어만 읽기</option>
+        <option value="lang1"></option>
+        <option value="lang2" selected></option>
         <option value="off">안 듣기</option>
       </select>
     </label>
@@ -601,8 +607,8 @@ tr.only-forget-hidden{display:none!important}
     <label>반복 <input id="flashSpeakRepeat" type="number" min="1" value="3" style="width:60px"> 회</label>
     <input id="flashSpeakInfinite" type="checkbox" style="display:none">
     <button id="flashSpeakInfiniteBtn" class="secondary small" onclick="toggleFlashInfinite()">∞ 무한 꺼짐</button>
-    <label>한글 속도 <input id="flashKoRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label>
-    <label>영어 속도 <input id="flashEnRate" type="number" min="0.5" max="2" step="0.1" value="0.9" style="width:70px"></label>
+    <label><span data-lang1-label>한글</span> 속도 <input id="flashKoRate" type="number" min="0.5" max="2" step="0.1" value="1.2" style="width:70px"></label>
+    <label><span data-lang2-label>영어</span> 속도 <input id="flashEnRate" type="number" min="0.5" max="2" step="0.1" value="0.9" style="width:70px"></label>
   </div>
   <div class="flash-bar clickable" onclick="jumpFlashByProgress(event)" title="누른 위치의 카드로 이동"><div id="flashBarInner" class="flash-bar-inner"></div></div>
   <div id="flashCard" class="flash-card" tabindex="0" onclick="handleFlashCardClick()" onkeydown="flashCardKeydown(event)">
@@ -610,8 +616,8 @@ tr.only-forget-hidden{display:none!important}
     <div id="flashBack" class="flash-back flash-hidden"></div>
   </div>
   <div class="flash-options">
-    <button class="secondary small" onclick="copyFlashText('ko')">한글 복사</button>
-    <button class="secondary small" onclick="copyFlashText('en')">영어 복사</button>
+    <button class="secondary small" onclick="copyFlashText('lang1')"><span data-lang1-label>한글</span> 복사</button>
+    <button class="secondary small" onclick="copyFlashText('lang2')"><span data-lang2-label>영어</span> 복사</button>
   </div>
   <div id="flashResult" class="scramble-result flash-hidden"></div>
   <div class="flash-help">카드 클릭: 정답 보기 → 다음 카드 / Space·Enter: 뒤집기·다음 / 타이핑 중 Ctrl+Space·Ctrl+Enter: 뒤집기·다음 / Ctrl+0: 음원 1회 듣기 / ← →: 이전·다음</div>
@@ -665,8 +671,8 @@ tr.only-forget-hidden{display:none!important}
   <div class="flash-options">
     <label>모드
       <select id="scrambleMode" onchange="resetScramble();this.blur();">
-        <option value="ko_en">한글 보고 영어 배열</option>
-        <option value="en_ko">영어 보고 한글 배열</option>
+        <option value="lang1_lang2"></option>
+        <option value="lang2_lang1"></option>
       </select>
     </label>
     <label>순서
@@ -678,8 +684,8 @@ tr.only-forget-hidden{display:none!important}
     <label>음성
       <select id="scrambleSpeakMode">
         <option value="both">둘 다 읽기</option>
-        <option value="ko">한글만 읽기</option>
-        <option value="en">영어만 읽기</option>
+        <option value="lang1"></option>
+        <option value="lang2"></option>
         <option value="off">안 듣기</option>
       </select>
     </label>
@@ -872,7 +878,7 @@ tr.only-forget-hidden{display:none!important}
 
 </div>
 <script>
-let rows=[],practiceVisible=true,actionsVisible=true,koColumnVisible=true,enColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[],selectedItemKeys=[];
+let rows=[],practiceVisible=true,actionsVisible=true,lang1ColumnVisible=true,lang2ColumnVisible=true,showOnlyNotMemorized=false,speaking=false,loopOne=false,paused=false,currentIndex=0,currentPythonMode='both',playToken=0,currentQuestionItems=[],selectedItemKeys=[];
 let studyGroups=[],studyGroupIndex=0;
 let subcategoryMode='select';
 let categorySelectionConfirmed=false,checkedCategoryValues=[];
@@ -900,6 +906,8 @@ function stripStress(text){return String(text??'').replace(/\[\[([\s\S]*?)\]\]/g
 const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycbyIAKLQzz9l-g2aBmCKXH6EAY2JE37_3szhYsFLUZOzuNljQ-06S5Vr-n0Tlx2Y3hcy/exec';
 const URL_STARTUP_PARAMS=parseStartupParams();
 const MODE_LABELS={table:'표',flash:'플래시카드',scramble:'단어 배열',molgong:'몰공 모드',keywordWrite:'키워드 보고 적기',grammarCheck:'문법 체크',cloze:'빈칸 맞추기',englishOnly:'문장 읽기',log:'기록 보기'};
+const LANGUAGE_NAMES={ko:'한국어',en:'영어',ch:'중국어',de:'독일어',jp:'일본어',fr:'프랑스어',es:'스페인어'};
+const LANGUAGE_LOCALES={ko:'ko-KR',en:'en-US',ch:'zh-CN',zh:'zh-CN',de:'de-DE',jp:'ja-JP',fr:'fr-FR',es:'es-ES'};
 const LOCAL_LOG_KEY='rr_local_log';
 const CLOUD_ALLOWED_TYPES=new Set(['answer_load','study_result']);
 let lastBookFiles=[];
@@ -912,6 +920,48 @@ let blockingLoaderCount=0;
 function todayKey(){return new Date().toLocaleDateString('sv-SE');}
 function rowTitle(row){return [row?.sheetName,row?.itemLabel].filter(Boolean).join(' - ');}
 function cloudSettings(){return{user:localStorage.getItem('rr_cloud_user')||'hoonyB',url:CLOUD_SCRIPT_URL};}
+function languageSettings(){return{lang1:localStorage.getItem('rr_lang1_code')||'ko',lang2:localStorage.getItem('rr_lang2_code')||'en'};}
+function languageName(slot){const code=languageSettings()[slot]||slot;return LANGUAGE_NAMES[code]||code;}
+function languageLocale(slotOrCode){const code=slotOrCode==='lang1'||slotOrCode==='lang2'?languageSettings()[slotOrCode]:slotOrCode;return LANGUAGE_LOCALES[code]||'en-US';}
+function populateLanguageSelects(){
+ const options=Object.entries(LANGUAGE_NAMES).map(([code,name])=>`<option value="${code}">${name}</option>`).join('');
+ ['lang1','lang2'].forEach(slot=>{
+  const sel=document.getElementById(slot+'CodeSelect');
+  if(!sel)return;
+  if(!sel.options.length)sel.innerHTML=options;
+  sel.value=languageSettings()[slot];
+ });
+}
+function saveLanguageSettings(){
+ const lang1=document.getElementById('lang1CodeSelect')?.value||'ko';
+ const lang2=document.getElementById('lang2CodeSelect')?.value||'en';
+ localStorage.setItem('rr_lang1_code',lang1);
+ localStorage.setItem('rr_lang2_code',lang2);
+ updateLanguageLabels();
+}
+function updateLanguageLabels(){
+ populateLanguageSelects();
+ const lang1=languageName('lang1'),lang2=languageName('lang2');
+ document.querySelectorAll('[data-lang1-label]').forEach(el=>el.textContent=lang1);
+ document.querySelectorAll('[data-lang2-label]').forEach(el=>el.textContent=lang2);
+ const input=document.getElementById('inputText');
+ if(input)input.placeholder=`${lang1}<Tab>${lang2} 또는 ${lang1}<Enter>${lang2} 형태로 붙여넣기`;
+ const setOpt=(selectId,value,text)=>{const opt=document.querySelector(`#${selectId} option[value="${value}"]`);if(opt)opt.textContent=text;};
+ setOpt('orderMode','lang1_lang2',`${lang1} → ${lang2}`);
+ setOpt('orderMode','lang2_lang1',`${lang2} → ${lang1}`);
+ setOpt('flashMode','lang1_lang2',`${lang1} → ${lang2}`);
+ setOpt('flashMode','lang2_lang1',`${lang2} → ${lang1}`);
+ setOpt('flashMode','lang1_only',`${lang1}만 보기`);
+ setOpt('flashMode','lang2_only',`${lang2}만 보기`);
+ setOpt('flashMode','both_visible',`${lang1}+${lang2} 같이 보기`);
+ setOpt('flashSpeakMode','lang1',`${lang1}만 읽기`);
+ setOpt('flashSpeakMode','lang2',`${lang2}만 읽기`);
+ setOpt('scrambleMode','lang1_lang2',`${lang1} 보고 ${lang2} 배열`);
+ setOpt('scrambleMode','lang2_lang1',`${lang2} 보고 ${lang1} 배열`);
+ setOpt('scrambleSpeakMode','lang1',`${lang1}만 읽기`);
+ setOpt('scrambleSpeakMode','lang2',`${lang2}만 읽기`);
+ applyLanguageColumnVisibility();
+}
 function onlineCredentials(){
  return {
   user:(document.getElementById('onlineUserId')?.value||localStorage.getItem('rr_online_user')||'').trim(),
@@ -1469,8 +1519,8 @@ function cleanLegacyLogData(){
    delete copy.correct;
    delete copy.wrong;
    delete copy.reason;
-   delete copy.ko;
-   delete copy.en;
+   delete copy.lang1;
+   delete copy.lang2;
    return copy;
   });
  saveLocalLogEntries(cleaned);
@@ -1594,7 +1644,7 @@ function recordQueuedAnswers(entries,source='선택 목록'){
 function recordModeChange(mode){
 }
 function markAutoNotMemorized(row,mode,reason='오답'){
- if(!row||!(row.ko||row.en))return;
+ if(!row||!(row.lang1||row.lang2))return;
  try{localStorage.setItem(sentenceMemoryKey(row),'1');}catch(e){}
  row.notMemorized=true;
  const rowIndex=rows.indexOf(row);
@@ -1676,8 +1726,8 @@ function parseAnswerSheet(ws,sheetName,fileName=''){
    unit:['unit번호','유닛번호'],
    group:['그룹번호','그룹 번호'],
    qno:['질문번호','질문 번호'],
-   ko:['한글','한국어'],
-   en:['영어','english']
+   lang1:['한글','한국어','언어1','language1','lang1'],
+   lang2:['영어','english','언어2','language2','lang2']
  });
  if(!header)return [];
 
@@ -1723,7 +1773,7 @@ function parseAnswerSheet(ws,sheetName,fileName=''){
  let lastUnit='';
  let lastGroup='';
  let blockImportant=false;
- const cols=[header.cols.unit,header.cols.group,header.cols.qno,header.cols.ko,header.cols.en,flowCol,importanceCol,notMemorizedCol,memoCol,keySentenceCol];
+ const cols=[header.cols.unit,header.cols.group,header.cols.qno,header.cols.lang1,header.cols.lang2,flowCol,importanceCol,notMemorizedCol,memoCol,keySentenceCol];
 
  function addRef(u,g,q){
    const unitNo=idCell(u||lastUnit);
@@ -1776,8 +1826,8 @@ function parseAnswerSheet(ws,sheetName,fileName=''){
    const unitNo=idCell(line[header.cols.unit]);
    const groupNo=idCell(line[header.cols.group]);
    const questionNo=idCell(line[header.cols.qno]);
-   const ko=val(line,header.cols.ko);
-   const en=val(line,header.cols.en);
+   const lang1=val(line,header.cols.lang1);
+   const lang2=val(line,header.cols.lang2);
    const flow=val(line,flowCol);
    if(isTruthyCell(val(line,importanceCol))) blockImportant=true;
    const important=keySentenceCol>=0 ? isTruthyCell(val(line,keySentenceCol)) : false;
@@ -1791,8 +1841,8 @@ function parseAnswerSheet(ws,sheetName,fileName=''){
    addFlow(flow);
    addMemoIfAny(memoValue);
 
-   if(ko||en){
-     answers.push({ko,en,important,notMemorized,origin:{fileName,sheetName,rowIndex:r,keySentenceCol,headerRowIndex:header.rowIndex}});
+   if(lang1||lang2){
+     answers.push({lang1,lang2,important,notMemorized,origin:{fileName,sheetName,rowIndex:r,keySentenceCol,headerRowIndex:header.rowIndex}});
    }
  }
  saveBlock();
@@ -1891,7 +1941,7 @@ function itemSearchText(item){
   `${ref.unitNo}${ref.groupNo}${ref.questionNo}`
  ]);
  const questionText=(item?.questions||[]).flatMap(q=>[q.content,q.trans,q.flow]);
- const answerText=(item?.answers||[]).flatMap(a=>[a.ko,a.en]);
+ const answerText=(item?.answers||[]).flatMap(a=>[a.lang1,a.lang2]);
  return [
   item?.label,
   item?.sheetName,
@@ -2284,9 +2334,9 @@ function renderNthBundleButtons(){
  box.innerHTML=`<span class="hint" style="margin:0 4px 0 0">번호별 추가</span><select id="nthBundleSelect">${nums.map(n=>`<option value="${n}">[${n}]만</option>`).join('')}</select><button class="secondary small" onclick="addSelectedNthItemsToQueue()">번호 추가</button>`;
 }
 
-function sentenceMemoryKey(row){return 'ls_auto_forget_'+storageSafe((row?.en||'')+'|'+(row?.ko||''));}
+function sentenceMemoryKey(row){return 'ls_auto_forget_'+storageSafe((row?.lang2||'')+'|'+(row?.lang1||''));}
 function isAutoNotMemorized(row){try{return localStorage.getItem(sentenceMemoryKey(row))==='1';}catch(e){return false;}}
-function itemToPairs(item){const flowText=(item.flows||[]).map(x=>String(x).trim()).filter(Boolean).join('\n');return item.answers.map((a,answerIndex)=>({ko:a.ko,en:a.en,important:!!a.important,notMemorized:!!a.notMemorized||isAutoNotMemorized(a),itemLabel:item.label||'',sheetName:item.sheetName||'',itemKey:item.key||'',answerIndex,flowText,origin:a.origin||null}));}
+function itemToPairs(item){const flowText=(item.flows||[]).map(x=>String(x).trim()).filter(Boolean).join('\n');return item.answers.map((a,answerIndex)=>({lang1:a.lang1??a.ko??'',lang2:a.lang2??a.en??'',important:!!a.important,notMemorized:!!a.notMemorized||isAutoNotMemorized(a),itemLabel:item.label||'',sheetName:item.sheetName||'',itemKey:item.key||'',answerIndex,flowText,origin:a.origin||null}));}
 function itemToImportantPairs(item){return itemToPairs(item).filter(p=>p.important);}
 function itemToNotMemorizedPairs(item){return itemToPairs(item).filter(p=>p.notMemorized);}
 function itemOptionLabel(item){
@@ -2837,7 +2887,7 @@ function copyKeyword(id){
  navigator.clipboard.writeText(box.textContent||'');
 }
 function hideQuestions(){currentQuestionItems=[];updateCurrentItemInfo();['questionBox','flashQuestionBox','scrambleQuestionBox','molgongQuestionBox','keywordWriteQuestionBox','grammarCheckQuestionBox','clozeQuestionBox'].forEach(id=>{const box=document.getElementById(id);if(box)box.style.display='none';});['questionList','flashQuestionList','scrambleQuestionList','molgongQuestionList','keywordWriteQuestionList','grammarCheckQuestionList','clozeQuestionList'].forEach(id=>{const list=document.getElementById(id);if(list)list.innerHTML='';});['flash','scramble','molgong','keywordWrite','grammarCheck','cloze'].forEach(mode=>setStudyQuestionToggle(mode,false));}
-function setRows(pairs,preserveGroups=false){if(!preserveGroups)clearStudyGroups();startStudyEntry();document.getElementById('inputText').value=pairs.map(i=>`${i.ko}\t${i.en}`).join('\n');rows=pairs.map(i=>({ko:i.ko||'',en:i.en||'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',itemKey:i.itemKey||'',answerIndex:Number.isFinite(Number(i.answerIndex))?Number(i.answerIndex):null,flowText:i.flowText||'',origin:i.origin||null,done:false})).filter(i=>i.ko||i.en);renderTable();if(currentMode==='grammarCheck')renderGrammarCheck();}
+function setRows(pairs,preserveGroups=false){if(!preserveGroups)clearStudyGroups();startStudyEntry();document.getElementById('inputText').value=pairs.map(i=>`${i.lang1??i.ko??''}\t${i.lang2??i.en??''}`).join('\n');rows=pairs.map(i=>({lang1:i.lang1??i.ko??'',lang2:i.lang2??i.en??'',important:!!i.important,notMemorized:!!i.notMemorized,itemLabel:i.itemLabel||'',sheetName:i.sheetName||'',itemKey:i.itemKey||'',answerIndex:Number.isFinite(Number(i.answerIndex))?Number(i.answerIndex):null,flowText:i.flowText||'',origin:i.origin||null,done:false})).filter(i=>i.lang1||i.lang2);renderTable();if(currentMode==='grammarCheck')renderGrammarCheck();}
 function loadSelectedItem(){stopSpeak();clearStudyGroups();const key=document.getElementById('unitSelect').value;if(key==='__ALL__'){loadAllItems();return;}const item=BOOK.items.find(v=>v.key===key);if(!item){alert('선택한 묶음을 찾지 못했어.');return;}showQuestions([item]);setRows(itemToPairs(item));recordAnswerLoad(item,'선택 답변 불러오기');}
 function canLoadNextSelectedItem(){
  const select=document.getElementById('unitSelect');
@@ -2956,10 +3006,10 @@ function addRandomImportantItems(){
  renderSelectedItemQueue();
 }
 function isHeader(ko,en){return norm(ko)==='한글'&&norm(en)==='영어';}
-function loadSample(){document.getElementById('inputText').value=`한글\t영어\n집에 있는 가구에 대해 말해 주세요.\tTell me about the furniture you have in your home.\n가장 좋아하는 가구가 있나요?\tIs there a piece that is your favorite?`;parseText();}
+function loadSample(){const l1=languageName('lang1'),l2=languageName('lang2');document.getElementById('inputText').value=`${l1}\t${l2}\n집에 있는 가구에 대해 말해 주세요.\tTell me about the furniture you have in your home.\n가장 좋아하는 가구가 있나요?\tIs there a piece that is your favorite?`;parseText();}
 function clearAll(){clearStudyGroups();rows=[];document.getElementById('inputText').value='';renderTable();document.getElementById('pythonCard').style.display='none';hideQuestions();}
-function parseText(){clearStudyGroups();const text=document.getElementById('inputText').value.trim();if(!text){alert('데이터를 먼저 넣어줘.');return;}const lines=text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);rows=[];for(const line of lines){let parts=line.split('\t'); if(parts.length<2)parts=line.split(/ {2,}|,/); if(parts.length>=2){const ko=parts[0].trim(),en=parts.slice(1).join(' ').trim(); if(ko&&en&&!isHeader(ko,en))rows.push({ko,en,important:false,notMemorized:false,done:false});}}
- if(!rows.length){const parts=text.replace(/\r\n/g,'\n').replace(/\t/g,'\n').split(/\n+/).map(x=>x.trim()).filter(Boolean);for(let i=0;i<parts.length;i+=2){const ko=parts[i]||'',en=parts[i+1]||'';if(ko&&en&&!isHeader(ko,en))rows.push({ko,en,important:false,notMemorized:false,done:false});}}
+function parseText(){clearStudyGroups();const text=document.getElementById('inputText').value.trim();if(!text){alert('데이터를 먼저 넣어줘.');return;}const lines=text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);rows=[];for(const line of lines){let parts=line.split('\t'); if(parts.length<2)parts=line.split(/ {2,}|,/); if(parts.length>=2){const lang1=parts[0].trim(),lang2=parts.slice(1).join(' ').trim(); if(lang1&&lang2&&!isHeader(lang1,lang2))rows.push({lang1,lang2,important:false,notMemorized:false,done:false});}}
+ if(!rows.length){const parts=text.replace(/\r\n/g,'\n').replace(/\t/g,'\n').split(/\n+/).map(x=>x.trim()).filter(Boolean);for(let i=0;i<parts.length;i+=2){const lang1=parts[i]||'',lang2=parts[i+1]||'';if(lang1&&lang2&&!isHeader(lang1,lang2))rows.push({lang1,lang2,important:false,notMemorized:false,done:false});}}
  renderTable();}
 function renderTable(){
  const tb=document.querySelector('#dataTable tbody');
@@ -2970,7 +3020,7 @@ function renderTable(){
   if(showOnlyNotMemorized && !r.notMemorized) tr.classList.add('only-forget-hidden');
   if(r.done) tr.classList.add('done');
   const pKey=getPracticeKey(r);
-  tr.innerHTML=`<td class="check-col"><input type="checkbox" class="forget-check" ${r.notMemorized?'checked':''} disabled></td><td class="num">${i+1}</td><td class="${r.important?'important-text':''}">${escapeHtml(r.ko)}</td><td class="${r.important?'important-text':''}">${formatStress(r.en)}</td><td class="practice-cell"><textarea class="practice-input" data-key="${escapeAttr(pKey)}" placeholder="" oninput="savePracticeInput(this)" onkeydown="practiceKeydown(event,this)">${escapeHtml(getSavedPractice(pKey))}</textarea></td><td class="actions actions-col"><button class="small" onclick="readOne(${i},'both')">▶전체</button><button class="small" onclick="readOne(${i},'ko')">한글</button><button class="small" onclick="readOne(${i},'en')">영어</button><button class="small orange" onclick="repeatOne(${i})">??</button></td>`;
+  tr.innerHTML=`<td class="check-col"><input type="checkbox" class="forget-check" ${r.notMemorized?'checked':''} disabled></td><td class="num">${i+1}</td><td class="${r.important?'important-text':''}">${escapeHtml(r.lang1)}</td><td class="${r.important?'important-text':''}">${formatStress(r.lang2)}</td><td class="practice-cell"><textarea class="practice-input" data-key="${escapeAttr(pKey)}" placeholder="" oninput="savePracticeInput(this)" onkeydown="practiceKeydown(event,this)">${escapeHtml(getSavedPractice(pKey))}</textarea></td><td class="actions actions-col"><button class="small" onclick="readOne(${i},'both')">▶전체</button><button class="small" onclick="readOne(${i},'lang1')">${escapeHtml(languageName('lang1'))}</button><button class="small" onclick="readOne(${i},'lang2')">${escapeHtml(languageName('lang2'))}</button><button class="small orange" onclick="repeatOne(${i})">??</button></td>`;
   tb.appendChild(tr);
  });
  updateCountInfo();
@@ -3016,8 +3066,8 @@ function renderImportantEditor(){
   <div class="important-editor-row ${row.important?'checked':''}" onclick="toggleImportantEditorRow(this, event)">
    <label><input type="checkbox" class="important-editor-check" data-row-index="${index}" ${row.important?'checked':''} onclick="event.stopPropagation()" onchange="syncImportantEditorRow(this)"></label>
    <div class="important-editor-meta">${index+1}번<br>${escapeHtml([row.sheetName,row.itemLabel].filter(Boolean).join(' - '))}</div>
-   <div class="important-editor-text">${escapeHtml(row.ko||'')}</div>
-   <div class="important-editor-text">${formatStress(row.en||'')}</div>
+   <div class="important-editor-text">${escapeHtml(row.lang1||'')}</div>
+   <div class="important-editor-text">${formatStress(row.lang2||'')}</div>
   </div>
  `).join('');
 }
@@ -3194,8 +3244,8 @@ async function saveImportantEditor(event){
      answerIndex:Number(row.answerIndex),
      important:!!check.checked,
      title:[row.sheetName,row.itemLabel].filter(Boolean).join(' - '),
-     ko:row.ko||'',
-     en:stripStress(row.en||'')
+     ko:row.lang1||'',
+     en:stripStress(row.lang2||'')
     });
    }
   });
@@ -3678,7 +3728,7 @@ async function startFlashSpeechRecognition(options={}){
  const base=key?(flashSpeechTexts.get(key)||''):'';
  let finalText=base;
  flashRecognition=new Ctor();
- flashRecognition.lang='en-US';
+ flashRecognition.lang=languageLocale('lang2');
  flashRecognition.interimResults=false;
  flashRecognition.continuous=true;
  flashRecognition.onstart=()=>{flashRecognizing=true;updateFlashSpeechButtons(true);setFlashRecognitionStatus('인식 중','active');};
@@ -3761,8 +3811,14 @@ function toggleFlashFreeInput(){
 function getFlashDisplayedSpeakSide(){
  const row=getFlashCurrent();
  if(!row)return null;
- const side=flashSide(row,flashRevealed?'back':'front');
+ const mode=document.getElementById('flashMode')?.value||'lang1_lang2';
  const speakMode=document.getElementById('flashSpeakMode')?.value||'both';
+ if(mode==='both_visible'){
+  if(speakMode==='off')return null;
+  if(speakMode==='lang1')return {lang:'lang1',html:escapeHtml(row.lang1||''),plain:row.lang1||''};
+  return {lang:'lang2',html:formatStress(row.lang2||''),plain:stripStress(row.lang2||'')};
+ }
+ const side=flashSide(row,flashRevealed?'back':'front');
  if(speakMode==='off')return null;
  if(speakMode!=='both'&&speakMode!==side.lang)return null;
  return side;
@@ -3812,12 +3868,12 @@ function toggleFlashInfinite(){
  }
 }
 function getFlashSpeakRate(lang){
- const id=lang==='ko'?'flashKoRate':'flashEnRate';
- const fallback=lang==='ko'?'koRate':'enRate';
+ const id=lang==='lang1'?'flashKoRate':'flashEnRate';
+ const fallback=lang==='lang1'?'koRate':'enRate';
  return document.getElementById(id)?.value || document.getElementById(fallback)?.value || 1;
 }
 function buildFlashOrder(){
- const indices=getVisibleRowIndices().filter(i=>rows[i]&&((rows[i].ko||'').trim()||(rows[i].en||'').trim()));
+ const indices=getVisibleRowIndices().filter(i=>rows[i]&&((rows[i].lang1||'').trim()||(rows[i].lang2||'').trim()));
  flashOrderList=document.getElementById('flashOrder')?.value==='random'?shuffleArray(indices):indices;
  flashIndex=0;
  flashRevealed=false;
@@ -3931,18 +3987,23 @@ function getFlashCurrent(){
  return rows[rowIndex]||null;
 }
 function isFlashSingleMode(){
- const mode=document.getElementById('flashMode')?.value||'ko_en';
- return mode==='ko_only'||mode==='en_only';
+ const mode=document.getElementById('flashMode')?.value||'lang1_lang2';
+ return mode==='lang1_only'||mode==='lang2_only'||mode==='both_visible';
 }
 function flashSide(row,side){
- const mode=document.getElementById('flashMode')?.value||'ko_en';
- const frontLang=mode==='ko_only'?'ko':mode==='en_only'?'en':mode==='ko_en'?'ko':'en';
- const backLang=mode==='ko_only'?'ko':mode==='en_only'?'en':mode==='ko_en'?'en':'ko';
+ const mode=document.getElementById('flashMode')?.value||'lang1_lang2';
+ const frontLang=mode==='lang1_only'?'lang1':mode==='lang2_only'?'lang2':mode==='lang1_lang2'?'lang1':'lang2';
+ const backLang=mode==='lang1_only'?'lang1':mode==='lang2_only'?'lang2':mode==='lang1_lang2'?'lang2':'lang1';
  const lang=side==='front'?frontLang:backLang;
- const raw=lang==='ko'?(row.ko||''):(row.en||'');
- const html=lang==='ko'?escapeHtml(raw):formatStress(raw);
- const plain=lang==='ko'?raw:stripStress(raw);
+ const raw=lang==='lang1'?(row.lang1||''):(row.lang2||'');
+ const html=lang==='lang1'?escapeHtml(raw):formatStress(raw);
+ const plain=lang==='lang1'?raw:stripStress(raw);
  return {lang,html,plain};
+}
+function flashBothVisibleHtml(row){
+ const ko=escapeHtml(row.lang1||'');
+ const en=formatStress(row.lang2||'');
+ return `<div>${ko}</div><div class="flash-back" style="display:block;margin-top:16px">${en}</div>`;
 }
 function renderFlashcard(autoSpeak=false){
  updateFlashSpeechAutoButton();
@@ -3969,6 +4030,17 @@ function renderFlashcard(autoSpeak=false){
  }
  const row=getFlashCurrent();
  if(!row)return;
+ const mode=document.getElementById('flashMode')?.value||'lang1_lang2';
+ if(mode==='both_visible'){
+   frontEl.innerHTML=flashBothVisibleHtml(row);
+   backEl.innerHTML='';
+   backEl.classList.add('flash-hidden');
+   if(prog)prog.textContent=`${flashIndex+1} / ${flashOrderList.length}`;
+   if(bar)bar.style.width=`${Math.round(((flashIndex+1)/flashOrderList.length)*100)}%`;
+   loadFlashScratch();
+   if(autoSpeak&&!flashAutoNextOn)playFlashSpeak({silent:true});
+   return;
+ }
  const front=flashSide(row,'front');
  const back=flashSide(row,'back');
  frontEl.innerHTML=front.html;
@@ -3999,7 +4071,7 @@ async function speakFlashText(side,rateOverride=null){
  const token=++playToken;
  speaking=true;
  paused=false;
- const rate=rateOverride ?? (side.lang==='ko'?document.getElementById('koRate').value:document.getElementById('enRate').value);
+ const rate=rateOverride ?? (side.lang==='lang1'?document.getElementById('koRate').value:document.getElementById('enRate').value);
  await speakText(side.plain,side.lang,rate,token);
  if(token===playToken)speaking=false;
 }
@@ -4081,18 +4153,18 @@ function showFlashAllSentences(){
  if(!res)return;
  const items=flashOrderList.map((rowIndex,pos)=>({pos:pos+1,rowIndex,row:rows[rowIndex]})).filter(x=>x.row);
  if(!items.length){hideFlashResult();return;}
- const mode=document.getElementById('flashMode')?.value||'ko_en';
- const answerLang=(mode==='en_ko'||mode==='ko_only')?'ko':'en';
+ const mode=document.getElementById('flashMode')?.value||'lang1_lang2';
+ const answerLang=(mode==='lang2_lang1'||mode==='lang1_only')?'lang1':'lang2';
  let wrongCount=0;
  flashResultCopyText=buildFlashResultCopyText(items,answerLang);
  flashResultExcelText=buildFlashResultExcelText(items);
  let html='<div class="toolbar" style="justify-content:space-between;margin-bottom:8px"><b>플래시카드 결과</b><span><button class="green small" onclick="playFlashRecordingSequence()">녹음 순서대로 재생</button> <button class="red small" onclick="stopFlashRecordingSequence()">재생 정지</button> <button class="secondary small" onclick="copyFlashResultForFeedback()">첨삭용 복사</button> <button class="secondary small" onclick="copyFlashResultForExcel()">엑셀용 복사</button></span></div><table><thead><tr><th class="num-col">번호</th><th>내가 쓴 문장</th><th>정답</th><th>녹음</th></tr></thead><tbody>';
  html+=items.map(item=>{
   const myAnswer=flashScratchAnswers[item.pos-1]||'';
-  const correct=answerLang==='ko'?(item.row.ko||''):(item.row.en||'');
+  const correct=answerLang==='lang1'?(item.row.lang1||''):(item.row.lang2||'');
   const isWrong=normalizeForCompare(myAnswer)!==normalizeForCompare(stripStress(correct));
   if(isWrong){wrongCount++;markAutoNotMemorized(item.row,'플래시카드','직접 쓴 답 비교');}
-  const correctHtml=answerLang==='ko'?escapeHtml(correct):formatStress(correct);
+  const correctHtml=answerLang==='lang1'?escapeHtml(correct):formatStress(correct);
   const rec=flashRecordings.get(String(item.rowIndex));
   const recordHtml=rec?.url?`<audio controls src="${escapeAttr(rec.url)}" style="width:180px;max-width:100%"></audio>`:'<span class="hint">녹음 없음</span>';
   return `<tr><td class="num-col">${item.pos}</td><td style="white-space:pre-wrap">${escapeHtml(myAnswer)}</td><td>${correctHtml}</td><td>${recordHtml}</td></tr>`;
@@ -4111,7 +4183,7 @@ function buildFlashResultCopyText(items,answerLang){
  ];
  items.forEach(item=>{
   const myAnswer=(flashScratchAnswers[item.pos-1]||'').trim();
-  const correct=answerLang==='ko'?(item.row.ko||''):(item.row.en||'');
+  const correct=answerLang==='lang1'?(item.row.lang1||''):(item.row.lang2||'');
   const plainCorrect=stripStress(correct).trim();
   if(!myAnswer&&!plainCorrect)return;
   const title=[item.row.sheetName,item.row.itemLabel].filter(Boolean).join(' - ');
@@ -4129,8 +4201,8 @@ function copyFlashResultForFeedback(){
 function buildFlashResultExcelText(items){
  const lines=[];
  items.forEach(item=>{
-  const ko=String(item.row.ko||'').replace(/\r?\n/g,' ').trim();
-  const en=stripStress(item.row.en||'').replace(/\r?\n/g,' ').trim();
+  const ko=String(item.row.lang1||'').replace(/\r?\n/g,' ').trim();
+  const en=stripStress(item.row.lang2||'').replace(/\r?\n/g,' ').trim();
   if(ko||en)lines.push(`${ko}\t${en}`);
  });
  return lines.join('\n');
@@ -4150,7 +4222,7 @@ function handleFlashCardClick(){
 function copyFlashText(lang){
  const row=getFlashCurrent();
  if(!row){alert('복사할 플래시카드가 없어.');return;}
- const text=lang==='ko'?(row.ko||''):stripStress(row.en||'');
+ const text=lang==='lang1'?(row.lang1||''):stripStress(row.lang2||'');
  if(!text.trim()){alert('복사할 내용이 없어.');return;}
  navigator.clipboard.writeText(text);
 }
@@ -4170,7 +4242,7 @@ function normalizeForCompare(text){
  return String(text||'').toLowerCase().replace(/[.,!?'"“”‘’]/g,'').replace(/\s+/g,' ').trim();
 }
 function buildScrambleOrder(){
- const indices=getVisibleRowIndices().filter(i=>rows[i]&&((rows[i].ko||'').trim()||(rows[i].en||'').trim()));
+ const indices=getVisibleRowIndices().filter(i=>rows[i]&&((rows[i].lang1||'').trim()||(rows[i].lang2||'').trim()));
  scrambleOrderList=document.getElementById('scrambleOrder')?.value==='random'?shuffleArray(indices):indices;
  scrambleIndex=0;
  scrambleWrongs=[];
@@ -4195,13 +4267,13 @@ function currentScrambleRow(){
  return {rowIndex,row:rows[rowIndex]};
 }
 function scrambleSides(row){
- const mode=document.getElementById('scrambleMode')?.value||'ko_en';
- const promptLang=mode==='ko_en'?'ko':'en';
- const answerLang=mode==='ko_en'?'en':'ko';
+ const mode=document.getElementById('scrambleMode')?.value||'lang1_lang2';
+ const promptLang=mode==='lang1_lang2'?'lang1':'lang2';
+ const answerLang=mode==='lang1_lang2'?'lang2':'lang1';
  return {
   promptLang,answerLang,
-  promptText:promptLang==='ko'?(row.ko||''):stripStress(row.en||''),
-  answerText:answerLang==='ko'?(row.ko||''):stripStress(row.en||'')
+  promptText:promptLang==='lang1'?(row.lang1||''):stripStress(row.lang2||''),
+  answerText:answerLang==='lang1'?(row.lang1||''):stripStress(row.lang2||'')
  };
 }
 function renderScrambleQuestion(autoSpeak=false){
@@ -4411,7 +4483,7 @@ function scrambleInputKeydown(e){
    else{nextScramble();}
  }
 }
-function scrambleSpeakMode(){return document.getElementById('scrambleSpeakMode')?.value||'en';}
+function scrambleSpeakMode(){return document.getElementById('scrambleSpeakMode')?.value||'lang2';}
 function speakScramblePromptAuto(promptLang,promptText){
  const mode=scrambleSpeakMode();
  if(mode==='off'||!promptText)return;
@@ -4449,9 +4521,9 @@ function startScrambleSpeech(){
 
   scrambleRecognition = new SpeechRecognition();
   scrambleRecognition.lang =
-    document.getElementById('scrambleMode').value === 'ko_en'
-      ? 'en-US'
-      : 'ko-KR';
+    document.getElementById('scrambleMode').value === 'lang1_lang2'
+      ? languageLocale('lang2')
+      : languageLocale('lang1');
 
   scrambleRecognition.interimResults = true;
   scrambleRecognition.continuous = true;
@@ -4509,7 +4581,7 @@ function checkScramble(){
  const userText=inputEl?inputEl.value:'';
  const correct=normalizeForCompare(userText)===normalizeForCompare(answerText);
  if(!correct){
-   scrambleWrongs.push({rowIndex:cur.rowIndex,ko:cur.row.ko||'',en:cur.row.en||''});
+   scrambleWrongs.push({rowIndex:cur.rowIndex,lang1:cur.row.lang1||'',lang2:cur.row.lang2||''});
  }
  const fb=document.getElementById('scrambleFeedback');
  if(fb){
@@ -4565,7 +4637,7 @@ function finishScramble(){
    let html=`<div><b>결과: ${total}문장 중 정답 ${correctCount}개 / 오답 ${wrongCount}개</b></div>`;
    if(wrongCount){
      html+='<table><thead><tr><th class="num-col">번호</th><th>한글</th><th>영어</th></tr></thead><tbody>';
-     html+=uniqueWrongRows.map(w=>`<tr><td class="num-col">${w.rowIndex+1}</td><td>${escapeHtml(w.ko)}</td><td>${formatStress(w.en)}</td></tr>`).join('');
+     html+=uniqueWrongRows.map(w=>`<tr><td class="num-col">${w.rowIndex+1}</td><td>${escapeHtml(w.lang1)}</td><td>${formatStress(w.lang2)}</td></tr>`).join('');
      html+='</tbody></table>';
    }else{
      html+='<div style="margin-top:8px">오답 없이 전부 맞췄어!</div>';
@@ -4576,7 +4648,7 @@ function finishScramble(){
 
 let molgongOrderList=[],molgongIndex=0,molgongTokens=[],molgongHintCount=0,molgongFinished=false;
 function buildMolgongOrder(){
- const indices=getVisibleRowIndices().filter(i=>rows[i]&&((rows[i].ko||'').trim()||(rows[i].en||'').trim()));
+ const indices=getVisibleRowIndices().filter(i=>rows[i]&&((rows[i].lang1||'').trim()||(rows[i].lang2||'').trim()));
  molgongOrderList=document.getElementById('molgongOrder')?.value==='random'?shuffleArray(indices):indices;
  molgongIndex=0;
  molgongHintCount=0;
@@ -4626,8 +4698,8 @@ function renderMolgong(focus=false){
  const sourceTitles=[...new Set(molgongOrderList.map(i=>[rows[i]?.sheetName,rows[i]?.itemLabel].filter(Boolean).join(' - ')).filter(Boolean))];
  const currentSource=[cur.row.sheetName,cur.row.itemLabel].filter(Boolean).join(' - ');
  if(source)source.textContent=sourceTitles.length>1&&currentSource?currentSource:'';
- prompt.textContent=cur.row.ko||'(한글 해석 없음)';
- molgongTokens=tokenizeSentence(cur.row.en||'');
+ prompt.textContent=cur.row.lang1||'(한글 해석 없음)';
+ molgongTokens=tokenizeSentence(cur.row.lang2||'');
  renderMolgongHintBox();
  if(prog)prog.textContent=`${molgongIndex+1} / ${molgongOrderList.length}`;
  if(bar)bar.style.width=`${Math.round(((molgongIndex+1)/molgongOrderList.length)*100)}%`;
@@ -4694,9 +4766,9 @@ function buildKeywordWriteList(){
  const entries=[];
  (currentQuestionItems||[]).forEach(item=>{
   const flows=(item.flows||[]).map(x=>String(x).trim()).filter(Boolean);
-  const koText=(item.answers||[]).map(a=>String(a.ko||'').trim()).filter(Boolean).join('\n');
-  const enText=(item.answers||[]).map(a=>stripStress(a.en||'').trim()).filter(Boolean).join('\n');
-  flows.forEach(flow=>entries.push({keyword:flow,ko:koText,en:enText,label:item.label||''}));
+  const lang1Text=(item.answers||[]).map(a=>String(a.lang1||'').trim()).filter(Boolean).join('\n');
+  const lang2Text=(item.answers||[]).map(a=>stripStress(a.lang2||'').trim()).filter(Boolean).join('\n');
+  flows.forEach(flow=>entries.push({keyword:flow,lang1:lang1Text,lang2:lang2Text,label:item.label||''}));
  });
  keywordWriteList=document.getElementById('keywordWriteOrder')?.value==='random'?shuffleArray(entries):entries;
  keywordWriteIndex=0;
@@ -4790,7 +4862,7 @@ function showKeywordWriteResult(){
   return `<tr><td class="keyword-col">${escapeHtml(item.keyword||'')}</td><td>${escapeHtml(keywordWriteAnswers[i]||'')}</td></tr>`;
  }).join('');
  html+='</tbody></table>';
- const originals=[...new Set(keywordWriteList.map(item=>String(item.en||'').trim()).filter(Boolean))];
+ const originals=[...new Set(keywordWriteList.map(item=>String(item.lang2||'').trim()).filter(Boolean))];
  if(originals.length){
  html+=`<div style="margin-top:12px"><b>원래 문장 전체</b><div class="keyword-box" style="display:block">${formatStress(originals.join('\n\n'))}</div></div>`;
  }
@@ -4808,12 +4880,12 @@ function grammarSentenceItems(){
  return rows.map((row,i)=>({
   index:i+1,
   title:grammarSentenceTitle(row),
-  ko:String(row.ko||'').trim(),
-  en:stripStress(row.en||'').trim()
- })).filter(item=>item.en);
+  lang1:String(row.lang1||'').trim(),
+  lang2:stripStress(row.lang2||'').trim()
+ })).filter(item=>item.lang2);
 }
 function grammarKey(item){
- return `${item.title}|${item.index}|${item.en}`;
+ return `${item.title}|${item.index}|${item.lang2}`;
 }
 function grammarNotesKey(item){
  return item?grammarKey(item):(currentQuestionTitle()||'empty');
@@ -4833,7 +4905,7 @@ function renderGrammarCheck(){
  box.innerHTML=items.map(item=>{
   const key=grammarNotesKey(item);
   const saved=grammarSheetNotes[key]||'';
-  return `<div class="english-answer-card" style="margin-bottom:10px"><div class="english-answer-head"><div class="english-answer-title">${escapeHtml(item.title)} · ${item.index}</div><div class="english-answer-actions"><button class="green small" onclick="askGrammarCheckChatGpt(${item.index})">${item.index}번 묻기</button><button class="secondary small" onclick="copyGrammarCheckPrompt(${item.index})">복사</button></div></div><div class="english-answer-lines"><p class="english-answer-line">${escapeHtml(item.en)}</p>${item.ko?`<p class="hint">${escapeHtml(item.ko)}</p>`:''}</div><div class="flash-scratch-box"><label class="flash-scratch-label"><span class="label-tag">${item.index}번 문법 설명 저장</span></label><textarea class="grammar-note-input" data-key="${escapeAttr(key)}" placeholder="ChatGPT에서 받은 ${item.index}번 문장 문법 설명을 여기에 붙여넣어." style="height:120px" oninput="markGrammarNoteDirty(this); autoGrow(this);">${escapeHtml(saved)}</textarea></div></div>`;
+  return `<div class="english-answer-card" style="margin-bottom:10px"><div class="english-answer-head"><div class="english-answer-title">${escapeHtml(item.title)} · ${item.index}</div><div class="english-answer-actions"><button class="green small" onclick="askGrammarCheckChatGpt(${item.index})">${item.index}번 묻기</button><button class="secondary small" onclick="copyGrammarCheckPrompt(${item.index})">복사</button></div></div><div class="english-answer-lines"><p class="english-answer-line">${escapeHtml(item.lang2)}</p>${item.lang1?`<p class="hint">${escapeHtml(item.lang1)}</p>`:''}</div><div class="flash-scratch-box"><label class="flash-scratch-label"><span class="label-tag">${item.index}번 문법 설명 저장</span></label><textarea class="grammar-note-input" data-key="${escapeAttr(key)}" placeholder="ChatGPT에서 받은 ${item.index}번 문장 문법 설명을 여기에 붙여넣어." style="height:120px" oninput="markGrammarNoteDirty(this); autoGrow(this);">${escapeHtml(saved)}</textarea></div></div>`;
  }).join('');
  setTimeout(()=>document.querySelectorAll('.grammar-note-input').forEach(autoGrow),0);
  updateGrammarStatus();
@@ -4849,7 +4921,7 @@ function copyGrammarCheckText(){
   const text=(document.querySelector(`.grammar-note-input[data-key="${CSS.escape(grammarNotesKey(item))}"]`)?.value||grammarSheetNotes[grammarNotesKey(item)]||'').trim();
   if(!text)return;
   lines.push(`${item.title} · ${item.index}`);
-  lines.push(item.en);
+  lines.push(item.lang2);
   lines.push(text);
   lines.push('');
  });
@@ -4873,8 +4945,8 @@ function buildGrammarCheckPrompt(targetIndex=null){
  ];
  items.forEach(item=>{
   lines.push('');
-  lines.push(`${item.index}. ${item.en}`);
-  if(item.ko)lines.push(`한글 뜻: ${item.ko}`);
+  lines.push(`${item.index}. ${item.lang2}`);
+  if(item.lang1)lines.push(`한글 뜻: ${item.lang1}`);
  });
  return lines.join('\n').trim();
 }
@@ -4899,7 +4971,7 @@ async function saveGrammarNotes(){
   const item=itemMap.get(input.dataset.key);
   if(!item)return;
   grammarSheetNotes[input.dataset.key]=input.value||'';
-  notes.push({noteKey:input.dataset.key,title:item.title,sentenceIndex:String(item.index),sentence:item.en,ko:item.ko,note:input.value||''});
+  notes.push({noteKey:input.dataset.key,title:item.title,sentenceIndex:String(item.index),sentence:item.lang2,ko:item.lang1,note:input.value||''});
  });
  if(!notes.length){alert('저장할 문법 설명 칸이 없어.');return;}
  await onlinePost('grammarNotesSave',{notes});
@@ -4960,7 +5032,7 @@ function updateGrammarStatus(){
 
 let clozeOrderList=[],clozeIndex=0,clozeFinished=false,clozeAnswers=[],clozeChecked=[],clozeHintVisible=false,clozeHintOrders=[];
 function buildClozeOrder(){
- const indices=getVisibleRowIndices().filter(i=>rows[i]&&String(rows[i].en||'').trim());
+ const indices=getVisibleRowIndices().filter(i=>rows[i]&&String(rows[i].lang2||'').trim());
  clozeOrderList=document.getElementById('clozeOrder')?.value==='random'?shuffleArray(indices):indices;
  clozeIndex=0;
  clozeFinished=false;
@@ -5070,7 +5142,7 @@ function clozeBlankIndexes(tokens){
  return picked;
 }
 function clozeData(row){
- const tokens=parseClozeTokens(row?.en||'');
+ const tokens=parseClozeTokens(row?.lang2||'');
  const blanks=clozeBlankIndexes(tokens);
  const answers=[];
  const parts=tokens.map((token,idx)=>{
@@ -5081,7 +5153,7 @@ function clozeData(row){
   }
   return {type:'text',raw:token.raw};
  });
- return {parts,answers,answerText:answers.join(' '),fullText:stripStress(row?.en||'')};
+ return {parts,answers,answerText:answers.join(' '),fullText:stripStress(row?.lang2||'')};
 }
 function clozeSavedWords(index=clozeIndex){
  return String(clozeAnswers[index]||'').split(/[,\s]+/).filter(Boolean);
@@ -5160,7 +5232,7 @@ function renderCloze(focusInput=false){
  }
  const cur=currentClozeRow();
  const data=clozeData(cur.row);
- prompt.textContent=cur.row.ko||'(한글 해석 없음)';
+ prompt.textContent=cur.row.lang1||'(한글 해석 없음)';
  sentence.innerHTML=data.parts.length?renderClozeSentenceInputs(data):'<span class="scramble-answer-placeholder">영어 문장이 없어.</span>';
  renderClozeHintBox(data);
  input.value=clozeAnswers[clozeIndex]||'';
@@ -5189,7 +5261,7 @@ function checkCloze(){
 function copyClozeFullAnswer(){
  const cur=currentClozeRow();
  if(!cur||!cur.row){alert('복사할 문장이 없어.');return;}
- const text=stripStress(cur.row.en||'').trim();
+ const text=stripStress(cur.row.lang2||'').trim();
  if(!text){alert('복사할 영어 문장이 없어.');return;}
  navigator.clipboard.writeText(text);
 }
@@ -5262,7 +5334,7 @@ function formatEnglishOnlyCopyItems(items){
   const title=item.title||'';
   if(currentTitle!==null && title!==currentTitle)flush();
   currentTitle=title;
-  if(item.en)currentLines.push(item.en);
+  if(item.lang2)currentLines.push(item.lang2);
  });
  flush();
  return {text:chunks.join('\n\n'),html:htmlChunks.join('<br><br>')};
@@ -5280,7 +5352,7 @@ function englishOnlyKeywordChips(flowText){
 function renderEnglishOnly(){
  const box=document.getElementById('englishOnlyList');
  if(!box)return;
- const allList=rows.map((r,i)=>({i,en:stripStress(r.en||'').trim(),title:[r.sheetName,r.itemLabel].filter(Boolean).join(' - '),flowText:String(r.flowText||'').trim(),important:!!r.important})).filter(x=>x.en);
+ const allList=rows.map((r,i)=>({i,lang2:stripStress(r.lang2||'').trim(),title:[r.sheetName,r.itemLabel].filter(Boolean).join(' - '),flowText:String(r.flowText||'').trim(),important:!!r.important})).filter(x=>x.lang2);
  const list=englishOnlyImportantOnly?allList.filter(x=>x.important):allList;
  if(!list.length){
   ENGLISH_ONLY_COPY={};
@@ -5314,7 +5386,7 @@ function renderEnglishOnly(){
    const keywordBox=x.flowText
     ? `<div id="${keywordId}" class="english-keyword-box">${englishOnlyKeywordChips(x.flowText)}</div>`
     : '';
-   lines.push(`<div class="english-answer-card"><div class="english-answer-head"><div class="english-answer-title">${escapeHtml(title)}</div></div><div class="english-answer-lines">${groupItems.map(v=>`<p class="english-answer-line">${escapeHtml(v.en)}</p>`).join('')}</div><div class="english-answer-footer"><div class="english-answer-actions">${keywordControls}<button class="secondary small" onclick="copyEnglishOnlyText('${groupId}', '문장묶음')">복사</button></div>${keywordBox}</div></div>`);
+   lines.push(`<div class="english-answer-card"><div class="english-answer-head"><div class="english-answer-title">${escapeHtml(title)}</div></div><div class="english-answer-lines">${groupItems.map(v=>`<p class="english-answer-line">${escapeHtml(v.lang2)}</p>`).join('')}</div><div class="english-answer-footer"><div class="english-answer-actions">${keywordControls}<button class="secondary small" onclick="copyEnglishOnlyText('${groupId}', '문장묶음')">복사</button></div>${keywordBox}</div></div>`);
   }
  });
  box.innerHTML=lines.join('')+nextAnswerButtonHtml();
@@ -5331,7 +5403,7 @@ function completeTableStudy(source){
 
 function completeEnglishOnlyStudy(){
  if(!rows.length){alert('먼저 문장을 불러와줘.');return;}
- const total=rows.filter(r=>String(r.en||'').trim()&&(!englishOnlyImportantOnly||r.important)).length;
+ const total=rows.filter(r=>String(r.lang2||'').trim()&&(!englishOnlyImportantOnly||r.important)).length;
  recordStudyResult('문장 읽기',total,0,englishOnlyImportantOnly?'핵심문장 읽기 완료':'읽기 완료');
 }
 
@@ -5386,7 +5458,7 @@ document.addEventListener('keydown',function(e){
 });
 
 function storageSafe(s){return encodeURIComponent(String(s||'')).slice(0,1800);}
-function getPracticeKey(row){return 'ls_practice_'+storageSafe((row.en||'')+'|'+(row.ko||''));}
+function getPracticeKey(row){return 'ls_practice_'+storageSafe((row.lang2||'')+'|'+(row.lang1||''));}
 function getQuestionPracticeKey(q){return 'ls_qpractice_'+storageSafe(keyOf(q.unitNo,q.groupNo,q.questionNo));}
 function getSavedPractice(key){return localStorage.getItem(key)||'';}
 function savePracticeInput(el){if(!el||!el.dataset.key)return;localStorage.setItem(el.dataset.key,el.value);autoGrow(el);}
@@ -5439,13 +5511,18 @@ function clearAllPractice(){if(!confirm('저장된 연습 내용을 전부 삭�
 const BAD_VOICE_NAMES=['albert','bad news','bahh','bells','boing','bubbles','cellos','deranged','good news','hysterical','pipe organ','trinoids','whisper','zarvox','wobble','jester','junior','kathy','fred','ralph','organ','superstar','rocko','sandy'];
 const GOOD_VOICE_NAMES={
  en:['victoria','samantha','ava','allison','susan','zoe','nicky','tom','alex','daniel','karen','moira','google us english','google uk english female','google uk english male'],
- ko:['yuna','google 한국의','google korean']
+ ko:['yuna','google 한국의','google korean'],
+ ch:['tingting','xiaoxiao','google 普通话','google chinese'],
+ zh:['tingting','xiaoxiao','google 普通话','google chinese'],
+ de:['anna','katja','google deutsch','google german']
 };
 function getVoice(lang){
+ const code=lang==='lang1'||lang==='lang2'?languageSettings()[lang]:lang;
+ const locale=languageLocale(lang).toLowerCase();
  const voices=speechSynthesis.getVoices();
- const matches=voices.filter(v=>v.lang.toLowerCase().startsWith(lang));
+ const matches=voices.filter(v=>v.lang.toLowerCase().startsWith(locale.split('-')[0]));
  const clean=matches.filter(v=>!BAD_VOICE_NAMES.some(bad=>v.name.toLowerCase().includes(bad)));
- const preferred=GOOD_VOICE_NAMES[lang]||[];
+ const preferred=GOOD_VOICE_NAMES[code]||[];
  for(const pref of preferred){
    const found=clean.find(v=>v.name.toLowerCase().includes(pref));
    if(found) return found;
@@ -5453,7 +5530,7 @@ function getVoice(lang){
  return clean[0]||matches[0]||null;
 }
 function sleepWithToken(ms,token){return new Promise(resolve=>{const start=Date.now();const tick=()=>{if(token!==playToken||!speaking){resolve(false);return;}const remain=ms-(Date.now()-start);if(remain<=0){resolve(true);return;}setTimeout(tick,Math.min(100,remain));};tick();});}
-function speakText(text,lang,rate,token){return new Promise(resolve=>{if(!text||token!==playToken||!speaking){resolve(false);return;}const u=new SpeechSynthesisUtterance(text);u.lang=lang==='ko'?'ko-KR':'en-US';u.rate=Number(rate)||1;u.pitch=1;const v=getVoice(lang);if(v)u.voice=v;let fin=false;const done=ok=>{if(fin)return;fin=true;resolve(ok)};u.onend=()=>done(true);u.onerror=()=>done(false);speechSynthesis.speak(u);const watcher=setInterval(()=>{if(fin){clearInterval(watcher);return;}if(token!==playToken||!speaking){clearInterval(watcher);done(false);}},100);});}
+function speakText(text,lang,rate,token){return new Promise(resolve=>{if(!text||token!==playToken||!speaking){resolve(false);return;}const u=new SpeechSynthesisUtterance(text);u.lang=languageLocale(lang);u.rate=Number(rate)||1;u.pitch=1;const v=getVoice(lang);if(v)u.voice=v;let fin=false;const done=ok=>{if(fin)return;fin=true;resolve(ok)};u.onend=()=>done(true);u.onerror=()=>done(false);speechSynthesis.speak(u);const watcher=setInterval(()=>{if(fin){clearInterval(watcher);return;}if(token!==playToken||!speaking){clearInterval(watcher);done(false);}},100);});}
 speechSynthesis.getVoices();
 if('onvoiceschanged' in speechSynthesis) speechSynthesis.onvoiceschanged=()=>{speechSynthesis.getVoices();};
 function markActive(i){currentIndex=i;document.querySelectorAll('tr').forEach(x=>x.classList.remove('active'));const tr=document.getElementById('row'+i);if(tr)tr.classList.add('active');}
@@ -5463,8 +5540,8 @@ async function speakRow(i,mode,token){
  if(token!==playToken||!rows[i])return;
  markActive(i);
  const r=rows[i];
- const koText=String(r.ko||'');
- const enText=stripStress(r.en||'');
+ const koText=String(r.lang1||'');
+ const enText=stripStress(r.lang2||'');
  const gap=Number(document.getElementById('pairGapSec').value||0)*1000;
  const koRate=document.getElementById('koRate').value;
  const enRate=document.getElementById('enRate').value;
@@ -5474,20 +5551,20 @@ async function speakRow(i,mode,token){
    ok=await sleepWithToken(500,token);
    if(!ok)return;
  }
- if(mode==='ko'){
-   await speakText(koText,'ko',koRate,token);
- }else if(mode==='en'){
-   await speakText(enText,'en',enRate,token);
- }else if(document.getElementById('orderMode').value==='ko_en'){
-   await speakText(koText,'ko',koRate,token);
+ if(mode==='lang1'){
+   await speakText(koText,'lang1',koRate,token);
+ }else if(mode==='lang2'){
+   await speakText(enText,'lang2',enRate,token);
+ }else if(document.getElementById('orderMode').value==='lang1_lang2'){
+   await speakText(koText,'lang1',koRate,token);
    ok=await sleepWithToken(gap,token);
    if(!ok)return;
-   await speakText(enText,'en',enRate,token);
+   await speakText(enText,'lang2',enRate,token);
  }else{
-   await speakText(enText,'en',enRate,token);
+   await speakText(enText,'lang2',enRate,token);
    ok=await sleepWithToken(gap,token);
    if(!ok)return;
-   await speakText(koText,'ko',koRate,token);
+   await speakText(koText,'lang1',koRate,token);
  }
  if(token===playToken&&speaking)markDone(i);
 }
@@ -5499,26 +5576,26 @@ function pauseSpeak(){if(speechSynthesis.speaking&&!speechSynthesis.paused){paus
 function resumeSpeak(){if(paused||speechSynthesis.paused){paused=false;speechSynthesis.resume();}}
 function stopSpeak(){playToken++;speaking=false;loopOne=false;paused=false;currentIndex=0;speechSynthesis.cancel();clearActive();const first=document.getElementById('row0');if(first)first.classList.add('active');}
 function applyLanguageColumnVisibility(){
- const states={ko:koColumnVisible,en:enColumnVisible};
+ const states={lang1:lang1ColumnVisible,lang2:lang2ColumnVisible};
  Object.keys(states).forEach(lang=>{
-  const colIndex=lang==='ko'?2:3;
+  const colIndex=lang==='lang1'?2:3;
   document.querySelectorAll('#dataTable tr').forEach(tr=>{
    const cell=tr.children[colIndex];
    if(cell)cell.style.display=states[lang]?'':'none';
   });
  });
- const koBtn=document.getElementById('koToggleBtn');
- const enBtn=document.getElementById('enToggleBtn');
- if(koBtn)koBtn.textContent=koColumnVisible?'한글 숨기기':'한글 보이기';
- if(enBtn)enBtn.textContent=enColumnVisible?'영어 숨기기':'영어 보이기';
+ const lang1Btn=document.getElementById('lang1ToggleBtn');
+ const lang2Btn=document.getElementById('lang2ToggleBtn');
+ if(lang1Btn)lang1Btn.textContent=lang1ColumnVisible?`${languageName('lang1')} 숨기기`:`${languageName('lang1')} 보이기`;
+ if(lang2Btn)lang2Btn.textContent=lang2ColumnVisible?`${languageName('lang2')} 숨기기`:`${languageName('lang2')} 보이기`;
 }
 function displayRow(lang){
- if(lang==='ko')koColumnVisible=!koColumnVisible;
- if(lang==='en')enColumnVisible=!enColumnVisible;
+ if(lang==='lang1')lang1ColumnVisible=!lang1ColumnVisible;
+ if(lang==='lang2')lang2ColumnVisible=!lang2ColumnVisible;
  applyLanguageColumnVisibility();
 }
 function copyColumn(lang){
- const colIndex=lang==='ko'?2:3;
+ const colIndex=lang==='lang1'?2:3;
  const text=[...document.querySelectorAll('#dataTable tbody tr')]
    .filter(tr=>!tr.classList.contains('only-forget-hidden') && !tr.classList.contains('group-gap') && tr.style.display!=='none')
    .map(tr=>{
@@ -5552,16 +5629,17 @@ function switchMode(mode){
  renderAnswerBundleNav();
  if(changed)recordModeChange(mode);
 }
-document.getElementById('fileInput').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;const name=file.name.toLowerCase();if(name.endsWith('.txt')||name.endsWith('.csv')){document.getElementById('inputText').value=await file.text();parseText();return;}const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];const arr=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false});rows=[];arr.forEach(line=>{const ko=val(line,0),en=val(line,1);if(ko&&en&&!isHeader(ko,en))rows.push({ko,en,important:false,notMemorized:false,done:false});});document.getElementById('inputText').value=rows.map(r=>`${r.ko}\t${r.en}`).join('\n');renderTable();});
+document.getElementById('fileInput').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;const name=file.name.toLowerCase();if(name.endsWith('.txt')||name.endsWith('.csv')){document.getElementById('inputText').value=await file.text();parseText();return;}const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];const arr=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false});rows=[];arr.forEach(line=>{const lang1=val(line,0),lang2=val(line,1);if(lang1&&lang2&&!isHeader(lang1,lang2))rows.push({lang1,lang2,important:false,notMemorized:false,done:false});});document.getElementById('inputText').value=rows.map(r=>`${r.lang1}\t${r.lang2}`).join('\n');renderTable();});
 function rateToEdge(v){const n=Number(v||1),pct=Math.round((n-1)*100);return pct===0?'+0%':pct>0?`+${pct}%`:`${pct}%`;}
-function getPythonDataBlock(){return rows.map(r=>`    (${pyStr(r.ko)}, ${pyStr(stripStress(r.en))})`).join(',\n');}
+function getPythonDataBlock(){return rows.map(r=>`    (${pyStr(r.lang1)}, ${pyStr(stripStress(r.lang2))})`).join(',\n');}
 function setPythonCode(code,mode){currentPythonMode=mode;document.getElementById('pythonCode').textContent=code;document.getElementById('pythonCard').style.display='block';return code;}
 function baseSettings(){return{base:document.getElementById('baseName').value||'opic_practice',repeat:Number(document.getElementById('repeatCount').value||1),random:document.getElementById('pythonRandom').checked,koRate:rateToEdge(document.getElementById('koRate').value),enRate:rateToEdge(document.getElementById('enRate').value),data:getPythonDataBlock()};}
-function generatePython(mode='both'){if(!rows.length){alert('먼저 표를 생성해줘.');return '';}const s=baseSettings();let code='';if(mode==='both')code=["# pip install edge-tts","import asyncio","import random","from pathlib import Path","import edge_tts","",`BASE_NAME = ${pyStr(s.base)}`,`REPEAT_COUNT = ${s.repeat}`,`RANDOM_ORDER = ${s.random?'True':'False'}`,`KO_VOICE = "ko-KR-SunHiNeural"`,`EN_VOICE = "en-US-JennyNeural"`,`KO_RATE = ${pyStr(s.koRate)}`,`EN_RATE = ${pyStr(s.enRate)}`,"DATA = [",s.data,"]","out_dir = Path(BASE_NAME)","out_dir.mkdir(exist_ok=True)","async def make_mp3(text, voice, rate, path):","    communicate = edge_tts.Communicate(text, voice=voice, rate=rate)","    await communicate.save(str(path))","async def main():","    sequence = list(DATA)","    clip_no = 1","    for _ in range(REPEAT_COUNT):","        if RANDOM_ORDER:","            random.shuffle(sequence)","        for ko, en in sequence:","            no = f'{clip_no:03d}'","            await make_mp3(ko, KO_VOICE, KO_RATE, out_dir / f'{no}_ko.mp3')","            await make_mp3(en, EN_VOICE, EN_RATE, out_dir / f'{no}_en.mp3')","            print(f'saved {no}')","            clip_no += 1","    print('완료!')","if __name__ == '__main__':","    asyncio.run(main())"].join('\n');else{const isKo=mode==='ko';code=["# pip install edge-tts","import asyncio","from pathlib import Path","import edge_tts","",`BASE_NAME = ${pyStr(s.base)}`,`SELECT_TXT = ${pyStr(mode)}`,`VOICE = ${pyStr(isKo?'ko-KR-SunHiNeural':'en-US-JennyNeural')}`,`RATE = ${pyStr(isKo?s.koRate:s.enRate)}`,"DATA = [",s.data,"]","out_dir = Path(BASE_NAME)","out_dir.mkdir(exist_ok=True)","async def make_mp3(text, voice, rate, path):","    communicate = edge_tts.Communicate(text, voice=voice, rate=rate)","    await communicate.save(str(path))","    print(f'생성 완료: {path}')","async def main():",isKo?"    final_text = ' '.join([ko for ko, en in DATA])":"    final_text = ' '.join([en for ko, en in DATA])",`    await make_mp3(final_text, VOICE, RATE, out_dir / ${pyStr(isKo?'ko.mp3':'en.mp3')})`,"if __name__ == '__main__':","    asyncio.run(main())"].join('\n');}return setPythonCode(code,mode);}
+function generatePython(mode='both'){if(!rows.length){alert('먼저 표를 생성해줘.');return '';}const s=baseSettings();let code='';if(mode==='both')code=["# pip install edge-tts","import asyncio","import random","from pathlib import Path","import edge_tts","",`BASE_NAME = ${pyStr(s.base)}`,`REPEAT_COUNT = ${s.repeat}`,`RANDOM_ORDER = ${s.random?'True':'False'}`,`LANG1_VOICE = "ko-KR-SunHiNeural"`,`LANG2_VOICE = "en-US-JennyNeural"`,`LANG1_RATE = ${pyStr(s.koRate)}`,`LANG2_RATE = ${pyStr(s.enRate)}`,"DATA = [",s.data,"]","out_dir = Path(BASE_NAME)","out_dir.mkdir(exist_ok=True)","async def make_mp3(text, voice, rate, path):","    communicate = edge_tts.Communicate(text, voice=voice, rate=rate)","    await communicate.save(str(path))","async def main():","    sequence = list(DATA)","    clip_no = 1","    for _ in range(REPEAT_COUNT):","        if RANDOM_ORDER:","            random.shuffle(sequence)","        for lang1, lang2 in sequence:","            no = f'{clip_no:03d}'","            await make_mp3(lang1, LANG1_VOICE, LANG1_RATE, out_dir / f'{no}_lang1.mp3')","            await make_mp3(lang2, LANG2_VOICE, LANG2_RATE, out_dir / f'{no}_lang2.mp3')","            print(f'saved {no}')","            clip_no += 1","    print('완료!')","if __name__ == '__main__':","    asyncio.run(main())"].join('\n');else{const isLang1=mode==='lang1';code=["# pip install edge-tts","import asyncio","from pathlib import Path","import edge_tts","",`BASE_NAME = ${pyStr(s.base)}`,`SELECT_TXT = ${pyStr(mode)}`,`VOICE = ${pyStr(isLang1?'ko-KR-SunHiNeural':'en-US-JennyNeural')}`,`RATE = ${pyStr(isLang1?s.koRate:s.enRate)}`,"DATA = [",s.data,"]","out_dir = Path(BASE_NAME)","out_dir.mkdir(exist_ok=True)","async def make_mp3(text, voice, rate, path):","    communicate = edge_tts.Communicate(text, voice=voice, rate=rate)","    await communicate.save(str(path))","    print(f'생성 완료: {path}')","async def main():",isLang1?"    final_text = ' '.join([lang1 for lang1, lang2 in DATA])":"    final_text = ' '.join([lang2 for lang1, lang2 in DATA])",`    await make_mp3(final_text, VOICE, RATE, out_dir / ${pyStr(isLang1?'lang1.mp3':'lang2.mp3')})`,"if __name__ == '__main__':","    asyncio.run(main())"].join('\n');}return setPythonCode(code,mode);}
 function copyPython(){let code=document.getElementById('pythonCode').textContent||generatePython(currentPythonMode);if(!code)return;navigator.clipboard.writeText(code);}
-function downloadPython(){let code=document.getElementById('pythonCode').textContent||generatePython(currentPythonMode);if(!code)return;const suffix=currentPythonMode==='ko'?'_ko_onefile':currentPythonMode==='en'?'_en_onefile':'_sentence_files';const blob=new Blob([code],{type:'text/x-python'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(document.getElementById('baseName').value||'opic_practice')+suffix+'.py';a.click();URL.revokeObjectURL(a.href);}
+function downloadPython(){let code=document.getElementById('pythonCode').textContent||generatePython(currentPythonMode);if(!code)return;const suffix=currentPythonMode==='lang1'?'_lang1_onefile':currentPythonMode==='lang2'?'_lang2_onefile':'_sentence_files';const blob=new Blob([code],{type:'text/x-python'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(document.getElementById('baseName').value||'opic_practice')+suffix+'.py';a.click();URL.revokeObjectURL(a.href);}
 
 cleanLegacyLogData();
+updateLanguageLabels();
 loadCloudSettings();
 renderLogView();
 applyStartupWeekBundleSettings();
@@ -5576,5 +5654,6 @@ window.addEventListener('beforeunload',()=>{
 </script>
 </body>
 </html>
+
 
 
