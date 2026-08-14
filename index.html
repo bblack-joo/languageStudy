@@ -312,7 +312,7 @@ tr.only-forget-hidden{display:none!important}
     <span style="display:inline-flex;align-items:center;gap:10px"><a class="brand-link" href="https://bblack-joo.github.io/opicSetPractice/" target="_blank" rel="noopener">시험모드↗</a><button type="button" class="secondary small" id="managerModeToggleBtn" onclick="toggleManagerMode()">관리 모드</button></span>
   </div>
   <div class="brand-quick-links">
-    <a class="brand-quick-link" href="https://bblack-joo.github.io/languageStudy/grammar-in-use-progress.html">Grammar In Use</a>
+    <a class="brand-quick-link" href="grammar-in-use-progress.html">Grammar In Use</a>
     <a class="brand-quick-link" href="https://bblack-joo.github.io/languageStudy/?folder=오픽의 신&week_size=1">OPIC</a>
   </div>
   <div class="brand-tagline">A language learning tool for studying any two languages.</div>
@@ -936,7 +936,9 @@ function parseStartupParams(){
   mode:params.get('mode')||params.get('선택모드')||'',
   load:params.get('load')||params.get('autoload')||params.get('불러오기')||'',
   week:params.get('week')||params.get('주차')||params.get('w')||'',
-  weekSize:params.get('week_size')||params.get('week-size')||params.get('주차개수')||params.get('묶음개수')||params.get('size')||params.get('count')||params.get('개수')||params.get('m')||''
+  weekSize:params.get('week_size')||params.get('week-size')||params.get('주차개수')||params.get('묶음개수')||params.get('size')||params.get('count')||params.get('개수')||params.get('m')||'',
+  startUnit:params.get('start_unit')||params.get('start')||params.get('시작강')||'',
+  endUnit:params.get('end_unit')||params.get('end')||params.get('끝강')||''
  };
 }
 function normalizeStartupMatch(value){
@@ -959,7 +961,7 @@ function startupPositiveNumber(value){
  return Number.isFinite(number)&&number>0?Math.floor(number):0;
 }
 function hasStartupWeekBundleParams(){
- return !!(URL_STARTUP_PARAMS.week||URL_STARTUP_PARAMS.weekSize);
+ return !!(URL_STARTUP_PARAMS.week||URL_STARTUP_PARAMS.weekSize||URL_STARTUP_PARAMS.startUnit||URL_STARTUP_PARAMS.endUnit);
 }
 function promptStartupWeekIfNeeded(){
  if(startupWeekPrompted||!hasStartupWeekBundleParams())return;
@@ -2060,8 +2062,26 @@ function inputWeekBundleNo(){
  return Math.max(1,Number(document.getElementById('weekBundleNo')?.value||1));
 }
 function categoryUnitNumber(unit){
- const name=String(unit||'').split('::').pop();
- const match=name.match(/\d+/);
+ return unitNumberFromName(unit);
+}
+function unitNumberFromName(value){
+ const text=String(value||'');
+ const parts=text.split('::');
+ if(parts.length>1){
+  const prefix=parts.slice(0,-1).join('::');
+  const local=parts[parts.length-1];
+  const range=prefix.match(/(\d+)\s*[-~]\s*(\d+)/);
+  const localMatch=local.match(/\d+/);
+  if(range&&localMatch){
+   const start=Number(range[1]);
+   const end=Number(range[2]);
+   const localNo=Number(localMatch[0]);
+   const actual=start+localNo-1;
+   if(Number.isFinite(actual)&&actual>=start&&actual<=end)return actual;
+  }
+  if(localMatch)return Number(localMatch[0]);
+ }
+ const match=text.match(/\d+/);
  return match?Number(match[0]):NaN;
 }
 function categoryUnitsHaveNumbers(units=categoryUnits()){
@@ -2084,6 +2104,21 @@ function unitsForWeekBundle(index,units=categoryUnits()){
   });
  }
  return units.slice(index*size,index*size+size);
+}
+function startupUnitRange(){
+ const start=startupPositiveNumber(URL_STARTUP_PARAMS.startUnit);
+ const end=startupPositiveNumber(URL_STARTUP_PARAMS.endUnit);
+ if(!start&&!end)return null;
+ const safeStart=start||end;
+ const safeEnd=end||start;
+ return {start:Math.min(safeStart,safeEnd),end:Math.max(safeStart,safeEnd)};
+}
+function unitsForUnitRange(range,units=categoryUnits()){
+ if(!range)return [];
+ return units.filter(unit=>{
+  const number=categoryUnitNumber(unit);
+  return Number.isFinite(number)&&number>=range.start&&number<=range.end;
+ });
 }
 function checkedCategoryKeys(){
  return [...document.querySelectorAll('#categoryCheckList input[type="checkbox"]:checked')].map(input=>input.value).filter(Boolean);
@@ -2116,6 +2151,9 @@ function addWeekCategoryBundle(index,options={}){
  const units=categoryUnits();
  const chunk=unitsForWeekBundle(index,units);
  if(!chunk.length){alert(`${weekBundleRangeLabel(index)} 대분류를 찾지 못했어.`);return;}
+ addCategoryUnitsToQueue(chunk);
+}
+function addCategoryUnitsToQueue(chunk){
  const selected=new Set(chunk);
  document.querySelectorAll('#categoryCheckList input[type="checkbox"]').forEach(input=>{input.checked=selected.has(input.value);});
  checkedCategoryValues=chunk;
@@ -2137,7 +2175,14 @@ function applyStartupWeekBundleLoad(){
  applyStartupWeekBundleSettings();
  applyStartupSelectionMode();
  const before=selectedItemKeys.length;
- addWeekCategoryBundle(inputWeekBundleNo()-1);
+ const range=startupUnitRange();
+ if(range){
+  const chunk=unitsForUnitRange(range);
+  if(!chunk.length){alert(`${range.start}~${range.end} 대분류를 찾지 못했어.`);return false;}
+  addCategoryUnitsToQueue(chunk);
+ }else{
+  addWeekCategoryBundle(inputWeekBundleNo()-1);
+ }
  if(selectedItemKeys.length===before)return false;
  startupWeekBundleLoaded=true;
  loadQueuedItems();
