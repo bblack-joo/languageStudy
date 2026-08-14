@@ -890,7 +890,7 @@ let flashRecordingSequenceAudio=null,flashRecordingSequenceStopped=false;
 const flashRecordings=new Map(),flashSpeechTexts=new Map();
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
-function norm(s){return String(s??'').trim().replace(/\s+/g,'').toLowerCase();}
+function norm(s){return String(s??'').trim().replace(/[\uFEFF\u200B-\u200D]/g,'').replace(/[*`_]/g,'').replace(/\s+/g,'').toLowerCase();}
 function val(row,i){return String((row&&row[i]!=null)?row[i]:'').trim();}
 function idCell(v){
  const s=String(v??'').trim();
@@ -914,6 +914,7 @@ let lastBookFiles=[];
 let loadedWorkbookFiles=[];
 let onlineFileMetaById=new Map();
 let onlineFilesCache=[];
+let onlineFoldersCache=[];
 let startupFolderApplied=false,startupFolderAutoLoaded=false,startupModeApplied=false;
 let startupWeekPrompted=false,startupWeekCancelled=false,startupWeekBundleLoaded=false;
 let blockingLoaderCount=0;
@@ -1163,29 +1164,62 @@ function getAllOnlineFileIds(){
 function selectedOnlineFolderKey(){
  return document.getElementById('onlineFolderSelect')?.value||'';
 }
+function normalizeOnlineFolderPath(path){
+ return String(path||'').trim().replace(/\\/g,'/').replace(/\s*\/\s*/g,'/').replace(/\/+/g,'/');
+}
 function onlineFolderKey(file){
- return `${file?.scope||''}::${file?.folderPath||''}`;
+ return `${file?.scope||''}::${normalizeOnlineFolderPath(file?.folderPath||'')}`;
 }
 function onlineFolderLabel(file){
  const scope=file?.scope||'';
- const path=file?.folderPath||'최상위';
+ const path=normalizeOnlineFolderPath(file?.folderPath||'')||'최상위';
  return `[${scope}] ${path}`;
 }
 function onlineFilesForSelectedFolder(){
  const key=selectedOnlineFolderKey();
- return key?onlineFilesCache.filter(file=>onlineFolderKey(file)===key):onlineFilesCache;
+ if(!key)return onlineFilesCache;
+ const [scope,path='']=key.split('::');
+ const normalizedPath=normalizeOnlineFolderPath(path);
+ return onlineFilesCache.filter(file=>{
+  if(String(file?.scope||'')!==scope)return false;
+  const filePath=normalizeOnlineFolderPath(file?.folderPath||'');
+  if(!normalizedPath)return !filePath;
+  return filePath===normalizedPath||filePath.startsWith(normalizedPath+'/');
+ });
 }
 function renderOnlineFolderSelect(){
  const select=document.getElementById('onlineFolderSelect');
  if(!select)return;
  const seen=new Set();
  const folders=[];
- onlineFilesCache.forEach(file=>{
-  const key=onlineFolderKey(file);
+ onlineFoldersCache.forEach(folder=>{
+  const scope=folder?.scope||'';
+  const path=normalizeOnlineFolderPath(folder?.folderPath||'');
+  const key=`${scope}::${path}`;
   if(seen.has(key))return;
   seen.add(key);
-  folders.push({key,label:onlineFolderLabel(file),path:file?.folderPath||'최상위',scope:file?.scope||''});
+  folders.push({key,label:`[${scope}] ${path||'최상위'}`,path:path||'최상위',scope});
  });
+ onlineFilesCache.forEach(file=>{
+  const scope=file?.scope||'';
+  const path=normalizeOnlineFolderPath(file?.folderPath||'');
+  const parts=path?path.split('/').filter(Boolean):[''];
+  for(let i=0;i<parts.length;i++){
+   const folderPath=parts.slice(0,i+1).join('/');
+   const key=`${scope}::${folderPath}`;
+   if(seen.has(key))continue;
+   seen.add(key);
+   folders.push({key,label:`[${scope}] ${folderPath||'최상위'}`,path:folderPath||'최상위',scope});
+  }
+  if(!path){
+   const key=`${scope}::`;
+   if(!seen.has(key)){
+    seen.add(key);
+    folders.push({key,label:`[${scope}] 최상위`,path:'최상위',scope});
+   }
+  }
+ });
+ folders.sort((a,b)=>`${a.scope}-${a.path}`.localeCompare(`${b.scope}-${b.path}`,'ko',{numeric:true,sensitivity:'base'}));
  select.innerHTML='<option value="">폴더 전체</option>'+folders.map(folder=>`<option value="${escapeAttr(folder.key)}" data-path="${escapeAttr(folder.path)}" data-scope="${escapeAttr(folder.scope)}">${escapeHtml(folder.label)}</option>`).join('');
 }
 function renderOnlineFileOptions(){
@@ -1319,6 +1353,7 @@ function logoutOnlineLibrary(){
  if(select)select.innerHTML='<option value="">선택하세요</option>';
  if(folderSelect)folderSelect.innerHTML='<option value="">폴더 전체</option>';
  onlineFilesCache=[];
+ onlineFoldersCache=[];
  onlineFileMetaById=new Map();
  setOnlineStatus('로그아웃했어. 이 브라우저에 저장된 온라인 로그인 정보도 지웠어.');
  if(prevUser)recordLocalLogin(prevUser,true,'로그아웃');
@@ -1333,17 +1368,20 @@ async function loadOnlineFileList(options={}){
  try{
   const res=await onlineJsonp('listFiles',cred);
   if(!res.ok){if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';setOnlineStatus(res.message||'파일 목록을 불러오지 못했어.');return false;}
- const files=sortOnlineFilesByName(res.files||[]);
+  const files=sortOnlineFilesByName(res.files||[]);
   onlineFilesCache=files;
+  onlineFoldersCache=res.folders||[];
   onlineFileMetaById=new Map(files.map(file=>[String(file.id),file]));
   renderOnlineFolderSelect();
   renderOnlineFileOptions();
-  if(options.silentSuccess&&files.length)hideOnlineStatus();
-  else setOnlineStatus(files.length?`온라인 파일 ${files.length}개를 찾았어.`:'온라인 폴더에 파일이 없어.');
-  setOnlineLoadProgress(1,1,files.length?`파일 목록 ${files.length}개 확인 완료`:'온라인 폴더에 파일이 없어.');
+  const folderCount=onlineFoldersCache.length;
+  const legacyHint=folderCount?'':' · 폴더 정보 없음: Apps Script 최신 코드 배포가 필요할 수 있어.';
+  if(options.silentSuccess&&(files.length||folderCount))hideOnlineStatus();
+  else setOnlineStatus((files.length||folderCount)?`온라인 폴더 ${folderCount}개 / 파일 ${files.length}개를 찾았어.${legacyHint}`:`온라인 폴더에 파일이 없어.${legacyHint}`);
+  setOnlineLoadProgress(1,1,(files.length||folderCount)?`폴더 ${folderCount}개 / 파일 ${files.length}개 확인 완료`:`온라인 폴더에 파일이 없어.${legacyHint}`);
   hideOnlineLoadProgressSoon();
   applyStartupFolderSelection();
-  return files.length>0;
+  return files.length>0||folderCount>0;
  }catch(e){
   if(select)select.innerHTML='<option value="">온라인 파일 없음</option>';
   setOnlineStatus(e.message||'파일 목록 오류');
@@ -1376,6 +1414,15 @@ function base64ToFile(base64,fileName,mimeType){
  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
  return new File([bytes],fileName||'online.xlsx',{type:mimeType||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
+function sheetDataToWorkbook(sheetData){
+ const wb={SheetNames:[],Sheets:{}};
+ (sheetData||[]).forEach((sheet,index)=>{
+  const name=String(sheet?.name||`Sheet${index+1}`);
+  wb.SheetNames.push(name);
+  wb.Sheets[name]=XLSX.utils.aoa_to_sheet(sheet?.values||[]);
+ });
+ return wb;
+}
 async function fetchOnlineWorkbookFile(fileId,options={}){
  const cred=onlineCredentials();
  if(!cred.user||!cred.password){alert('먼저 로그인해줘.');return;}
@@ -1383,6 +1430,14 @@ async function fetchOnlineWorkbookFile(fileId,options={}){
  try{
   const res=await onlineJsonp('getFile',{...cred,fileId});
   if(!res.ok){setOnlineStatus(res.message||'온라인 파일을 불러오지 못했어.');return false;}
+  if(Array.isArray(res.sheetData)){
+   return {
+    name:onlineDisplayFileName(fileId,res.fileName),
+    type:res.mimeType||'application/vnd.google-apps.spreadsheet+json',
+    onlineFileId:fileId,
+    sheetData:res.sheetData
+   };
+  }
   const file=base64ToFile(res.base64,onlineDisplayFileName(fileId,res.fileName),res.mimeType);
   file.onlineFileId=fileId;
   return file;
@@ -1676,6 +1731,114 @@ function findHeaderRow(arr, required){
   }
   return null;
 }
+function findLanguageHeaderRow(arr){
+  return findHeaderRow(arr,{
+    lang1:['한글','한국어','언어1','language1','lang1'],
+    lang2:['영어','english','언어2','language2','lang2']
+  });
+}
+function parseSimpleLanguageSheet(ws,sheetName,fileName=''){
+ const arr=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:true,defval:''});
+ const header=findLanguageHeaderRow(arr);
+ if(!header)return [];
+ const headerCells=(arr[header.rowIndex]||[]).map(norm);
+ const memoCol=headerCells.findIndex(v=>['메모','비고','note','memo'].includes(v));
+ const keySentenceCol=headerCells.findIndex(v=>['핵심','핵심문장','핵심문장여부','키문장','keysentence'].includes(v));
+ const notMemorizedCol=headerCells.findIndex(v=>['안외워짐','안외움','미암기','안외워진','안외워짐체크'].includes(v));
+ const answers=[];
+ let memo='';
+ for(let r=header.rowIndex+1;r<arr.length;r++){
+   const line=arr[r]||[];
+   const lang1=val(line,header.cols.lang1);
+   const lang2=val(line,header.cols.lang2);
+   if(!lang1&&!lang2)continue;
+   const memoValue=memoCol>=0?val(line,memoCol):'';
+   if(!memo&&memoValue)memo=memoValue;
+   answers.push({
+    lang1,
+    lang2,
+    important:keySentenceCol>=0?isTruthyCell(val(line,keySentenceCol)):false,
+    notMemorized:notMemorizedCol>=0?isTruthyCell(val(line,notMemorizedCol)):false,
+    origin:{fileName,sheetName,rowIndex:r,keySentenceCol,headerRowIndex:header.rowIndex}
+   });
+ }
+ if(!answers.length)return [];
+ return [{sheetName,blockNo:1,refs:[],answers,flows:[],memo,important:false}];
+}
+function worksheetCellText(ws,r,c){
+ const cell=ws[XLSX.utils.encode_cell({r,c})];
+ return String(cell?.w??cell?.v??'').trim();
+}
+function parseSimpleLanguageSheetFromCells(ws,sheetName,fileName=''){
+ const range=XLSX.utils.decode_range(ws['!ref']||'A1');
+ const lang1Aliases=['한글','한국어','언어1','language1','lang1'].map(norm);
+ const lang2Aliases=['영어','english','언어2','language2','lang2'].map(norm);
+ let headerRow=-1,lang1Col=-1,lang2Col=-1,memoCol=-1,keySentenceCol=-1,notMemorizedCol=-1;
+ for(let r=range.s.r;r<=range.e.r;r++){
+   const cells=[];
+   for(let c=range.s.c;c<=range.e.c;c++)cells.push({c,text:worksheetCellText(ws,r,c),n:norm(worksheetCellText(ws,r,c))});
+   const l1=cells.find(cell=>lang1Aliases.includes(cell.n));
+   const l2=cells.find(cell=>lang2Aliases.includes(cell.n));
+   if(l1&&l2){
+    headerRow=r;
+    lang1Col=l1.c;
+    lang2Col=l2.c;
+    memoCol=(cells.find(cell=>['메모','비고','note','memo'].includes(cell.n))||{}).c ?? -1;
+    keySentenceCol=(cells.find(cell=>['핵심','핵심문장','핵심문장여부','키문장','keysentence'].includes(cell.n))||{}).c ?? -1;
+    notMemorizedCol=(cells.find(cell=>['안외워짐','안외움','미암기','안외워진','안외워짐체크'].includes(cell.n))||{}).c ?? -1;
+    break;
+   }
+ }
+ if(headerRow<0)return [];
+ const answers=[];
+ let memo='';
+ for(let r=headerRow+1;r<=range.e.r;r++){
+   const lang1=worksheetCellText(ws,r,lang1Col);
+   const lang2=worksheetCellText(ws,r,lang2Col);
+   if(!lang1&&!lang2)continue;
+   const memoValue=memoCol>=0?worksheetCellText(ws,r,memoCol):'';
+   if(!memo&&memoValue)memo=memoValue;
+   answers.push({
+    lang1,
+    lang2,
+    important:keySentenceCol>=0?isTruthyCell(worksheetCellText(ws,r,keySentenceCol)):false,
+    notMemorized:notMemorizedCol>=0?isTruthyCell(worksheetCellText(ws,r,notMemorizedCol)):false,
+    origin:{fileName,sheetName,rowIndex:r,keySentenceCol,headerRowIndex:headerRow}
+   });
+ }
+ if(!answers.length)return [];
+ return [{sheetName,blockNo:1,refs:[],answers,flows:[],memo,important:false}];
+}
+function worksheetPreviewText(ws,maxRows=7,maxCols=10){
+ const ref=ws['!ref'];
+ if(!ref)return ['시트 범위 없음'];
+ const range=XLSX.utils.decode_range(ref);
+ const lines=[];
+ for(let r=range.s.r;r<=range.e.r&&lines.length<maxRows;r++){
+   const cells=[];
+   for(let c=range.s.c;c<=Math.min(range.e.c,range.s.c+maxCols-1);c++){
+    const text=worksheetCellText(ws,r,c);
+    if(text)cells.push(`${XLSX.utils.encode_col(c)}${r+1}:${text}`);
+   }
+   if(cells.length)lines.push(cells.join(' | '));
+ }
+ return lines.length?lines:['앞쪽에서 값 있는 셀을 찾지 못함'];
+}
+function describeSheetDetection(ws,sheetName){
+ const arr=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:true,defval:''});
+ const oldHeader=findHeaderRow(arr,{
+   unit:['unit번호','유닛번호'],
+   group:['그룹번호','그룹 번호'],
+   qno:['질문번호','질문 번호'],
+   lang1:['한글','한국어','언어1','language1','lang1'],
+   lang2:['영어','english','언어2','language2','lang2']
+ });
+ const langHeader=findLanguageHeaderRow(arr);
+ const ref=ws['!ref']||'범위 없음';
+ const oldText=oldHeader?`기존 헤더 ${oldHeader.rowIndex+1}행`:'기존 헤더 못 찾음';
+ const langText=langHeader?`언어 헤더 ${langHeader.rowIndex+1}행`:'언어 헤더 못 찾음';
+ return `${sheetName} (${ref})\n${oldText} / ${langText}\n${worksheetPreviewText(ws).join('\n')}`;
+}
 function getUnitFromSheetName(name){const m=String(name).match(/^(\d+)/);return m?String(Number(m[1])):'';}
 function findSheetUnit(arr){
   for(let r=0;r<arr.length;r++) for(let c=0;c<(arr[r]||[]).length;c++){
@@ -1722,13 +1885,19 @@ function parseQuestionSheet(ws){
 }
 function parseAnswerSheet(ws,sheetName,fileName=''){
  const arr=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:true,defval:''});
- const header=findHeaderRow(arr,{
+ let header=findHeaderRow(arr,{
    unit:['unit번호','유닛번호'],
    group:['그룹번호','그룹 번호'],
    qno:['질문번호','질문 번호'],
    lang1:['한글','한국어','언어1','language1','lang1'],
    lang2:['영어','english','언어2','language2','lang2']
  });
+ const simpleMode=!header;
+ if(simpleMode){
+   const langHeader=findLanguageHeaderRow(arr);
+   if(!langHeader)return [];
+   header={rowIndex:langHeader.rowIndex,cols:{unit:-1,group:-1,qno:-1,lang1:langHeader.cols.lang1,lang2:langHeader.cols.lang2}};
+ }
  if(!header)return [];
 
  // 답변 시트의 H열 "답변 흐름" 읽기
@@ -1773,7 +1942,7 @@ function parseAnswerSheet(ws,sheetName,fileName=''){
  let lastUnit='';
  let lastGroup='';
  let blockImportant=false;
- const cols=[header.cols.unit,header.cols.group,header.cols.qno,header.cols.lang1,header.cols.lang2,flowCol,importanceCol,notMemorizedCol,memoCol,keySentenceCol];
+ const cols=[header.cols.unit,header.cols.group,header.cols.qno,header.cols.lang1,header.cols.lang2,flowCol,importanceCol,notMemorizedCol,memoCol,keySentenceCol].filter(c=>c>=0);
 
  function addRef(u,g,q){
    const unitNo=idCell(u||lastUnit);
@@ -1823,9 +1992,9 @@ function parseAnswerSheet(ws,sheetName,fileName=''){
    const isBlank=cols.every(c=>!val(line,c));
    if(isBlank){saveBlock(); continue;}
 
-   const unitNo=idCell(line[header.cols.unit]);
-   const groupNo=idCell(line[header.cols.group]);
-   const questionNo=idCell(line[header.cols.qno]);
+   const unitNo=header.cols.unit>=0?idCell(line[header.cols.unit]):'';
+   const groupNo=header.cols.group>=0?idCell(line[header.cols.group]):'';
+   const questionNo=header.cols.qno>=0?idCell(line[header.cols.qno]):'';
    const lang1=val(line,header.cols.lang1);
    const lang2=val(line,header.cols.lang2);
    const flow=val(line,flowCol);
@@ -1866,13 +2035,25 @@ async function loadWorkbookFiles(fileList){
   BOOK.questions={};
   BOOK.items=[];
   loadedWorkbookFiles=[];
+  const workbookDebug=[];
 
   for(let fileIndex=0;fileIndex<files.length;fileIndex++){
    const file=files[fileIndex];
    updateBlockingLoader(`엑셀 파일 읽는 중... ${fileIndex+1}/${files.length}`);
-   const data=await file.arrayBuffer();
-   const wb=XLSX.read(data,{type:'array'});
-   loadedWorkbookFiles.push({fileName:file.name,mimeType:file.type||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',fileId:file.onlineFileId||'',workbook:wb,originalBuffer:data.slice(0)});
+   let data=null;
+   let wb=null;
+   if(file.sheetData){
+    wb=sheetDataToWorkbook(file.sheetData);
+   }else{
+    data=await file.arrayBuffer();
+    const headText=String.fromCharCode(...new Uint8Array(data.slice(0,8)));
+    if(headText.startsWith('%PDF')){
+     alert(`${file.name} 파일이 엑셀이 아니라 PDF 형태로 들어왔어.\n\nGoogle Sheets 파일이면 Apps Script를 최신 코드로 다시 배포한 뒤 다시 불러와줘.`);
+     return;
+    }
+    wb=XLSX.read(data,{type:'array'});
+   }
+   loadedWorkbookFiles.push({fileName:file.name,mimeType:file.type||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',fileId:file.onlineFileId||'',workbook:wb,originalBuffer:data?data.slice(0):null});
    const fileLabel=String(file.name||'').replace(/\.(xlsx|xls)$/i,'');
 
    const qName=wb.SheetNames.find(n=>norm(n)==='0.질문')||wb.SheetNames.find(n=>String(n).includes('질문'));
@@ -1880,7 +2061,10 @@ async function loadWorkbookFiles(fileList){
 
    wb.SheetNames.forEach(sheetName=>{
     if(sheetName===qName)return;
-    const blocks=parseAnswerSheet(wb.Sheets[sheetName],sheetName,file.name);
+    let blocks=parseAnswerSheet(wb.Sheets[sheetName],sheetName,file.name);
+    if(!blocks.length)blocks=parseSimpleLanguageSheet(wb.Sheets[sheetName],sheetName,file.name);
+    if(!blocks.length)blocks=parseSimpleLanguageSheetFromCells(wb.Sheets[sheetName],sheetName,file.name);
+    workbookDebug.push(`${file.name} > ${describeSheetDetection(wb.Sheets[sheetName],sheetName)}\n읽은 묶음: ${blocks.length}개`);
     const displaySheet=multi?`${fileLabel}::${sheetName}`:sheetName;
     blocks.forEach(b=>{
      const questions=b.refs.map(ref=>{
@@ -1907,7 +2091,9 @@ async function loadWorkbookFiles(fileList){
   const select=document.getElementById('unitSelect');
   if(!BOOK.items.length){
     select.innerHTML='<option value="">불러올 문장이 없음</option>';
-    alert('엑셀에서 불러올 문장을 찾지 못했어.');
+    const debugText=workbookDebug.slice(0,6).join('\n\n')||'시트 정보를 읽지 못했어.';
+    console.warn('RepeatRepeat workbook debug',workbookDebug);
+    alert(`엑셀에서 불러올 문장을 찾지 못했어.\n\n진단 정보:\n${debugText.slice(0,1500)}`);
     return;
   }
   renderUnitFilter();
