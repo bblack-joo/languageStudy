@@ -111,21 +111,8 @@ function appUrlForWeek(week,size,total){
 function state(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}')||{};}catch(e){return {};}}
 function saveState(data){localStorage.setItem(STORAGE_KEY,JSON.stringify(data||{}));}
 function roundKey(){return String(Math.max(1,Number(document.getElementById('roundInput')?.value||1)));}
-function settings(){const total=Math.max(1,Number(document.getElementById('totalUnitInput')?.value||145));const size=Math.max(1,Number(document.getElementById('weekSizeInput')?.value||4));return {total,size,weeks:dayCount(total,size),round:Number(roundKey())};}
-function hasGrammarInUseDayException(size){return Number(size)===4;}
-function dayCount(total,size){
- if(!hasGrammarInUseDayException(size))return Math.ceil(total/size);
- if(total<=4)return 1;
- if(total<=6)return 2;
- return 2+Math.ceil((total-6)/size);
-}
-function rangeForWeek(week,size,total){
- if(!hasGrammarInUseDayException(size))return {start:(week-1)*size+1,end:Math.min(week*size,total)};
- if(week===1)return {start:1,end:Math.min(4,total)};
- if(week===2)return {start:5,end:Math.min(6,total)};
- const start=7+(week-3)*size;
- return {start,end:Math.min(start+size-1,total)};
-}
+function settings(){const total=Math.max(1,Number(document.getElementById('totalUnitInput')?.value||145));const size=Math.max(1,Number(document.getElementById('weekSizeInput')?.value||4));return {total,size,weeks:Math.ceil(total/size),round:Number(roundKey())};}
+function rangeForWeek(week,size,total){return {start:(week-1)*size+1,end:Math.min(week*size,total)};}
 function roundData(){const data=state();return data[roundKey()]||{};}
 function setRoundData(next){const data=state();data[roundKey()]=next||{};saveState(data);}
 function updateWeek(week,patch){const data=roundData();data[String(week)]={...(data[String(week)]||{}),...patch};setRoundData(data);renderWeeks();}
