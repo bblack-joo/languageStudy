@@ -520,12 +520,15 @@ tr.only-forget-hidden{display:none!important}
   <div class="study-mode-head"><b>문장 관리 모드</b></div>
   <div class="toolbar">
     <button type="button" class="secondary small" id="importantEditorToggleBtn" onclick="toggleImportantEditor()">핵심문장 수정</button>
+    <button type="button" class="secondary small" onclick="copyNotMemorizedValues()">안외워짐 값 복사</button>
+    <button type="button" class="orange small" onclick="saveImportantValuesToExcel()">서식 유지 저장</button>
     <button type="button" class="secondary small" onclick="refreshImportantEditor()">새로고침</button>
   </div>
   <div id="importantEditorPanel" class="manager-panel">
     <div class="toolbar">
       <button type="button" class="secondary small" id="importantOnlyEditorBtn" onclick="toggleImportantEditorOnly()">핵심문장만 보기</button>
       <button type="button" class="secondary small" onclick="copyImportantValues()">값 복사</button>
+      <button type="button" class="secondary small" onclick="copyNotMemorizedValues()">안외워짐 값 복사</button>
       <button type="button" class="orange small" onclick="saveImportantValuesToExcel()">서식 유지 저장</button>
       <button type="button" class="green small" onclick="saveImportantEditor(event)">저장</button>
     </div>
@@ -889,6 +892,7 @@ let flashOrderList=[],flashIndex=0,flashRevealed=false,flashFinished=false,flash
 let flashRecorder=null,flashMicStream=null,flashRecordChunks=[],flashRecognition=null,flashRecognizing=false,flashSpeechAutoMode=false,flashSpeechAutoStartTimer=null;
 let flashRecordingSequenceAudio=null,flashRecordingSequenceStopped=false;
 const flashRecordings=new Map(),flashSpeechTexts=new Map();
+let workbookAutoSaveChain=Promise.resolve();
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BOOK={workbook:null,questions:{},items:[]};
 function norm(s){return String(s??'').trim().replace(/[\uFEFF\u200B-\u200D]/g,'').replace(/[*`_]/g,'').replace(/\s+/g,'').toLowerCase();}
@@ -3326,6 +3330,17 @@ async function copyImportantValues(){
   alert('복사에 실패했어. 브라우저 권한을 확인해줘.');
  }
 }
+async function copyNotMemorizedValues(){
+ if(!rows.length){alert('복사할 문장이 없어.');return;}
+ const values=rows.map(row=>row.notMemorized?'1':'');
+ const text=values.join('\n');
+ try{
+  await navigator.clipboard.writeText(text);
+  setOnlineStatus(`안외워짐 값 ${values.length}줄 복사 완료`);
+ }catch(e){
+  alert('복사에 실패했어. 브라우저 권한을 확인해줘.');
+ }
+}
 function xmlDoc(text){return new DOMParser().parseFromString(text,'application/xml');}
 function xmlText(doc){return new XMLSerializer().serializeToString(doc);}
 function relTargetPath(base,target){
@@ -3409,7 +3424,7 @@ async function patchWorkbookImportantValues(meta){
   if(!file)continue;
   const doc=xmlDoc(await file.async('text'));
   const firstOrigin=list[0]?.origin;
-  if(firstOrigin&&firstOrigin.headerRowIndex!=null)setWorksheetCellValue(doc,firstOrigin.headerRowIndex,firstOrigin.keySentenceCol,'핵심 문장');
+  if(firstOrigin&&firstOrigin.headerRowIndex!=null&&firstOrigin.keySentenceCol>=0)setWorksheetCellValue(doc,firstOrigin.headerRowIndex,firstOrigin.keySentenceCol,'핵심 문장');
   list.forEach(row=>{
    if(row.origin.keySentenceCol>=0)setWorksheetCellValue(doc,row.origin.rowIndex,row.origin.keySentenceCol,!!row.important);
    if(row.origin.notMemorizedCol>=0)setWorksheetCellValue(doc,row.origin.rowIndex,row.origin.notMemorizedCol,!!row.notMemorized);
@@ -3426,6 +3441,47 @@ async function uploadPatchedWorkbook(meta,blob){
  fetch(CLOUD_SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'uploadWorkbook',user:cred.user,password:cred.password,fileId:meta.fileId,fileName:meta.fileName,mimeType:file.type,base64})});
  return true;
 }
+function workbookMetaForRow(row){
+ return row?.origin?.fileName?loadedWorkbookFiles.find(file=>file.fileName===row.origin.fileName):null;
+}
+async function saveWorkbookValuesForMeta(meta,options={}){
+ if(!meta)return false;
+ const blob=await patchWorkbookImportantValues(meta);
+ const uploaded=await uploadPatchedWorkbook(meta,blob);
+ if(uploaded){
+  if(!options.silent)setOnlineStatus(`파일 저장 요청 완료: ${meta.fileName}`);
+  return true;
+ }
+ if(options.auto){
+  setOnlineStatus('로컬 파일은 브라우저가 직접 덮어쓸 수 없어. 서식 유지 저장으로 다운로드해줘.');
+  return false;
+ }
+ downloadBlob(blob,meta.fileName.replace(/\.xlsx?$/i,'')+'_수정.xlsx');
+ return false;
+}
+function queueWorkbookAutoSaveForRow(index){
+ const row=rows[index];
+ const meta=workbookMetaForRow(row);
+ if(!meta){
+  setOnlineStatus('원본 파일 정보를 찾지 못해서 자동 저장하지 못했어.');
+  return;
+ }
+ if(!meta.originalBuffer){
+  setOnlineStatus('Google Sheets 직접 읽기 파일은 자동 덮어쓰기를 지원하지 않아.');
+  return;
+ }
+ workbookAutoSaveChain=workbookAutoSaveChain
+  .catch(()=>{})
+  .then(async()=>{
+   setOnlineStatus('안외워짐 값을 파일에 저장 중...');
+   await saveWorkbookValuesForMeta(meta,{silent:true,auto:true});
+   setOnlineStatus('안외워짐 값 저장 요청 완료');
+  })
+  .catch(e=>{
+   console.error(e);
+   setOnlineStatus(e.message||'안외워짐 자동 저장 실패');
+  });
+}
 function downloadBlob(blob,fileName){
  const a=document.createElement('a');
  a.href=URL.createObjectURL(blob);
@@ -3436,18 +3492,20 @@ function downloadBlob(blob,fileName){
 async function saveImportantValuesToExcel(){
  try{
   const checks=[...document.querySelectorAll('.important-editor-check')];
-  if(!checks.length){alert('저장할 문장이 없어.');return;}
   checks.forEach(check=>{
    const index=Number(check.dataset.rowIndex);
    if(rows[index])setRowImportant(index,!!check.checked);
   });
+  if(!rows.some(row=>row.origin)){alert('저장할 원본 문장이 없어.');return;}
   if(!loadedWorkbookFiles.length){alert('엑셀 파일을 다시 불러온 뒤 시도해줘.');return;}
   setOnlineStatus('엑셀 서식을 유지하면서 핵심 문장/안외워짐 값을 저장 중...');
   let uploaded=0,downloaded=0;
   for(const meta of loadedWorkbookFiles){
-   const blob=await patchWorkbookImportantValues(meta);
-   if(await uploadPatchedWorkbook(meta,blob))uploaded++;
-   else{downloadBlob(blob,meta.fileName.replace(/\.xlsx?$/i,'')+'_핵심문장.xlsx');downloaded++;}
+   const hasRows=rows.some(row=>row.origin&&row.origin.fileName===meta.fileName);
+   if(!hasRows)continue;
+   const uploadedOne=await saveWorkbookValuesForMeta(meta,{silent:true});
+   if(uploadedOne)uploaded++;
+   else downloaded++;
   }
   setOnlineStatus(uploaded?`서식 유지 저장 요청 완료: ${uploaded}개 파일`:`서식 유지 파일 ${downloaded}개 다운로드 완료`);
  }catch(e){
