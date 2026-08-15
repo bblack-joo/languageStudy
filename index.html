@@ -618,6 +618,7 @@ tr.only-forget-hidden{display:none!important}
   <div class="flash-options">
     <button class="secondary small" onclick="copyFlashText('lang1')"><span data-lang1-label>한글</span> 복사</button>
     <button class="secondary small" onclick="copyFlashText('lang2')"><span data-lang2-label>영어</span> 복사</button>
+    <button class="orange small" id="flashForgetBtn" onclick="toggleFlashNotMemorized()">안외워짐 표시</button>
   </div>
   <div id="flashResult" class="scramble-result flash-hidden"></div>
   <div class="flash-help">카드 클릭: 정답 보기 → 다음 카드 / Space·Enter: 뒤집기·다음 / 타이핑 중 Ctrl+Space·Ctrl+Enter: 뒤집기·다음 / Ctrl+0: 음원 1회 듣기 / ← →: 이전·다음</div>
@@ -1188,6 +1189,31 @@ function onlineFilesForSelectedFolder(){
   return filePath===normalizedPath||filePath.startsWith(normalizedPath+'/');
  });
 }
+function fileUnitRange(file){
+ const text=[file?.name,file?.label,file?.folderPath].filter(Boolean).join(' ');
+ const compact=String(text||'').replace(/\s+/g,'');
+ const range=compact.match(/(\d{1,3})\s*(?:~|-|–|—|_)\s*(\d{1,3})/);
+ if(range){
+  const start=Number(range[1]),end=Number(range[2]);
+  if(Number.isFinite(start)&&Number.isFinite(end))return {start:Math.min(start,end),end:Math.max(start,end)};
+ }
+ const single=compact.match(/(?:unit|유닛|강|lesson)?(\d{1,3})(?:강|과|unit)?/i);
+ if(single){
+  const n=Number(single[1]);
+  if(Number.isFinite(n))return {start:n,end:n};
+ }
+ return null;
+}
+function rangesOverlap(a,b){
+ if(!a||!b)return false;
+ return a.start<=b.end&&b.start<=a.end;
+}
+function filterOnlineFilesByStartupUnitRange(files){
+ const range=startupUnitRange();
+ if(!range)return files;
+ const matched=files.filter(file=>rangesOverlap(fileUnitRange(file),range));
+ return matched.length?matched:files;
+}
 function renderOnlineFolderSelect(){
  const select=document.getElementById('onlineFolderSelect');
  if(!select)return;
@@ -1471,8 +1497,11 @@ async function loadSelectedOnlineFolderFiles(options={}){
   const loaded=await loadOnlineFileList({silentSuccess:true});
   if(!loaded)return false;
  }
- const files=onlineFilesForSelectedFolder();
+ const allFiles=onlineFilesForSelectedFolder();
+ const files=filterOnlineFilesByStartupUnitRange(allFiles);
  if(!files.length){alert('선택한 폴더에 불러올 엑셀 파일이 없어.');return false;}
+ const range=startupUnitRange();
+ if(range&&files.length<allFiles.length)setOnlineStatus(`${range.start}~${range.end}강 범위 파일 ${files.length}개만 불러오는 중...`);
  return loadOnlineFilesByIds(files.map(file=>file.id).filter(Boolean),options);
 }
 async function loadOnlineFilesByIds(fileIds,options={}){
@@ -1702,13 +1731,9 @@ function recordModeChange(mode){
 function markAutoNotMemorized(row,mode,reason='오답'){
  if(!row||!(row.lang1||row.lang2))return;
  try{localStorage.setItem(sentenceMemoryKey(row),'1');}catch(e){}
- row.notMemorized=true;
  const rowIndex=rows.indexOf(row);
- const tr=rowIndex>=0?document.getElementById('row'+rowIndex):null;
- const check=tr?.querySelector('.forget-check');
- if(check)check.checked=true;
- if(tr&&showOnlyNotMemorized)tr.classList.remove('only-forget-hidden');
- updateCountInfo();
+ if(rowIndex>=0)setRowNotMemorized(rowIndex,true);
+ else row.notMemorized=true;
 }
 
 function formatStress(text){
@@ -1760,7 +1785,7 @@ function parseSimpleLanguageSheet(ws,sheetName,fileName=''){
     lang2,
     important:keySentenceCol>=0?isTruthyCell(val(line,keySentenceCol)):false,
     notMemorized:notMemorizedCol>=0?isTruthyCell(val(line,notMemorizedCol)):false,
-    origin:{fileName,sheetName,rowIndex:r,keySentenceCol,headerRowIndex:header.rowIndex}
+    origin:{fileName,sheetName,rowIndex:r,keySentenceCol,notMemorizedCol,headerRowIndex:header.rowIndex}
    });
  }
  if(!answers.length)return [];
@@ -1804,7 +1829,7 @@ function parseSimpleLanguageSheetFromCells(ws,sheetName,fileName=''){
     lang2,
     important:keySentenceCol>=0?isTruthyCell(worksheetCellText(ws,r,keySentenceCol)):false,
     notMemorized:notMemorizedCol>=0?isTruthyCell(worksheetCellText(ws,r,notMemorizedCol)):false,
-    origin:{fileName,sheetName,rowIndex:r,keySentenceCol,headerRowIndex:headerRow}
+    origin:{fileName,sheetName,rowIndex:r,keySentenceCol,notMemorizedCol,headerRowIndex:headerRow}
    });
  }
  if(!answers.length)return [];
@@ -2012,7 +2037,7 @@ function parseAnswerSheet(ws,sheetName,fileName=''){
    addMemoIfAny(memoValue);
 
    if(lang1||lang2){
-     answers.push({lang1,lang2,important,notMemorized,origin:{fileName,sheetName,rowIndex:r,keySentenceCol,headerRowIndex:header.rowIndex}});
+     answers.push({lang1,lang2,important,notMemorized,origin:{fileName,sheetName,rowIndex:r,keySentenceCol,notMemorizedCol,headerRowIndex:header.rowIndex}});
    }
  }
  saveBlock();
@@ -3221,7 +3246,7 @@ function renderTable(){
   if(showOnlyNotMemorized && !r.notMemorized) tr.classList.add('only-forget-hidden');
   if(r.done) tr.classList.add('done');
   const pKey=getPracticeKey(r);
-  tr.innerHTML=`<td class="check-col"><input type="checkbox" class="forget-check" ${r.notMemorized?'checked':''} disabled></td><td class="num">${i+1}</td><td class="${r.important?'important-text':''}">${escapeHtml(r.lang1)}</td><td class="${r.important?'important-text':''}">${formatStress(r.lang2)}</td><td class="practice-cell"><textarea class="practice-input" data-key="${escapeAttr(pKey)}" placeholder="" oninput="savePracticeInput(this)" onkeydown="practiceKeydown(event,this)">${escapeHtml(getSavedPractice(pKey))}</textarea></td><td class="actions actions-col"><button class="small" onclick="readOne(${i},'both')">▶전체</button><button class="small" onclick="readOne(${i},'lang1')">${escapeHtml(languageName('lang1'))}</button><button class="small" onclick="readOne(${i},'lang2')">${escapeHtml(languageName('lang2'))}</button><button class="small orange" onclick="repeatOne(${i})">??</button></td>`;
+  tr.innerHTML=`<td class="check-col"><input type="checkbox" class="forget-check" ${r.notMemorized?'checked':''} onchange="setRowNotMemorized(${i},this.checked)"></td><td class="num">${i+1}</td><td class="${r.important?'important-text':''}">${escapeHtml(r.lang1)}</td><td class="${r.important?'important-text':''}">${formatStress(r.lang2)}</td><td class="practice-cell"><textarea class="practice-input" data-key="${escapeAttr(pKey)}" placeholder="" oninput="savePracticeInput(this)" onkeydown="practiceKeydown(event,this)">${escapeHtml(getSavedPractice(pKey))}</textarea></td><td class="actions actions-col"><button class="small" onclick="readOne(${i},'both')">▶전체</button><button class="small" onclick="readOne(${i},'lang1')">${escapeHtml(languageName('lang1'))}</button><button class="small" onclick="readOne(${i},'lang2')">${escapeHtml(languageName('lang2'))}</button><button class="small orange" onclick="repeatOne(${i})">??</button></td>`;
   tb.appendChild(tr);
  });
  updateCountInfo();
@@ -3385,7 +3410,10 @@ async function patchWorkbookImportantValues(meta){
   const doc=xmlDoc(await file.async('text'));
   const firstOrigin=list[0]?.origin;
   if(firstOrigin&&firstOrigin.headerRowIndex!=null)setWorksheetCellValue(doc,firstOrigin.headerRowIndex,firstOrigin.keySentenceCol,'핵심 문장');
-  list.forEach(row=>setWorksheetCellValue(doc,row.origin.rowIndex,row.origin.keySentenceCol,!!row.important));
+  list.forEach(row=>{
+   if(row.origin.keySentenceCol>=0)setWorksheetCellValue(doc,row.origin.rowIndex,row.origin.keySentenceCol,!!row.important);
+   if(row.origin.notMemorizedCol>=0)setWorksheetCellValue(doc,row.origin.rowIndex,row.origin.notMemorizedCol,!!row.notMemorized);
+  });
   zip.file(path,xmlText(doc));
  }
  return await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -3414,7 +3442,7 @@ async function saveImportantValuesToExcel(){
    if(rows[index])setRowImportant(index,!!check.checked);
   });
   if(!loadedWorkbookFiles.length){alert('엑셀 파일을 다시 불러온 뒤 시도해줘.');return;}
-  setOnlineStatus('엑셀 서식을 유지하면서 핵심 문장 값만 저장 중...');
+  setOnlineStatus('엑셀 서식을 유지하면서 핵심 문장/안외워짐 값을 저장 중...');
   let uploaded=0,downloaded=0;
   for(const meta of loadedWorkbookFiles){
    const blob=await patchWorkbookImportantValues(meta);
@@ -3494,6 +3522,49 @@ function setRowImportant(index,important){
    });
   });
  }
+}
+function setRowNotMemorized(index,notMemorized){
+ if(!rows[index])return;
+ rows[index].notMemorized=!!notMemorized;
+ const row=rows[index];
+ try{
+  if(notMemorized)localStorage.setItem(sentenceMemoryKey(row),'1');
+  else localStorage.removeItem(sentenceMemoryKey(row));
+ }catch(e){}
+ const itemKey=row.itemKey;
+ const answerIndex=row.answerIndex;
+ if(itemKey&&answerIndex!=null){
+  const item=BOOK.items.find(v=>v.key===itemKey);
+  if(item&&item.answers&&item.answers[answerIndex])item.answers[answerIndex].notMemorized=!!notMemorized;
+  studyGroups.forEach(group=>{
+   (group.pairs||[]).forEach(pair=>{
+    if(pair.itemKey===itemKey&&Number(pair.answerIndex)===Number(answerIndex))pair.notMemorized=!!notMemorized;
+   });
+  });
+ }
+ const tr=document.getElementById('row'+index);
+ const check=tr?.querySelector('.forget-check');
+ if(check)check.checked=!!notMemorized;
+ if(tr)tr.classList.toggle('only-forget-hidden',showOnlyNotMemorized&&!notMemorized);
+ updateCountInfo();
+ updateFlashForgetButton();
+}
+function currentFlashRowIndex(){
+ if(!flashOrderList.length||flashFinished)return -1;
+ return Number(flashOrderList[flashIndex]);
+}
+function updateFlashForgetButton(){
+ const btn=document.getElementById('flashForgetBtn');
+ if(!btn)return;
+ const index=currentFlashRowIndex();
+ const row=Number.isFinite(index)&&index>=0?rows[index]:null;
+ btn.textContent=row?.notMemorized?'안외워짐 해제':'안외워짐 표시';
+ btn.className=row?.notMemorized?'secondary small':'orange small';
+}
+function toggleFlashNotMemorized(){
+ const index=currentFlashRowIndex();
+ if(!Number.isFinite(index)||index<0||!rows[index]){alert('먼저 플래시카드를 시작해줘.');return;}
+ setRowNotMemorized(index,!rows[index].notMemorized);
 }
 function refreshImportantVisuals(){
  rows.forEach((row,index)=>{
@@ -4214,6 +4285,7 @@ function flashBothVisibleHtml(row){
 }
 function renderFlashcard(autoSpeak=false){
  updateFlashSpeechAutoButton();
+ updateFlashForgetButton();
  const frontEl=document.getElementById('flashFront');
  const backEl=document.getElementById('flashBack');
  const prog=document.getElementById('flashProgress');
@@ -4225,6 +4297,7 @@ function renderFlashcard(autoSpeak=false){
    backEl.classList.add('flash-hidden');
    if(prog)prog.textContent=`${flashOrderList.length} / ${flashOrderList.length}`;
    if(bar)bar.style.width='100%';
+   updateFlashForgetButton();
    return;
  }
  if(!flashOrderList.length){
@@ -4233,6 +4306,7 @@ function renderFlashcard(autoSpeak=false){
    backEl.classList.add('flash-hidden');
    if(prog)prog.textContent='0 / 0';
    if(bar)bar.style.width='0%';
+   updateFlashForgetButton();
    return;
  }
  const row=getFlashCurrent();
@@ -4245,6 +4319,7 @@ function renderFlashcard(autoSpeak=false){
    if(prog)prog.textContent=`${flashIndex+1} / ${flashOrderList.length}`;
    if(bar)bar.style.width=`${Math.round(((flashIndex+1)/flashOrderList.length)*100)}%`;
    loadFlashScratch();
+   updateFlashForgetButton();
    if(autoSpeak&&!flashAutoNextOn)playFlashSpeak({silent:true});
    return;
  }
@@ -4262,6 +4337,7 @@ function renderFlashcard(autoSpeak=false){
  if(prog)prog.textContent=`${flashIndex+1} / ${flashOrderList.length}`;
  if(bar)bar.style.width=`${Math.round(((flashIndex+1)/flashOrderList.length)*100)}%`;
  loadFlashScratch();
+ updateFlashForgetButton();
  if(autoSpeak&&!flashAutoNextOn){
    if(document.getElementById('flashRepeatModeEnabled')?.checked){
      playFlashSpeak({silent:true});
