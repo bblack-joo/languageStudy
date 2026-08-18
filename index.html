@@ -313,7 +313,7 @@ tr.only-forget-hidden{display:none!important}
   </div>
   <div class="brand-quick-links">
     <a class="brand-quick-link" href="grammar-in-use-progress.html">Grammar In Use</a>
-    <a class="brand-quick-link" href="https://bblack-joo.github.io/languageStudy/?folder=오픽의 신&week_size=1">OPIC</a>
+    <a class="brand-quick-link" href="opic-progress.html">OPIC</a>
   </div>
   <div class="brand-tagline">A language learning tool for studying any two languages.</div>
 </div>
@@ -987,6 +987,12 @@ function parseStartupParams(){
  const languageStudyIndex=pathParts.findIndex(part=>part.toLowerCase()==='languagestudy');
  let pathFolder=languageStudyIndex>=0&&pathParts.length>languageStudyIndex+1?pathParts.slice(languageStudyIndex+1).join('/'):'';
  pathFolder=pathFolder.replace(/^folder=/i,'');
+ const categoryNames=[
+  ...params.getAll('category'),
+  ...params.getAll('categories'),
+  ...params.getAll('unit_name'),
+  ...params.getAll('대분류')
+ ].filter(Boolean).join('|');
  return {
   folder:params.get('folder')||params.get('폴더')||params.get('f')||pathFolder||'',
   mode:params.get('mode')||params.get('선택모드')||'',
@@ -995,11 +1001,16 @@ function parseStartupParams(){
   weekSize:params.get('week_size')||params.get('week-size')||params.get('주차개수')||params.get('묶음개수')||params.get('size')||params.get('count')||params.get('개수')||params.get('m')||'',
   startUnit:params.get('start_unit')||params.get('start')||params.get('시작강')||'',
   endUnit:params.get('end_unit')||params.get('end')||params.get('끝강')||'',
-  subNo:params.get('sub')||params.get('subcategory')||params.get('소분류')||params.get('소분류번호')||params.get('block')||''
+  subNo:params.get('sub')||params.get('subcategory')||params.get('소분류')||params.get('소분류번호')||params.get('block')||'',
+  importantOnly:params.get('important')||params.get('core')||params.get('핵심')||params.get('핵심만')||'',
+  categoryNames
  };
 }
 function normalizeStartupMatch(value){
  return safeDecodeUrlPart(value).toLowerCase().replace(/\.[a-z0-9]+$/,'').replace(/[\s\\/_]+/g,'-').replace(/-+/g,'-').trim();
+}
+function startupTruthValue(value){
+ return ['1','true','yes','y','on','important','core','핵심','핵심만'].includes(normalizeStartupMatch(value));
 }
 function shouldStartupAutoLoadFolder(){
  const value=normalizeStartupMatch(URL_STARTUP_PARAMS.load);
@@ -1017,8 +1028,19 @@ function startupPositiveNumber(value){
  const number=Number(String(value||'').replace(/[^\d.]/g,''));
  return Number.isFinite(number)&&number>0?Math.floor(number):0;
 }
+function startupExactCategoryNames(){
+ return String(URL_STARTUP_PARAMS.categoryNames||'').split(/\|\||\|/).map(v=>safeDecodeUrlPart(v).trim()).filter(Boolean);
+}
+function baseCategoryName(name){
+ return String(name||'').split('::').pop().trim();
+}
+function findExactStartupCategories(names){
+ const wanted=new Set((names||[]).map(baseCategoryName).filter(Boolean));
+ if(!wanted.size)return [];
+ return categoryUnits().filter(unit=>wanted.has(baseCategoryName(unit)));
+}
 function hasStartupWeekBundleParams(){
- return !!(URL_STARTUP_PARAMS.week||URL_STARTUP_PARAMS.weekSize||URL_STARTUP_PARAMS.startUnit||URL_STARTUP_PARAMS.endUnit);
+ return !!(URL_STARTUP_PARAMS.week||URL_STARTUP_PARAMS.weekSize||URL_STARTUP_PARAMS.startUnit||URL_STARTUP_PARAMS.endUnit||URL_STARTUP_PARAMS.categoryNames);
 }
 function promptStartupWeekIfNeeded(){
  if(startupWeekPrompted||!hasStartupWeekBundleParams())return;
@@ -2431,7 +2453,8 @@ function addCategoryUnitsToQueue(chunk,options={}){
  updateCategoryCheckCount();
  const subValue=String(options.subNo||'').trim().toLowerCase();
  const subNo=startupPositiveNumber(subValue);
- if(['not1','except1','exclude1','without1','연습','practice'].includes(subValue))addExceptNthItemsToQueue(1);
+ if(options.importantOnly)addFilteredImportantItemsToQueue();
+ else if(['not1','except1','exclude1','without1','연습','practice'].includes(subValue))addExceptNthItemsToQueue(1);
  else if(subNo)addNthItemsToQueue(subNo);
  else addFilteredItemsToQueue();
 }
@@ -2447,12 +2470,18 @@ function applyStartupWeekBundleLoad(){
  const before=selectedItemKeys.length;
  const range=startupUnitRange();
  const subNo=URL_STARTUP_PARAMS.subNo;
- if(range){
+ const importantOnly=startupTruthValue(URL_STARTUP_PARAMS.importantOnly);
+ const exactCategories=startupExactCategoryNames();
+ if(exactCategories.length){
+  const chunk=findExactStartupCategories(exactCategories);
+  if(!chunk.length){alert(`${exactCategories.join(', ')} 대분류를 찾지 못했어.`);return false;}
+  addCategoryUnitsToQueue(chunk,{subNo,importantOnly});
+ }else if(range){
   const chunk=unitsForUnitRange(range);
   if(!chunk.length){alert(`${range.start}~${range.end} 대분류를 찾지 못했어.`);return false;}
-  addCategoryUnitsToQueue(chunk,{subNo});
+  addCategoryUnitsToQueue(chunk,{subNo,importantOnly});
  }else{
-  addWeekCategoryBundle(inputWeekBundleNo()-1,{subNo});
+  addWeekCategoryBundle(inputWeekBundleNo()-1,{subNo,importantOnly});
  }
  if(selectedItemKeys.length===before)return false;
  startupWeekBundleLoaded=true;
@@ -2663,6 +2692,15 @@ function addExceptNthItemsToQueue(n){
  renderSelectedItemQueue();
  if(!added){alert(`[${n}]번을 제외한 답변은 이미 전부 추가되어 있어.`);}
 }
+function addFilteredImportantItemsToQueue(){
+ if(!BOOK.items.length){alert('먼저 엑셀 파일을 선택해줘.');return;}
+ const importantItems=getFilteredItems().filter(item=>itemToImportantPairs(item).length);
+ if(!importantItems.length){alert('현재 선택 범위에 핵심 문장이 없어.');return;}
+ let added=0;
+ importantItems.forEach(item=>{if(addQueueEntry(item.key,true,true))added++;});
+ renderSelectedItemQueue();
+ if(!added){alert('현재 범위의 핵심 답변은 이미 전부 추가되어 있어.');}
+}
 function addSelectedNthItemsToQueue(){
  const n=document.getElementById('nthBundleSelect')?.value;
  if(!n){alert('추가할 번호를 선택해줘.');return;}
@@ -2671,11 +2709,7 @@ function addSelectedNthItemsToQueue(){
 function addSelectedImportantToQueue(){
  const select=document.getElementById('unitSelect');
  if(select?.value==='__ALL__'){
-  const importantItems=getFilteredItems().filter(item=>itemToImportantPairs(item).length);
-  if(!importantItems.length){alert('현재 선택 범위에 핵심 문장이 없어.');return;}
-  let added=0;
-  importantItems.forEach(item=>{if(addQueueEntry(item.key,true,true))added++;});
-  renderSelectedItemQueue();
+  addFilteredImportantItemsToQueue();
   return;
  }
  const selected=getSelectedQueueItem();
