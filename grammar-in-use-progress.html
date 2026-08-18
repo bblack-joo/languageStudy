@@ -595,6 +595,12 @@ tr.only-forget-hidden{display:none!important}
         <option value="off">안 듣기</option>
       </select>
     </label>
+    <label>조작
+      <select id="flashControlMode" onchange="focusFlashAnswerAfterCardChange();this.blur();">
+        <option value="advance" selected>넘김 모드</option>
+        <option value="typing">타이핑 모드</option>
+      </select>
+    </label>
     <button class="green small" onclick="startFlashcards()">시작</button>
     <button class="secondary small" onclick="playFlashSpeak()">듣기</button>
     <button class="secondary small" onclick="prevFlashcard()">◀ 이전</button>
@@ -4187,9 +4193,15 @@ function focusFlashFirstInputOrConfirm(){
  const target=!isFlashScratchInputHidden()?document.getElementById('flashScratchInput'):!isFlashFreeInputHidden()?document.getElementById('flashFreeInput'):document.getElementById('flashConfirmBtn');
  target?.focus();
 }
+function isFlashTypingControlMode(){
+ return document.getElementById('flashControlMode')?.value==='typing';
+}
 function focusFlashAnswerAfterCardChange(){
  if(currentMode!=='flash'||flashFinished||!flashOrderList.length)return;
- setTimeout(()=>focusFlashFirstInputOrConfirm(),0);
+ setTimeout(()=>{
+  if(isFlashTypingControlMode())focusFlashFirstInputOrConfirm();
+  else document.getElementById('flashCard')?.focus();
+ },0);
 }
 function focusFlashLastInputOrCard(){
  const target=!isFlashFreeInputHidden()?document.getElementById('flashFreeInput'):!isFlashScratchInputHidden()?document.getElementById('flashScratchInput'):document.getElementById('flashCard');
