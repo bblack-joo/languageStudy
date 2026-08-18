@@ -14,6 +14,9 @@ h1{margin:0;font-size:34px;line-height:1;font-weight:950;color:var(--primary)}
 .sub{margin-top:8px;color:var(--text-muted);font-size:14px;font-weight:750}
 .top-actions,.settings,.cloud-row,.week-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .top-actions{justify-content:flex-end}
+.cloud-summary{display:none;gap:8px;flex-wrap:wrap;align-items:center}
+.cloud-summary.active{display:flex}
+.cloud-form.hidden{display:none}
 a,button{border:0;border-radius:8px;padding:9px 13px;background:var(--primary);color:#fff;font-weight:850;font-size:14px;text-decoration:none;cursor:pointer}
 a:hover,button:hover{background:var(--primary-dark)}
 .ghost{background:#fff;color:var(--filter-dark);border:1px solid var(--border)}
@@ -59,21 +62,32 @@ input[type=password],input[type=text]{width:135px}
   </section>
 
   <section class="panel">
+    <div id="cloudSummary" class="cloud-summary">
+      <span id="cloudUserBadge" class="status"></span>
+      <button type="button" onclick="loadCloudProgress()">구글에서 불러오기</button>
+      <button type="button" class="ghost" onclick="saveCloudProgress()">구글에 저장</button>
+      <button type="button" class="ghost" onclick="toggleCloudForm(true)">로그인 정보 수정</button>
+      <span id="cloudSummaryStatus" class="status"></span>
+    </div>
+    <div id="cloudForm" class="cloud-form">
     <div class="cloud-row">
       <label>아이디 <input id="onlineUserId" type="text" placeholder="mintB"></label>
       <label>비밀번호 <input id="onlinePassword" type="password" placeholder="비밀번호"></label>
       <button type="button" onclick="loadCloudProgress()">구글에서 불러오기</button>
       <button type="button" class="ghost" onclick="saveCloudProgress()">구글에 저장</button>
+      <button type="button" class="ghost" onclick="toggleCloudForm(false)">숨기기</button>
       <span id="cloudStatus" class="status"></span>
     </div>
     <div class="hint">RepeatRepeat에서 로그인한 기록이 있으면 자동으로 채워져. 저장하면 구글 시트의 Grammar_Progress 탭에 기록돼.</div>
+    </div>
   </section>
 
   <section class="panel">
     <div class="settings">
       <label>회독 <input id="roundInput" type="number" min="1" value="1" onchange="changeRound()"></label>
-      <label>총 강의 <input id="totalUnitInput" type="number" min="1" value="145" onchange="renderWeeks()"></label>
+      <label>총 강의 <input id="totalUnitInput" type="number" min="1" value="142" onchange="renderWeeks()"></label>
       <label>일차당 <input id="weekSizeInput" type="number" min="1" value="4" onchange="renderWeeks()"></label>
+      <label><input id="forgetOnlyInput" type="checkbox" onchange="renderWeeks()"> 안외워짐만</label>
       <button type="button" class="ghost" onclick="renderWeeks()">다시 나누기</button>
       <button type="button" class="ghost" onclick="copyProgressText()">진도 복사</button>
       <button type="button" class="danger" onclick="clearRoundProgress()">현재 회독 초기화</button>
@@ -103,15 +117,16 @@ const STORAGE_KEY='rr_grammar_in_use_progress_v2';
 const COURSE='Grammar In Use';
 function appBaseUrl(){return location.protocol==='file:'?'repeat-repeat-v2.html':'./';}
 function todayKey(){return new Date().toLocaleDateString('sv-SE');}
-function appUrlForWeek(week,size,total){
+function appUrlForWeek(week,size,total,subNo=''){
  const range=rangeForWeek(week,size,total);
  const params=new URLSearchParams({folder:COURSE,week:String(week),week_size:String(size),start_unit:String(range.start),end_unit:String(range.end)});
+ if(subNo)params.set('sub',String(subNo));
  return appBaseUrl()+'?'+params.toString();
 }
 function state(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}')||{};}catch(e){return {};}}
 function saveState(data){localStorage.setItem(STORAGE_KEY,JSON.stringify(data||{}));}
 function roundKey(){return String(Math.max(1,Number(document.getElementById('roundInput')?.value||1)));}
-function settings(){const total=Math.max(1,Number(document.getElementById('totalUnitInput')?.value||145));const size=Math.max(1,Number(document.getElementById('weekSizeInput')?.value||4));return {total,size,weeks:Math.ceil(total/size),round:Number(roundKey())};}
+function settings(){const total=Math.max(1,Number(document.getElementById('totalUnitInput')?.value||142));const size=Math.max(1,Number(document.getElementById('weekSizeInput')?.value||4));return {total,size,weeks:Math.ceil(total/size),round:Number(roundKey())};}
 function rangeForWeek(week,size,total){return {start:(week-1)*size+1,end:Math.min(week*size,total)};}
 function roundData(){const data=state();return data[roundKey()]||{};}
 function setRoundData(next){const data=state();data[roundKey()]=next||{};saveState(data);}
@@ -119,6 +134,9 @@ function updateWeek(week,patch){const data=roundData();data[String(week)]={...(d
 function toggleDone(week,checked){const current=roundData()[String(week)]||{};updateWeek(week,{done:!!checked,studyDate:current.studyDate||todayKey()});}
 function setStudyDate(week,value){updateWeek(week,{studyDate:value||''});}
 function updateProgress(weeks,data){const count=Array.from({length:weeks},(_,i)=>data[String(i+1)]?.done).filter(Boolean).length;document.getElementById('progressBar').style.width=weeks?`${Math.round((count/weeks)*100)}%`:'0%';document.getElementById('progressText').textContent=`${roundKey()}회독 · ${count} / ${weeks}일차 완료`;}
+function applyForgetFilter(url){
+ return document.getElementById('forgetOnlyInput')?.checked?`${url}&forget=1`:url;
+}
 function renderWeeks(){
  const grid=document.getElementById('weekGrid');
  const home=document.getElementById('appHomeLink');
@@ -127,7 +145,7 @@ function renderWeeks(){
  if(home)home.href=appBaseUrl();
  updateProgress(weeks,data);
  grid.innerHTML=Array.from({length:weeks},(_,i)=>{
-  const week=i+1,range=rangeForWeek(week,size,total),record=data[String(week)]||{},checked=!!record.done,href=appUrlForWeek(week,size,total);
+  const week=i+1,range=rangeForWeek(week,size,total),record=data[String(week)]||{},checked=!!record.done,href=applyForgetFilter(appUrlForWeek(week,size,total)),basicHref=applyForgetFilter(appUrlForWeek(week,size,total,1)),practiceHref=applyForgetFilter(appUrlForWeek(week,size,total,'not1'));
   return `<article class="week-card${checked?' done':''}">
     <div class="week-head">
       <div class="week-title">${week}일차</div>
@@ -135,7 +153,7 @@ function renderWeeks(){
     </div>
     <div class="range">${range.start}강 ~ ${range.end}강</div>
     <label>공부 날짜 <input class="date-input" type="date" value="${record.studyDate||''}" onchange="setStudyDate(${week},this.value)"></label>
-    <div class="week-actions"><a class="small" href="${href}">학습 시작</a><a class="small ghost" href="${href}&mode=check">체크모드</a></div>
+    <div class="week-actions"><a class="small" href="${href}">전체 학습</a><a class="small ghost" href="${basicHref}">기본 예제</a><a class="small ghost" href="${practiceHref}">연습 문제</a><a class="small ghost" href="${href}&mode=check">체크모드</a></div>
   </article>`;
  }).join('');
 }
@@ -143,7 +161,32 @@ function changeRound(){renderWeeks();}
 function clearRoundProgress(){if(!confirm(`${roundKey()}회독 진도를 초기화할까?`))return;setRoundData({});renderWeeks();}
 function copyProgressText(){const {total,size,weeks,round}=settings();const data=roundData();const lines=[`${COURSE} ${round}회독`];for(let w=1;w<=weeks;w++){const r=rangeForWeek(w,size,total),v=data[String(w)]||{};lines.push(`${w}일차\t${r.start}-${r.end}강\t${v.done?'완료':'미완료'}\t${v.studyDate||''}`);}navigator.clipboard.writeText(lines.join('\n'));setCloudStatus('진도 내용을 복사했어.');}
 function credentials(){return {user:(document.getElementById('onlineUserId')?.value||localStorage.getItem('rr_online_user')||'').trim(),password:(document.getElementById('onlinePassword')?.value||localStorage.getItem('rr_online_password')||'').trim()};}
-function setCloudStatus(text){document.getElementById('cloudStatus').textContent=text||'';}
+function toggleCloudForm(show){
+ const form=document.getElementById('cloudForm');
+ const summary=document.getElementById('cloudSummary');
+ form?.classList.toggle('hidden',!show);
+ summary?.classList.toggle('active',!show);
+ updateCloudSummary();
+}
+function updateCloudSummary(){
+ const cred=credentials();
+ const badge=document.getElementById('cloudUserBadge');
+ if(badge)badge.textContent=cred.user?`로그인: ${cred.user}`:'로그인 정보 없음';
+}
+function rememberCredentials(){
+ const user=(document.getElementById('onlineUserId')?.value||'').trim();
+ const password=(document.getElementById('onlinePassword')?.value||'').trim();
+ if(user)localStorage.setItem('rr_online_user',user);
+ if(password)localStorage.setItem('rr_online_password',password);
+ updateCloudSummary();
+}
+function setCloudStatus(text){
+ const value=text||'';
+ const status=document.getElementById('cloudStatus');
+ const summaryStatus=document.getElementById('cloudSummaryStatus');
+ if(status)status.textContent=value;
+ if(summaryStatus)summaryStatus.textContent=value;
+}
 function onlineJsonp(action,params={}){
  return new Promise((resolve,reject)=>{
   const callback='rr_progress_'+Date.now()+'_'+Math.random().toString(36).slice(2);
@@ -160,6 +203,7 @@ function onlineJsonp(action,params={}){
 async function loadCloudProgress(){
  const cred=credentials();
  if(!cred.user||!cred.password){alert('아이디와 비밀번호를 입력해줘.');return;}
+ rememberCredentials();
  setCloudStatus('구글 진도 불러오는 중...');
  try{
   const res=await onlineJsonp('grammarProgressLoad',{...cred,course:COURSE});
@@ -172,12 +216,14 @@ async function loadCloudProgress(){
   });
   saveState(next);
   setCloudStatus('구글 진도를 불러왔어.');
+  toggleCloudForm(false);
   renderWeeks();
  }catch(e){setCloudStatus(e.message||'불러오기 실패');}
 }
 async function saveCloudProgress(){
  const cred=credentials();
  if(!cred.user||!cred.password){alert('아이디와 비밀번호를 입력해줘.');return;}
+ rememberCredentials();
  const {total,size,weeks}=settings();
  const data=state();
  const records=[];
@@ -194,12 +240,15 @@ async function saveCloudProgress(){
   const res=await onlineJsonp('grammarProgressSave',{...cred,course:COURSE,records:JSON.stringify(records)});
   if(!res.ok)throw new Error(res.message||'저장 실패');
   setCloudStatus(`구글에 ${res.saved||0}개 저장했어.`);
+  toggleCloudForm(false);
  }catch(e){setCloudStatus(e.message||'저장 실패');}
 }
 function init(){
  const cred=credentials();
  document.getElementById('onlineUserId').value=cred.user;
  document.getElementById('onlinePassword').value=cred.password;
+ updateCloudSummary();
+ if(cred.user&&cred.password)toggleCloudForm(false);
  renderWeeks();
 }
 init();
