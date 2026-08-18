@@ -168,9 +168,10 @@ function renderFolderSelect(selectedName=''){
 function loadFolderSettings(){
  const preset=presetForFolder(folderName())||{};
  const saved=settingsState()[folderName()]||{};
- document.getElementById('totalUnitInput').value=saved.total||preset.total||1;
- document.getElementById('weekSizeInput').value=saved.size||preset.size||1;
- document.getElementById('unitLabelInput').value=saved.unitLabel||preset.unitLabel||'강';
+ const inferred=inferFolderDefaults(folderName());
+ document.getElementById('totalUnitInput').value=saved.total||preset.total||inferred.total||1;
+ document.getElementById('weekSizeInput').value=saved.size||preset.size||inferred.size||1;
+ document.getElementById('unitLabelInput').value=saved.unitLabel||preset.unitLabel||inferred.unitLabel||'강';
 }
 function saveFolderSettings(){
  const data=settingsState();
@@ -195,6 +196,9 @@ function toggleDone(week,checked){const current=roundData()[String(week)]||{};up
 function setStudyDate(week,value){updateWeek(week,{studyDate:value||''});}
 function updateProgress(weeks,data){const count=Array.from({length:weeks},(_,i)=>data[String(i+1)]?.done).filter(Boolean).length;document.getElementById('progressBar').style.width=weeks?`${Math.round((count/weeks)*100)}%`:'0%';document.getElementById('progressText').textContent=`${folderName()} · ${roundKey()}회독 · ${count} / ${weeks}일차 완료`;}
 function applyForgetFilter(url){return document.getElementById('forgetOnlyInput')?.checked?`${url}&forget=1`:url;}
+function rangeTitle(range,unitLabel){
+ return range.start===range.end?`${range.start}${unitLabel}`:`${range.start}~${range.end}${unitLabel}`;
+}
 function renderWeeks(){
  const grid=document.getElementById('weekGrid');
  const home=document.getElementById('appHomeLink');
@@ -206,7 +210,7 @@ function renderWeeks(){
   const week=i+1,range=rangeForWeek(week,size,total),record=data[String(week)]||{},checked=!!record.done,href=applyForgetFilter(appUrlForWeek(week,size,total));
   return `<article class="week-card${checked?' done':''}">
     <div class="week-head">
-      <div class="week-title">${week}일차</div>
+      <div class="week-title">${rangeTitle(range,unitLabel)}</div>
       <label class="check"><input type="checkbox" ${checked?'checked':''} onchange="toggleDone(${week},this.checked)">완료</label>
     </div>
     <div class="range">${range.start}${unitLabel} ~ ${range.end}${unitLabel}</div>
@@ -215,16 +219,26 @@ function renderWeeks(){
   </article>`;
  }).join('');
 }
+function clearRenderedWeeks(){
+ const grid=document.getElementById('weekGrid');
+ if(grid)grid.innerHTML='';
+ const bar=document.getElementById('progressBar');
+ if(bar)bar.style.width='0%';
+ const text=document.getElementById('progressText');
+ if(text)text.textContent='0 / 0';
+}
 function selectFolder(name){
+ clearRenderedWeeks();
  renderFolderSelect(name);
  document.getElementById('folderNameInput').value='';
  loadFolderSettings();
  renderWeeks();
 }
-function changeFolder(){saveFolderSettings();renderFolderSelect(folderName());loadFolderSettings();renderWeeks();}
+function changeFolder(){clearRenderedWeeks();saveFolderSettings();renderFolderSelect(folderName());loadFolderSettings();renderWeeks();}
 function addCustomFolder(){
  const name=(document.getElementById('folderNameInput')?.value||'').trim();
  if(!name){alert('추가할 폴더 이름을 적어줘.');return;}
+ clearRenderedWeeks();
  rememberFolderOption(name);
  renderFolderSelect(name);
  loadFolderSettings();
@@ -257,6 +271,18 @@ function driveFolderDisplay(scope,path){
  const label=normalizeDriveFolderPath(path)||'최상위';
  return scope?`[${scope}] ${label}`:label;
 }
+function addDriveFolderOption(map,scope,path){
+ const normalized=normalizeDriveFolderPath(path);
+ const key=normalized||`${scope||'폴더'} 최상위`;
+ if(!map.has(key))map.set(key,{name:normalized||key,label:driveFolderDisplay(scope,normalized)});
+}
+function inferFileUnitEnd(fileName){
+ const text=String(fileName||'').replace(/\.[a-z0-9]+$/i,'');
+ const range=text.match(/(\d+)\s*(?:~|～|-|–|—|_)\s*(\d+)/);
+ if(range)return Math.max(Number(range[1]),Number(range[2]));
+ const numbers=[...text.matchAll(/\d+/g)].map(match=>Number(match[0])).filter(Number.isFinite);
+ return numbers.length?Math.max(...numbers):0;
+}
 async function loadDriveFolders(options={}){
  const cred=credentials();
  if(!cred.user||!cred.password){
@@ -268,25 +294,60 @@ async function loadDriveFolders(options={}){
  try{
   const res=await onlineJsonp('listFiles',cred);
   if(!res.ok)throw new Error(res.message||'온라인 폴더 목록을 불러오지 못했어.');
-  const map=new Map();
+ const map=new Map();
+  const fileCounts=new Map();
+  const folderMaxUnits=new Map();
+  function countFileForFolder(path){
+   const normalized=normalizeDriveFolderPath(path);
+   if(!normalized)return;
+   const parts=normalized.split('/').filter(Boolean);
+   for(let i=0;i<parts.length;i++){
+    const folderPath=parts.slice(0,i+1).join('/');
+    fileCounts.set(folderPath,(fileCounts.get(folderPath)||0)+1);
+   }
+  }
+  function countUnitForFolder(path,fileName){
+   const unitEnd=inferFileUnitEnd(fileName);
+   if(!unitEnd)return;
+   const normalized=normalizeDriveFolderPath(path);
+   if(!normalized)return;
+   const parts=normalized.split('/').filter(Boolean);
+   for(let i=0;i<parts.length;i++){
+    const folderPath=parts.slice(0,i+1).join('/');
+    folderMaxUnits.set(folderPath,Math.max(folderMaxUnits.get(folderPath)||0,unitEnd));
+   }
+  }
   (res.folders||[]).forEach(folder=>{
    const path=normalizeDriveFolderPath(folder.folderPath||folder.path||'');
-   if(!path)return;
-   const key=path;
-   if(!map.has(key))map.set(key,{name:path,label:driveFolderDisplay(folder.scope,path)});
+   addDriveFolderOption(map,folder.scope,path);
   });
   (res.files||[]).forEach(file=>{
    const path=normalizeDriveFolderPath(file.folderPath||'');
+   countFileForFolder(path);
+   countUnitForFolder(path,file.name||file.label||'');
+   addDriveFolderOption(map,file.scope,path);
    if(!path)return;
    const parts=path.split('/').filter(Boolean);
    for(let i=0;i<parts.length;i++){
     const folderPath=parts.slice(0,i+1).join('/');
-    if(!map.has(folderPath))map.set(folderPath,{name:folderPath,label:driveFolderDisplay(file.scope,folderPath)});
+    addDriveFolderOption(map,file.scope,folderPath);
    }
   });
-  [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'ko',{numeric:true,sensitivity:'base'})).forEach(folder=>rememberFolderOption(folder.name,null,null,null,folder.label));
+  const savedSettings=settingsState();
+  [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'ko',{numeric:true,sensitivity:'base'})).forEach(folder=>{
+   const count=fileCounts.get(folder.name)||0;
+   const maxUnit=folderMaxUnits.get(folder.name)||0;
+   const total=maxUnit||count;
+   rememberFolderOption(folder.name,total||null,total?1:null,total?'강':null,folder.label);
+   if(total&&!DEFAULT_FOLDERS.some(base=>base.name===folder.name)){
+    savedSettings[folder.name]={...(savedSettings[folder.name]||{}),total,size:1,unitLabel:'강'};
+   }
+  });
+  saveSettingsState(savedSettings);
   const current=folderName();
   renderFolderSelect(current);
+  loadFolderSettings();
+  renderWeeks();
   if(!options.silent)setCloudStatus(map.size?`온라인 폴더 ${map.size}개를 불러왔어.`:'온라인 폴더가 없어.');
   return map.size>0;
  }catch(e){
@@ -351,8 +412,9 @@ function init(){
  document.getElementById('onlinePassword').value=cred.password;
  updateCloudSummary();
  if(cred.user&&cred.password)toggleCloudForm(false);
+ if(cred.user&&cred.password)setCloudStatus('온라인 폴더 전체 불러오는 중...');
  renderWeeks();
- if(cred.user&&cred.password)loadDriveFolders({silent:true});
+ if(cred.user&&cred.password)loadDriveFolders({silent:false});
 }
 init();
 </script>
