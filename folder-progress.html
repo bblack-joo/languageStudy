@@ -89,6 +89,7 @@ select{border:1px solid var(--border);border-radius:8px;padding:8px 9px;font-siz
       <label>폴더 <select id="folderSelect" onchange="selectFolder(this.value)"></select></label>
       <label>새 폴더 <input id="folderNameInput" type="text" placeholder="폴더 이름"></label>
       <button type="button" onclick="addCustomFolder()">추가/적용</button>
+      <button type="button" class="ghost" onclick="loadDriveFolders()">온라인 폴더 전체 불러오기</button>
       <button type="button" class="ghost small" onclick="setFolderPreset('Grammar In Use',142,4,'강')">Grammar In Use</button>
       <button type="button" class="ghost small" onclick="setFolderPreset('오픽의 신',40,1,'Unit')">오픽의 신</button>
       <label>회독 <input id="roundInput" type="number" min="1" value="1" onchange="changeRound()"></label>
@@ -113,8 +114,8 @@ const CLOUD_SCRIPT_URL='https://script.google.com/macros/s/AKfycbyIAKLQzz9l-g2aB
 const SETTINGS_KEY='rr_folder_progress_settings_v1';
 const FOLDER_OPTIONS_KEY='rr_folder_progress_options_v1';
 const DEFAULT_FOLDERS=[
- {name:'Grammar In Use',total:142,size:4,unitLabel:'강'},
- {name:'오픽의 신',total:40,size:1,unitLabel:'Unit'}
+ {name:'Grammar In Use',label:'Grammar In Use',total:142,size:4,unitLabel:'강'},
+ {name:'오픽의 신',label:'오픽의 신',total:40,size:1,unitLabel:'Unit'}
 ];
 function safeDecode(value){try{return decodeURIComponent(String(value||'').replace(/\+/g,' '));}catch(e){return String(value||'');}}
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
@@ -128,15 +129,22 @@ function settingsState(){try{return JSON.parse(localStorage.getItem(SETTINGS_KEY
 function saveSettingsState(data){localStorage.setItem(SETTINGS_KEY,JSON.stringify(data||{}));}
 function folderOptions(){try{return JSON.parse(localStorage.getItem(FOLDER_OPTIONS_KEY)||'[]')||[];}catch(e){return [];}}
 function saveFolderOptions(options){localStorage.setItem(FOLDER_OPTIONS_KEY,JSON.stringify(options||[]));}
+function inferFolderDefaults(name){
+ const normalized=String(name||'').toLowerCase();
+ if(normalized.includes('grammar'))return {total:142,size:4,unitLabel:'강'};
+ if(String(name||'').includes('오픽'))return {total:40,size:1,unitLabel:'Unit'};
+ return {total:40,size:1,unitLabel:'개'};
+}
 function presetForFolder(name){
  return DEFAULT_FOLDERS.find(folder=>folder.name===name)||folderOptions().find(folder=>folder.name===name)||null;
 }
-function rememberFolderOption(name,total=null,size=null,unitLabel=null){
+function rememberFolderOption(name,total=null,size=null,unitLabel=null,label=''){
  const clean=String(name||'').trim();
  if(!clean)return;
  const options=folderOptions().filter(folder=>folder.name!==clean);
  const preset=DEFAULT_FOLDERS.find(folder=>folder.name===clean)||{};
- options.push({name:clean,total:total||preset.total||Number(document.getElementById('totalUnitInput')?.value||1),size:size||preset.size||Number(document.getElementById('weekSizeInput')?.value||1),unitLabel:unitLabel||preset.unitLabel||document.getElementById('unitLabelInput')?.value||'강'});
+ const inferred=inferFolderDefaults(clean);
+ options.push({name:clean,label:label||preset.label||clean,total:total||preset.total||inferred.total||Number(document.getElementById('totalUnitInput')?.value||1),size:size||preset.size||inferred.size||Number(document.getElementById('weekSizeInput')?.value||1),unitLabel:unitLabel||preset.unitLabel||inferred.unitLabel||document.getElementById('unitLabelInput')?.value||'강'});
  saveFolderOptions(options);
 }
 function renderFolderSelect(selectedName=''){
@@ -148,7 +156,7 @@ function renderFolderSelect(selectedName=''){
   seen.add(folder.name);
   return true;
  });
- select.innerHTML=list.map(folder=>`<option value="${escapeAttr(folder.name)}">${escapeHtml(folder.name)}</option>`).join('');
+ select.innerHTML=list.map(folder=>`<option value="${escapeAttr(folder.name)}">${escapeHtml(folder.label||folder.name)}</option>`).join('');
  const target=selectedName||select.value||list[0]?.name||'Grammar In Use';
  if(!seen.has(target)){
   rememberFolderOption(target);
@@ -241,8 +249,50 @@ function onlineJsonp(action,queryParams={}){
   window[callback]=(data)=>{cleanup();resolve(data||{});};
   script.onerror=()=>{cleanup();reject(new Error('구글 시트에 연결하지 못했어.'));};
   script.src=CLOUD_SCRIPT_URL+'?'+query.toString();
-  document.body.appendChild(script);
+ document.body.appendChild(script);
  });
+}
+function normalizeDriveFolderPath(path){return String(path||'').replace(/\\/g,'/').replace(/^\/+|\/+$/g,'').trim();}
+function driveFolderDisplay(scope,path){
+ const label=normalizeDriveFolderPath(path)||'최상위';
+ return scope?`[${scope}] ${label}`:label;
+}
+async function loadDriveFolders(options={}){
+ const cred=credentials();
+ if(!cred.user||!cred.password){
+  if(!options.silent)alert('아이디와 비밀번호를 먼저 입력해줘.');
+  return false;
+ }
+ rememberCredentials();
+ if(!options.silent)setCloudStatus('온라인 폴더 목록 불러오는 중...');
+ try{
+  const res=await onlineJsonp('listFiles',cred);
+  if(!res.ok)throw new Error(res.message||'온라인 폴더 목록을 불러오지 못했어.');
+  const map=new Map();
+  (res.folders||[]).forEach(folder=>{
+   const path=normalizeDriveFolderPath(folder.folderPath||folder.path||'');
+   if(!path)return;
+   const key=path;
+   if(!map.has(key))map.set(key,{name:path,label:driveFolderDisplay(folder.scope,path)});
+  });
+  (res.files||[]).forEach(file=>{
+   const path=normalizeDriveFolderPath(file.folderPath||'');
+   if(!path)return;
+   const parts=path.split('/').filter(Boolean);
+   for(let i=0;i<parts.length;i++){
+    const folderPath=parts.slice(0,i+1).join('/');
+    if(!map.has(folderPath))map.set(folderPath,{name:folderPath,label:driveFolderDisplay(file.scope,folderPath)});
+   }
+  });
+  [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'ko',{numeric:true,sensitivity:'base'})).forEach(folder=>rememberFolderOption(folder.name,null,null,null,folder.label));
+  const current=folderName();
+  renderFolderSelect(current);
+  if(!options.silent)setCloudStatus(map.size?`온라인 폴더 ${map.size}개를 불러왔어.`:'온라인 폴더가 없어.');
+  return map.size>0;
+ }catch(e){
+  if(!options.silent)setCloudStatus(e.message||'온라인 폴더 목록 오류');
+  return false;
+ }
 }
 async function loadCloudProgress(){
  const cred=credentials();
@@ -302,6 +352,7 @@ function init(){
  updateCloudSummary();
  if(cred.user&&cred.password)toggleCloudForm(false);
  renderWeeks();
+ if(cred.user&&cred.password)loadDriveFolders({silent:true});
 }
 init();
 </script>
