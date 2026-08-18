@@ -24,6 +24,8 @@ h1{font-size:23px;font-weight:800;margin:6px 0 16px;letter-spacing:-.2px}
 .brand{margin:4px 0 20px}
 .brand-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .brand-title{font-size:36px;font-weight:900;letter-spacing:-.8px;margin:0;line-height:1;display:inline-flex}
+.brand-title-link{display:inline-flex;text-decoration:none;background:transparent;border:0;padding:0;margin:0}
+.brand-title-link:hover{filter:brightness(.96)}
 .brand-repeat-1{color:var(--primary)}
 .brand-repeat-2{color:var(--filter)}
 .brand-tagline{font-size:13px;color:var(--text-muted);font-weight:700;margin-top:7px;letter-spacing:.03em}
@@ -308,7 +310,7 @@ tr.only-forget-hidden{display:none!important}
 <div class="wrap">
 <div class="brand">
   <div class="brand-head">
-    <h1 class="brand-title"><span class="brand-repeat-1">Repeat</span><span class="brand-repeat-2">Repeat</span></h1>
+    <h1 class="brand-title"><a class="brand-title-link" href="repeat-repeat-v2.html" aria-label="메인 페이지"><span class="brand-repeat-1">Repeat</span><span class="brand-repeat-2">Repeat</span></a></h1>
     <span style="display:inline-flex;align-items:center;gap:10px"><a class="brand-link" href="https://bblack-joo.github.io/opicSetPractice/" target="_blank" rel="noopener">시험모드↗</a><button type="button" class="secondary small" id="managerModeToggleBtn" onclick="toggleManagerMode()">관리 모드</button></span>
   </div>
   <div class="brand-quick-links">
